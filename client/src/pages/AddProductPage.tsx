@@ -61,7 +61,7 @@ export default function AddProductPage() {
   }
 
   function validate(): string | null {
-    if (!files.length) return t.errImageRequired ?? t.emptyImg;
+    if (!files.length) return t.emptyImg;
     if (!draft.titleRaw.trim()) return t.errTitleRequired;
     if (!draft.priceAmount.trim()) return t.errPriceRequired;
     if (!draft.colorRaw.trim()) return t.errColorRequired;
