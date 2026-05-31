@@ -121,6 +121,9 @@ export const COPY = {
     deleteCancel: "Vazgeç",
     deleted: "Ürün silindi.",
     // Auth
+    loginAdminLabel: "Admin Giriş Paneli",
+    loginDeveloper: "Geliştirici",
+    loginDeveloperName: "Abdurrahman El Shawaf",
     accessIntro: "Devam etmek için authenticator uygulamasındaki 6 haneli kodu gir.",
     accessCode: "Doğrulama kodu",
     codePlaceholder: "6 haneli kod",
@@ -311,6 +314,9 @@ export const COPY = {
     deleteCancel: "إلغاء",
     deleted: "تم حذف المنتج.",
     // Auth
+    loginAdminLabel: "لوحة تحكم المدير",
+    loginDeveloper: "المطور",
+    loginDeveloperName: "عبد الرحمن الشواف",
     accessIntro: "أدخلي الرمز المكون من 6 أرقام من تطبيق المصادقة للمتابعة.",
     accessCode: "رمز التحقق",
     codePlaceholder: "الرمز المكون من 6 أرقام",
