@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArchiveRestore, Box, Palette, Ruler, ShoppingBag, Tag } from "lucide-react";
+import { ArchiveRestore, Box, CalendarDays, Images, Palette, Ruler, ShoppingBag, Tag } from "lucide-react";
 import { updateStatus } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -46,13 +46,38 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className={cn("line-clamp-2 text-sm font-extrabold leading-5", s.title)}>
-            {p.germanTitleSuggestion || p.titleRaw || record.folderName}
-          </h3>
-          <p className={cn("mt-1 text-xs", s.muted)}>
-            {new Date(record.createdAt).toLocaleDateString(dateLocale)} · {t.imageCount(record.images.length)}
-          </p>
+        <div className="min-w-0 flex-1">
+          {/* Almanca ad — ana başlık */}
+          {p.germanTitleSuggestion && (
+            <h3 className={cn("line-clamp-1 text-sm font-extrabold leading-5", s.title)}>
+              {p.germanTitleSuggestion}
+            </h3>
+          )}
+          {/* Orijinal ad — ikincil */}
+          {p.titleRaw && (
+            <p className={cn(
+              "line-clamp-1 text-xs font-semibold leading-5",
+              p.germanTitleSuggestion ? s.muted : cn(s.title, "font-extrabold text-sm"),
+            )} dir="auto">
+              {p.titleRaw}
+            </p>
+          )}
+          {/* Hiçbiri yoksa klasör adı */}
+          {!p.germanTitleSuggestion && !p.titleRaw && (
+            <h3 className={cn("line-clamp-1 text-sm font-extrabold", s.muted)}>{record.folderName}</h3>
+          )}
+          {/* Tarih + görsel sayısı — renkli badge'ler */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400">
+              <CalendarDays className="size-3" />
+              {new Date(record.createdAt).toLocaleDateString(dateLocale)}
+            </span>
+            <span className={cn("text-[11px]", s.muted)}>·</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400">
+              <Images className="size-3" />
+              {record.images.length}
+            </span>
+          </div>
           <div className="mt-2 flex flex-wrap gap-1">
             <span className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ring-1", s.pill)}>
               <Box className="size-3" />
