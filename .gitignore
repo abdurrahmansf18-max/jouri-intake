@@ -1,0 +1,38 @@
+# Environment — hassas bilgiler
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.npm
+
+# Frontend build
+client/dist/
+
+# Product images — büyük medya, git'e eklenmez
+../products_photo/
+
+# Docker
+*.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
