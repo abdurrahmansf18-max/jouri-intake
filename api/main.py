@@ -1,9 +1,12 @@
 import json
 import os
+import secrets
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Annotated
 
+import pyotp
 from fastapi import Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -28,9 +31,35 @@ from models import (
 )
 from parser import parse_description
 
-ACCESS_CODE = os.environ.get("INTAKE_ACCESS_CODE", "").strip()
+TOTP_SECRET = os.environ.get("TOTP_SECRET", "").strip()
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
-AUTH_COOKIE_NAME = "jouri_access_code"
+AUTH_COOKIE_NAME = "jouri_session"
+SESSION_TTL = 60 * 60 * 24 * 7  # 7 gün
+
+# Bellek içi oturum deposu: {token: oluşturulma_zamanı}
+_sessions: dict[str, float] = {}
+
+
+def _create_session() -> str:
+    token = secrets.token_urlsafe(32)
+    _sessions[token] = time.time()
+    # Süresi dolmuş oturumları temizle
+    expired = [t for t, ts in list(_sessions.items()) if time.time() - ts > SESSION_TTL]
+    for t in expired:
+        _sessions.pop(t, None)
+    return token
+
+
+def _is_valid_session(token: str | None) -> bool:
+    if not token:
+        return False
+    ts = _sessions.get(token)
+    if ts is None:
+        return False
+    if time.time() - ts > SESSION_TTL:
+        _sessions.pop(token, None)
+        return False
+    return True
 
 
 # ── Startup helpers (defined before lifespan so they are in scope) ────────────
@@ -137,27 +166,12 @@ app.add_middleware(
 # ── Auth guard ────────────────────────────────────────────────────────────────
 
 def verify_access(
-    response: Response,
-    x_access_code: Annotated[str | None, Header()] = None,
-    code: Annotated[str | None, Query()] = None,
-    jouri_access_code: Annotated[str | None, Cookie()] = None,
+    jouri_session: Annotated[str | None, Cookie()] = None,
 ):
-    if not ACCESS_CODE:
-        return
-    if (
-        x_access_code != ACCESS_CODE
-        and code != ACCESS_CODE
-        and jouri_access_code != ACCESS_CODE
-    ):
+    if not TOTP_SECRET:
+        return  # Auth yapılandırılmamış, serbest
+    if not _is_valid_session(jouri_session):
         raise HTTPException(status_code=401, detail={"code": "ERR_UNAUTHORIZED"})
-    if x_access_code == ACCESS_CODE or code == ACCESS_CODE:
-        response.set_cookie(
-            AUTH_COOKIE_NAME,
-            ACCESS_CODE,
-            httponly=True,
-            samesite="lax",
-            secure=COOKIE_SECURE,
-        )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -206,23 +220,26 @@ def _get_or_404(db: Session, product_id: str) -> Product:
 
 @app.post("/api/auth/verify")
 def auth_verify(body: AuthRequest, response: Response):
-    if not ACCESS_CODE:
+    if not TOTP_SECRET:
         return {"ok": True}
-    if body.code != ACCESS_CODE:
+    totp = pyotp.TOTP(TOTP_SECRET)
+    if not totp.verify(body.code.strip(), valid_window=1):
         raise HTTPException(status_code=401, detail={"code": "ERR_WRONG_CODE"})
+    token = _create_session()
     response.set_cookie(
         AUTH_COOKIE_NAME,
-        ACCESS_CODE,
+        token,
         httponly=True,
         samesite="lax",
         secure=COOKIE_SECURE,
+        max_age=SESSION_TTL,
     )
     return {"ok": True}
 
 
 @app.get("/api/auth/required")
 def auth_required():
-    return {"required": bool(ACCESS_CODE)}
+    return {"required": bool(TOTP_SECRET)}
 
 
 # ── Products ──────────────────────────────────────────────────────────────────

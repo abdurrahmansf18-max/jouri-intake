@@ -1,22 +1,12 @@
 import type { ActivityLog, ParsedProduct, ProductRecord, ProductStatus } from "./types";
 
-const CODE_KEY = "jouri_access_code";
-
-export function getStoredCode(): string {
-  return localStorage.getItem(CODE_KEY) ?? "";
-}
-
-export function storeCode(code: string) {
-  localStorage.setItem(CODE_KEY, code);
-}
-
-export function clearCode() {
-  localStorage.removeItem(CODE_KEY);
-}
+// Kimlik doğrulama artık session cookie ile yapılıyor (TOTP)
+export function getStoredCode(): string { return ""; }
+export function storeCode(_code: string) {}
+export function clearCode() {}
 
 function headers(extra?: Record<string, string>): Record<string, string> {
-  const code = getStoredCode();
-  return { ...(code ? { "X-Access-Code": code } : {}), ...extra };
+  return { ...extra };
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
