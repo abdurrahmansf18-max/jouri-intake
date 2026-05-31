@@ -57,68 +57,69 @@ export default function BackupPage() {
     }
   }
 
-  const hasStatus = status.last_run;
+  const hasStatus = !!status.last_run;
 
   return (
     <div className="grid gap-5">
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.backupTitle}</h1>
         <button
           type="button"
           onClick={load}
           disabled={loading}
-          className={cn("inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition", s.controlGroup, s.controlIdle)}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
+            s.controlGroup, s.controlIdle
+          )}
         >
           <RefreshCw className={cn("size-4", loading && "animate-spin")} />
-          {loading ? t.loading : locale === "ar" ? "تحديث" : "Yenile"}
+          {t.backupRefresh}
         </button>
       </div>
 
-      {/* Status cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Status cards — 2 col on mobile, 4 on large */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+
         {/* Last backup */}
-        <div className={cn("rounded-xl border p-4", s.panel)}>
-          <div className={cn("flex items-center gap-2 text-xs font-bold mb-2", s.muted)}>
-            <Clock className="size-4" />
+        <div className={cn("col-span-2 rounded-xl border p-4 sm:col-span-1", s.panel)}>
+          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
+            <Clock className="size-3.5 shrink-0" />
             {t.backupLastRun}
           </div>
-          <div className={cn("text-sm font-extrabold", s.title)}>
+          <div className={cn("text-sm font-extrabold leading-5", s.title)}>
             {hasStatus
               ? new Date(status.last_run!).toLocaleString(dateLocale)
               : t.backupNever}
           </div>
-          <div className={cn("mt-1 text-xs", s.muted)}>{t.backupSchedule}</div>
+          <div className={cn("mt-1.5 text-xs leading-4", s.muted)}>{t.backupSchedule}</div>
         </div>
 
         {/* DB size */}
         <div className={cn("rounded-xl border p-4", s.panel)}>
-          <div className={cn("flex items-center gap-2 text-xs font-bold mb-2", s.muted)}>
-            <Database className="size-4" />
+          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
+            <Database className="size-3.5 shrink-0" />
             {t.backupDb}
           </div>
-          <div className={cn("text-lg font-black text-violet-400")}>
-            {status.last_db_size ?? "-"}
-          </div>
+          <div className="text-xl font-black text-violet-400">{status.last_db_size ?? "-"}</div>
           <div className={cn("mt-1 text-xs", s.muted)}>{t.backupLocalStorage}</div>
         </div>
 
         {/* Images size */}
         <div className={cn("rounded-xl border p-4", s.panel)}>
-          <div className={cn("flex items-center gap-2 text-xs font-bold mb-2", s.muted)}>
-            <Images className="size-4" />
+          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
+            <Images className="size-3.5 shrink-0" />
             {t.backupImages}
           </div>
-          <div className={cn("text-lg font-black text-sky-400")}>
-            {status.last_img_size ?? "-"}
-          </div>
+          <div className="text-xl font-black text-sky-400">{status.last_img_size ?? "-"}</div>
           <div className={cn("mt-1 text-xs", s.muted)}>{t.backupLocalStorage}</div>
         </div>
 
         {/* Drive status */}
         <div className={cn("rounded-xl border p-4", s.panel)}>
-          <div className={cn("flex items-center gap-2 text-xs font-bold mb-2", s.muted)}>
-            <CloudUpload className="size-4" />
+          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
+            <CloudUpload className="size-3.5 shrink-0" />
             {t.backupDrive}
           </div>
           <div className="flex items-center gap-2">
@@ -135,11 +136,12 @@ export default function BackupPage() {
           </div>
           <div className={cn("mt-1 text-xs", s.muted)}>{t.backupDriveStorage}</div>
         </div>
+
       </div>
 
       {/* Backup list */}
       <div className={cn("rounded-xl border", s.panel)}>
-        <div className={cn("flex items-center justify-between px-5 py-4 border-b", s.panelBorder)}>
+        <div className={cn("flex items-center justify-between px-4 py-4 border-b sm:px-5", s.panelBorder)}>
           <h2 className={cn("text-base font-extrabold", s.title)}>{t.backupAvailable}</h2>
           <span className={cn("text-sm font-black", s.muted)}>{backups.length}</span>
         </div>
@@ -154,45 +156,48 @@ export default function BackupPage() {
             <p className={cn("text-sm font-semibold", s.muted)}>{t.backupEmpty}</p>
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: "transparent" }}>
+          <div>
             {backups.map((b) => (
               <div
                 key={b.date}
-                className={cn("flex items-center gap-4 px-5 py-4 border-b last:border-b-0", s.panelBorder)}
+                className={cn(
+                  "flex flex-wrap items-center gap-3 px-4 py-4 border-b last:border-b-0 sm:px-5 sm:flex-nowrap",
+                  s.panelBorder
+                )}
               >
-                {/* Date */}
+                {/* Date — full width on mobile */}
                 <div className="flex-1 min-w-0">
                   <div className={cn("text-sm font-extrabold", s.title)}>{b.date}</div>
                 </div>
 
-                {/* DB */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Database className={cn("size-3.5", s.muted)} />
-                  <span className={cn("text-xs font-bold", s.muted)}>{b.db_size}</span>
+                {/* Sizes — side by side */}
+                <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <Database className={cn("size-3.5", s.muted)} />
+                    <span className={cn("text-xs font-bold", s.muted)}>{b.db_size}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Images className={cn("size-3.5", s.muted)} />
+                    <span className={cn("text-xs font-bold", s.muted)}>{b.img_size}</span>
+                  </div>
                 </div>
 
-                {/* Images */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Images className={cn("size-3.5", s.muted)} />
-                  <span className={cn("text-xs font-bold", s.muted)}>{b.img_size}</span>
-                </div>
-
-                {/* Delete */}
+                {/* Delete button */}
                 <button
                   type="button"
                   onClick={() => handleDelete(b.date)}
                   disabled={deleting === b.date}
                   className={cn(
-                    "inline-flex size-8 shrink-0 items-center justify-center rounded-lg border transition",
-                    s.error,
-                    "opacity-60 hover:opacity-100"
+                    "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5",
+                    "text-xs font-extrabold transition shrink-0",
+                    s.error, "opacity-70 hover:opacity-100 disabled:opacity-40"
                   )}
-                  title={locale === "ar" ? "حذف" : "Sil"}
                 >
                   {deleting === b.date
                     ? <Loader2 className="size-3.5 animate-spin" />
                     : <Trash2 className="size-3.5" />
                   }
+                  <span className="hidden sm:inline">{t.backupDelete}</span>
                 </button>
               </div>
             ))}
@@ -200,19 +205,19 @@ export default function BackupPage() {
         )}
       </div>
 
-      {/* Info */}
-      <div className={cn("rounded-xl border p-4 text-sm", s.subPanel)}>
-        <div className={cn("font-extrabold mb-2", s.title)}>
-          {locale === "ar" ? "كيف يعمل النسخ الاحتياطي؟" : "Yedekleme nasıl çalışır?"}
-        </div>
-        <div className={cn("grid gap-1.5 text-xs leading-5", s.muted)}>
-          <div>• {locale === "ar" ? "كل ليلة الساعة 02:00 يعمل تلقائياً" : "Her gece 02:00'de otomatik çalışır"}</div>
-          <div>• {locale === "ar" ? "قاعدة البيانات: كل المنتجات والمبيعات والسجلات" : "Veritabanı: tüm ürünler, satışlar, loglar"}</div>
-          <div>• {locale === "ar" ? "الصور: نسخ تدريجي (الملفات الجديدة فقط)" : "Görseller: artımlı kopyalama (sadece yeni dosyalar)"}</div>
-          <div>• {locale === "ar" ? "يُرفع إلى Google Drive تلقائياً" : "Google Drive'a otomatik yüklenir"}</div>
-          <div>• {locale === "ar" ? "يُحذف تلقائياً بعد 30 يوماً" : "30 günden eski yedekler otomatik silinir"}</div>
-        </div>
+      {/* How it works info box */}
+      <div className={cn("rounded-xl border p-4", s.subPanel)}>
+        <div className={cn("font-extrabold mb-3 text-sm", s.title)}>{t.backupHowTitle}</div>
+        <ul className={cn("grid gap-2 text-xs leading-5", s.muted)}>
+          {[t.backupHow1, t.backupHow2, t.backupHow3, t.backupHow4, t.backupHow5].map((item) => (
+            <li key={item} className="flex items-start gap-2">
+              <span className="mt-1.5 size-1.5 rounded-full bg-violet-400 shrink-0" />
+              {item}
+            </li>
+          ))}
+        </ul>
       </div>
+
     </div>
   );
 }
