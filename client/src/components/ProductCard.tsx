@@ -78,22 +78,25 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
               {record.images.length}
             </span>
           </div>
+          {/* Stok — yeşil */}
           <div className="mt-2 flex flex-wrap gap-1">
-            <span className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ring-1", s.pill)}>
+            <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/25">
               <Box className="size-3" />
               {t.activeStock(record.stockQuantity)}
             </span>
             {record.soldQuantity > 0 && (
-              <span className={cn("inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ring-1", s.pill)}>
+              <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/25">
                 <ShoppingBag className="size-3" />
                 {record.soldQuantity}
               </span>
             )}
           </div>
         </div>
+
+        {/* Fiyat + durum badge'i */}
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           {p.priceAmount && (
-            <span className={cn("rounded-lg border px-2 py-1 text-xs font-black", s.success)}>
+            <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-xs font-black text-emerald-300">
               {p.priceAmount} {p.currency}
             </span>
           )}
@@ -103,21 +106,21 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
         </div>
       </div>
 
-      {/* Tags */}
+      {/* Tags — her biri farklı renk */}
       {(p.categorySuggestion || p.colorRaw || p.sizesRaw) && (
         <div className="mt-2 flex flex-wrap gap-1">
           {p.categorySuggestion && (
-            <span className={cn("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ring-1", s.pill)}>
+            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold bg-violet-400/10 text-violet-300 ring-1 ring-violet-400/25">
               <Tag className="size-3" /> {p.categorySuggestion}
             </span>
           )}
           {p.colorRaw && (
-            <span className={cn("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ring-1", s.pill)}>
+            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold bg-fuchsia-400/10 text-fuchsia-300 ring-1 ring-fuchsia-400/25">
               <Palette className="size-3" /> {p.colorRaw}
             </span>
           )}
           {p.sizesRaw && (
-            <span className={cn("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ring-1", s.pill)}>
+            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold bg-sky-400/10 text-sky-300 ring-1 ring-sky-400/25">
               <Ruler className="size-3" /> {p.sizesRaw}
             </span>
           )}
@@ -135,8 +138,8 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
             className={cn(
               "rounded-lg border px-2.5 py-1 text-[11px] font-extrabold transition disabled:opacity-50",
               record.status === status
-                ? statusBadge(status, s)
-                : cn(s.controlGroup, s.controlIdle, "cursor-pointer hover:opacity-80"),
+                ? statusActiveBadge(status, s)
+                : cn(statusBadge(status, s), "cursor-pointer opacity-50 hover:opacity-100"),
             )}
           >
             {statusLabel(status, locale)}
@@ -170,4 +173,11 @@ export function statusBadge(status: ProductStatus, s: ThemeStyles) {
   if (status === "ai_enhanced")  return s.statusAiEnhanced;
   if (status === "published")    return s.statusPublished;
   return s.statusSoldArchive;
+}
+
+export function statusActiveBadge(status: ProductStatus, s: ThemeStyles) {
+  if (status === "pending")      return s.statusPendingActive;
+  if (status === "ai_enhanced")  return s.statusAiEnhancedActive;
+  if (status === "published")    return s.statusPublishedActive;
+  return s.statusSoldArchiveActive;
 }

@@ -10,6 +10,22 @@ import ProductDetail from "../components/ProductDetail";
 
 const FILTERS: StatusFilter[] = ["all", "pending", "ai_enhanced", "published"];
 
+// Arapça hareke + elif varyantları + Almanca/Latin aksan normalizasyonu
+function norm(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")       // Latin aksan işaretleri (ä→a, ö→o, ü→u)
+    .replace(/[ً-ٰٟ]/g, "") // Arapça hareke (تشكيل)
+    .replace(/[أإآٱ]/g, "ا")              // Elif varyantları
+    .replace(/[ىئ]/g, "ي")               // Ya varyantları
+    .replace(/ة/g, "ه")                  // Te merbuta
+    .toLocaleLowerCase();
+}
+
+function normalizeSearch(q: string): string[] {
+  return norm(q).split(/\s+/).filter(Boolean);
+}
+
 export default function ProductsPage() {
   const { locale, theme } = useApp();
   const t = COPY[locale];
@@ -37,14 +53,17 @@ export default function ProductsPage() {
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLocaleLowerCase();
+    const tokens = normalizeSearch(search);
     return records.filter((r) => {
       if (filter !== "all" && r.status !== filter) return false;
-      if (!q) return true;
+      if (tokens.length === 0) return true;
       const p = r.parsed;
-      return [p.titleRaw, p.germanTitleSuggestion, p.categorySuggestion, p.colorRaw,
-              p.sizesRaw, p.priceAmount, r.notes, r.folderName]
-        .join(" ").toLocaleLowerCase().includes(q);
+      const haystack = norm([
+        p.titleRaw, p.germanTitleSuggestion, p.categorySuggestion,
+        p.colorRaw, p.sizesRaw, p.priceAmount, p.productTypeSuggestion,
+        r.notes, r.folderName, r.description,
+      ].join(" "));
+      return tokens.every((tok) => haystack.includes(tok));
     });
   }, [records, filter, search]);
 

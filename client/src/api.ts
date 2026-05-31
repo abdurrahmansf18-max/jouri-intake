@@ -37,6 +37,11 @@ export async function isAuthRequired(): Promise<boolean> {
   return data.required;
 }
 
+export async function checkAuth(): Promise<boolean> {
+  const res = await fetch("/api/auth/check");
+  return res.ok;
+}
+
 export async function fetchProducts(): Promise<ProductRecord[]> {
   const res = await fetch("/api/products", { headers: headers() });
   return handleResponse<ProductRecord[]>(res);
@@ -142,6 +147,11 @@ export async function deleteProduct(productId: string): Promise<void> {
 export async function fetchLogs(limit = 50): Promise<ActivityLog[]> {
   const res = await fetch(`/api/logs?limit=${limit}`, { headers: headers() });
   return handleResponse<ActivityLog[]>(res);
+}
+
+export async function deleteLog(logId: number): Promise<void> {
+  const res = await fetch(`/api/logs/${logId}`, { method: "DELETE", headers: headers() });
+  await handleResponse(res);
 }
 
 export interface BackupEntry {

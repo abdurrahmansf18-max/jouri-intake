@@ -4,7 +4,7 @@ import secrets
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import pyotp
@@ -243,6 +243,11 @@ def auth_required():
     return {"required": bool(TOTP_SECRET)}
 
 
+@app.get("/api/auth/check")
+def auth_check(_: Annotated[None, Depends(verify_access)]):
+    return {"authed": True}
+
+
 # ── Products ──────────────────────────────────────────────────────────────────
 
 @app.get("/api/products", response_model=list[ProductRecord])
@@ -382,27 +387,47 @@ def update_product(
 ):
     p = _get_or_404(db, product_id)
 
+    # Değişiklikleri takip et
+    changes: dict[str, dict] = {}
+
+    def track(field: str, old_val, new_val):
+        if new_val is not None and str(old_val) != str(new_val):
+            changes[field] = {"from": str(old_val), "to": str(new_val)}
+
     if body.notes is not None:
+        track("notes", p.notes, body.notes)
         p.notes = body.notes
     if body.stockQuantity is not None:
+        track("stock", p.stock_quantity, max(0, int(body.stockQuantity)))
         p.stock_quantity = max(0, int(body.stockQuantity))
     if body.parsed:
         pd = body.parsed
-        if pd.titleRaw is not None: p.title_raw = pd.titleRaw
-        if pd.germanTitleSuggestion is not None: p.german_title = pd.germanTitleSuggestion
-        if pd.categorySuggestion is not None: p.category = pd.categorySuggestion
-        if pd.productTypeSuggestion is not None: p.product_type = pd.productTypeSuggestion
-        if pd.priceAmount is not None: p.price_amount = pd.priceAmount
-        if pd.currency is not None: p.currency = pd.currency
-        if pd.colorRaw is not None: p.color_raw = pd.colorRaw
-        if pd.colorGermanSuggestion is not None: p.color_german = pd.colorGermanSuggestion
-        if pd.sizesRaw is not None: p.sizes_raw = pd.sizesRaw
-        if pd.tags is not None: p.tags = pd.tags
+        if pd.titleRaw is not None:
+            track("title", p.title_raw, pd.titleRaw); p.title_raw = pd.titleRaw
+        if pd.germanTitleSuggestion is not None:
+            track("german_title", p.german_title, pd.germanTitleSuggestion); p.german_title = pd.germanTitleSuggestion
+        if pd.categorySuggestion is not None:
+            track("category", p.category, pd.categorySuggestion); p.category = pd.categorySuggestion
+        if pd.productTypeSuggestion is not None:
+            track("product_type", p.product_type, pd.productTypeSuggestion); p.product_type = pd.productTypeSuggestion
+        if pd.priceAmount is not None:
+            track("price", p.price_amount, pd.priceAmount); p.price_amount = pd.priceAmount
+        if pd.currency is not None:
+            track("currency", p.currency, pd.currency); p.currency = pd.currency
+        if pd.colorRaw is not None:
+            track("color", p.color_raw, pd.colorRaw); p.color_raw = pd.colorRaw
+        if pd.colorGermanSuggestion is not None:
+            p.color_german = pd.colorGermanSuggestion
+        if pd.sizesRaw is not None:
+            track("size", p.sizes_raw, pd.sizesRaw); p.sizes_raw = pd.sizesRaw
+        if pd.tags is not None:
+            p.tags = pd.tags
 
     activity_logger.log(
         db, "update",
         product_id=p.id,
         product_title=p.title_raw or p.german_title,
+        details={"changed": changes} if changes else None,
     )
     db.commit()
     db.refresh(p)
@@ -636,6 +661,11 @@ def get_logs(
     db: Session = Depends(get_db),
     limit: int = Query(default=50, le=200),
 ):
+    # 30 günden eski logları otomatik sil
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+    db.query(ActivityLog).filter(ActivityLog.created_at < cutoff).delete()
+    db.commit()
+
     logs = (
         db.query(ActivityLog)
         .order_by(ActivityLog.created_at.desc())
@@ -653,3 +683,17 @@ def get_logs(
         }
         for log in logs
     ]
+
+
+@app.delete("/api/logs/{log_id}")
+def delete_log(
+    log_id: int,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    log = db.query(ActivityLog).filter(ActivityLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail={"code": "ERR_PRODUCT_NOT_FOUND"})
+    db.delete(log)
+    db.commit()
+    return {"ok": True}

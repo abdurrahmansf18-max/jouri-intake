@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   Activity,
   ArchiveIcon,
-  Bot,
   CheckCircle2,
   Clock,
   Images,
@@ -11,9 +10,8 @@ import {
   PackageX,
   ShoppingBag,
   Trash2,
-  UploadCloud,
 } from "lucide-react";
-import { fetchLogs, fetchProducts } from "../api";
+import { deleteLog, fetchLogs, fetchProducts } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, logActionLabel } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -27,6 +25,7 @@ export default function DashboardPage() {
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([fetchProducts(), fetchLogs(30)])
@@ -61,6 +60,32 @@ export default function DashboardPage() {
       return locale === "ar" ? `منذ ${h} ساعة` : `${h} sa önce`;
     }
     return new Date(iso).toLocaleDateString(dateLocale);
+  }
+
+  async function handleDeleteLog(id: number) {
+    setDeletingId(id);
+    try {
+      await deleteLog(id);
+      setLogs(prev => prev.filter(l => l.id !== id));
+    } catch { /* ignore */ } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function fieldLabel(field: string): string {
+    const map: Record<string, string> = {
+      title: t.logFieldTitle,
+      german_title: t.logFieldGermanTitle,
+      price: t.logFieldPrice,
+      color: t.logFieldColor,
+      size: t.logFieldSize,
+      stock: t.logFieldStock,
+      category: t.logFieldCategory,
+      product_type: t.logFieldProductType,
+      notes: t.logFieldNotes,
+      currency: t.logFieldCurrency,
+    };
+    return map[field] || field;
   }
 
   function actionIcon(action: string) {
@@ -126,29 +151,62 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="divide-y" style={{ borderColor: "transparent" }}>
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className={cn("flex items-start gap-3 px-5 py-3", s.panelBorder, "border-b last:border-b-0")}
-              >
-                <div className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg", s.subPanel)}>
-                  {actionIcon(log.action)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className={cn("text-sm font-bold", s.title)}>
-                    {logActionLabel(log.action, locale, log.details)}
+            {logs.map((log) => {
+              const changed = log.action === "update" && log.details?.changed
+                ? log.details.changed as Record<string, { from: string; to: string }>
+                : null;
+              return (
+                <div
+                  key={log.id}
+                  className={cn("flex items-start gap-3 px-5 py-3", s.panelBorder, "border-b last:border-b-0")}
+                >
+                  <div className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg", s.subPanel)}>
+                    {actionIcon(log.action)}
                   </div>
-                  {log.product_title && (
-                    <div className={cn("mt-0.5 truncate text-xs font-semibold", s.muted)}>
-                      {log.product_title}
+                  <div className="min-w-0 flex-1">
+                    <div className={cn("text-sm font-bold", s.title)}>
+                      {logActionLabel(log.action, locale, log.details)}
                     </div>
-                  )}
+                    {log.product_title && (
+                      <div className={cn("mt-0.5 truncate text-xs font-semibold", s.muted)}>
+                        {log.product_title}
+                      </div>
+                    )}
+                    {changed && Object.keys(changed).length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        <span className={cn("text-[10px] font-bold", s.muted)}>{t.logChanged}:</span>
+                        {Object.entries(changed).map(([field, ch]) => (
+                          <span
+                            key={field}
+                            className="inline-flex items-center gap-1 rounded-md bg-blue-400/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-300 ring-1 ring-blue-400/20"
+                          >
+                            {fieldLabel(field)}: <span className="line-through opacity-60">{ch.from}</span> → {ch.to}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span className={cn("text-xs font-semibold", s.muted)}>{timeAgo(log.created_at)}</span>
+                    <button
+                      type="button"
+                      title={t.logDeleteEntry}
+                      disabled={deletingId === log.id}
+                      onClick={() => handleDeleteLog(log.id)}
+                      className={cn(
+                        "flex size-6 items-center justify-center rounded-md transition hover:bg-red-400/15 hover:text-red-400",
+                        s.muted,
+                        deletingId === log.id && "opacity-40",
+                      )}
+                    >
+                      {deletingId === log.id
+                        ? <Loader2 className="size-3 animate-spin" />
+                        : <Trash2 className="size-3" />}
+                    </button>
+                  </div>
                 </div>
-                <div className={cn("shrink-0 text-xs font-semibold", s.muted)}>
-                  {timeAgo(log.created_at)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { clearCode, getStoredCode, isAuthRequired, storeCode, verifyCode } from "./api";
+import { checkAuth, clearCode, isAuthRequired, storeCode, verifyCode } from "./api";
 import { AppContext, useToastState } from "./context";
 import LoginGate from "./components/LoginGate";
 import AppLayout from "./layouts/AppLayout";
@@ -55,11 +55,8 @@ export default function App() {
         const required = await isAuthRequired();
         setAuthRequired(required);
         if (!required) { setAuthed(true); setChecking(false); return; }
-        const stored = getStoredCode();
-        if (stored) {
-          const ok = await verifyCode(stored);
-          if (ok) { storeCode(stored); setAuthed(true); }
-        }
+        const ok = await checkAuth();
+        if (ok) setAuthed(true);
       } catch { /* API not ready */ } finally {
         setChecking(false);
       }
