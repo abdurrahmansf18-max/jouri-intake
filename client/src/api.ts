@@ -144,6 +144,31 @@ export async function fetchLogs(limit = 50): Promise<ActivityLog[]> {
   return handleResponse<ActivityLog[]>(res);
 }
 
+export interface BackupEntry {
+  date: string;
+  db_size: string;
+  img_size: string;
+}
+
+export interface BackupStatus {
+  last_run?: string;
+  last_date?: string;
+  last_db_size?: string;
+  last_img_size?: string;
+  drive_ok?: boolean;
+  backups?: BackupEntry[];
+}
+
+export async function fetchBackups(): Promise<{ status: BackupStatus; backups: BackupEntry[] }> {
+  const res = await fetch("/api/backups", { headers: headers() });
+  return handleResponse(res);
+}
+
+export async function deleteBackup(date: string): Promise<void> {
+  const res = await fetch(`/api/backups/${date}`, { method: "DELETE", headers: headers() });
+  await handleResponse(res);
+}
+
 export function productImageUrl(
   productId: string,
   fileName: string,

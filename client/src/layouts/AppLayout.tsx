@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   ArchiveIcon,
+  HardDrive,
   LayoutDashboard,
   Languages,
   LogOut,
@@ -17,7 +18,7 @@ import type { Locale } from "../types";
 
 interface NavItem {
   to: string;
-  labelKey: "navDashboard" | "navAddProduct" | "navProducts" | "navArchive";
+  labelKey: "navDashboard" | "navAddProduct" | "navProducts" | "navArchive" | "navBackup";
   icon: React.ReactNode;
 }
 
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/add",       labelKey: "navAddProduct", icon: <PackagePlus className="size-5" /> },
   { to: "/products",  labelKey: "navProducts",   icon: <ShoppingBag className="size-5" /> },
   { to: "/archive",   labelKey: "navArchive",    icon: <ArchiveIcon className="size-5" /> },
+  { to: "/backup",    labelKey: "navBackup",     icon: <HardDrive className="size-5" /> },
 ];
 
 interface Props {

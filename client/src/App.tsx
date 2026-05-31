@@ -8,6 +8,7 @@ import DashboardPage from "./pages/DashboardPage";
 import AddProductPage from "./pages/AddProductPage";
 import ProductsPage from "./pages/ProductsPage";
 import ArchivePage from "./pages/ArchivePage";
+import BackupPage from "./pages/BackupPage";
 import ToastContainer from "./components/Toast";
 import type { Locale, Theme } from "./types";
 
@@ -109,6 +110,7 @@ export default function App() {
             <Route path="/add" element={<AddProductPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/archive" element={<ArchivePage />} />
+            <Route path="/backup" element={<BackupPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </AppLayout>

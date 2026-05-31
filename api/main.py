@@ -3,6 +3,7 @@ import os
 import secrets
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -559,6 +560,72 @@ def product_image(
         return FileResponse(path)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail={"code": "ERR_IMAGE_NOT_FOUND"})
+
+
+# ── Backup management ─────────────────────────────────────────────────────────
+
+BACKUP_ROOT = Path("/backups")
+
+
+@app.get("/api/backups")
+def get_backups(_: Annotated[None, Depends(verify_access)]):
+    from pathlib import Path as P
+    import json as _json
+
+    status_file = BACKUP_ROOT / "status.json"
+    status = {}
+    if status_file.exists():
+        try:
+            status = _json.loads(status_file.read_text())
+        except Exception:
+            pass
+
+    backups = []
+    if BACKUP_ROOT.exists():
+        for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
+            if not entry.is_dir() or not entry.name.startswith("20"):
+                continue
+            db_file = entry / "db.sql"
+            img_dir = entry / "products_photo"
+            backups.append({
+                "date": entry.name,
+                "db_size": _dir_size(db_file),
+                "img_size": _dir_size(img_dir),
+            })
+
+    return {"status": status, "backups": backups}
+
+
+@app.delete("/api/backups/{date}")
+def delete_backup(
+    date: str,
+    _: Annotated[None, Depends(verify_access)],
+):
+    import re as _re
+    if not _re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        raise HTTPException(status_code=400, detail={"code": "ERR_GENERAL"})
+    backup_dir = BACKUP_ROOT / date
+    if not backup_dir.exists():
+        raise HTTPException(status_code=404, detail={"code": "ERR_PRODUCT_NOT_FOUND"})
+    import shutil as _shutil
+    _shutil.rmtree(str(backup_dir))
+    return {"ok": True}
+
+
+def _dir_size(path) -> str:
+    from pathlib import Path as P
+    p = P(path)
+    if not p.exists():
+        return "-"
+    if p.is_file():
+        size = p.stat().st_size
+    else:
+        size = sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
 
 
 # ── Activity logs ─────────────────────────────────────────────────────────────
