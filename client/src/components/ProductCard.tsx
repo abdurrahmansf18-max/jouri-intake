@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArchiveRestore, Box, CalendarDays, ImageOff, Palette, Ruler, ShoppingBag, Tag } from "lucide-react";
+import { ArchiveRestore, Box, CalendarDays, ExternalLink, ImageOff, Palette, Ruler, ShoppingBag, Tag } from "lucide-react";
 import { productImageUrl, updateStatus } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -42,7 +42,9 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
   return (
     <article
       className={cn(
-        "cursor-pointer rounded-xl border overflow-hidden transition hover:-translate-y-0.5 select-none",
+        "group cursor-pointer rounded-xl border overflow-hidden transition-all duration-200",
+        "hover:-translate-y-1 hover:border-violet-400/50 hover:shadow-lg hover:shadow-violet-900/20",
+        "select-none",
         s.subPanel,
       )}
       onClick={onOpen}
@@ -95,6 +97,14 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
             {!p.germanTitleSuggestion && !p.titleRaw && (
               <h3 className={cn("line-clamp-1 text-sm font-extrabold", s.muted)}>{record.folderName}</h3>
             )}
+            {/* Tıklanabilir göstergesi */}
+            <span className={cn(
+              "mt-1 inline-flex items-center gap-1 text-[10px] font-bold opacity-0 transition-opacity group-hover:opacity-100",
+              "text-violet-400",
+            )}>
+              <ExternalLink className="size-2.5" />
+              {t.openDetail}
+            </span>
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -149,7 +159,7 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
           </div>
         )}
 
-        {/* Aksiyon butonları */}
+        {/* Aksiyon butonları — sadece durum değiştirme */}
         <div className="mt-3 flex flex-wrap gap-1.5">
           {!showRestoreBtn && ACTIVE_STATUSES.map((status) => (
             <button
@@ -158,10 +168,11 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
               disabled={busy || record.status === "sold_archive"}
               onClick={(e) => handleStatusChange(status, e)}
               className={cn(
-                "rounded-lg border px-2.5 py-1 text-[11px] font-extrabold transition disabled:opacity-50",
+                "rounded-lg border px-2.5 py-1 text-[11px] font-extrabold",
+                "transition-all duration-150 active:scale-95 disabled:pointer-events-none disabled:opacity-40",
                 record.status === status
-                  ? statusActiveBadge(status, s)
-                  : cn(statusBadge(status, s), "cursor-pointer opacity-50 hover:opacity-100"),
+                  ? cn(statusActiveBadge(status, s), "shadow-sm")
+                  : cn(statusBadge(status, s), "opacity-50 hover:opacity-90 hover:shadow-sm"),
               )}
             >
               {statusLabel(status, locale)}
@@ -172,19 +183,16 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
               type="button"
               disabled={busy}
               onClick={(e) => { e.stopPropagation(); onOpen(); }}
-              className={cn("inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold transition", s.success)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold",
+                "transition-all duration-150 active:scale-95",
+                s.success,
+              )}
             >
               <ArchiveRestore className="size-3" />
               {t.restoreProduct}
             </button>
           )}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onOpen(); }}
-            className={cn("rounded-lg border px-2.5 py-1 text-[11px] font-extrabold transition", s.controlGroup, s.controlIdle)}
-          >
-            {t.openDetail}
-          </button>
         </div>
       </div>
     </article>
