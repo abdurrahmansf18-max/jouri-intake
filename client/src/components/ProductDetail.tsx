@@ -25,7 +25,7 @@ import {
 } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
-import { DARK, LIGHT } from "../theme";
+import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord } from "../types";
 import { statusBadge } from "./ProductCard";
 import { statusLabel } from "../i18n";
@@ -500,7 +500,7 @@ function DetailField({
   label, onChange, s, type = "text", value,
 }: {
   label: string; onChange: (v: string) => void;
-  s: typeof DARK; type?: "number" | "text"; value: string;
+  s: ThemeStyles; type?: "number" | "text"; value: string;
 }) {
   return (
     <label className="grid gap-1.5">

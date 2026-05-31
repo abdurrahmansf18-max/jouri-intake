@@ -3,7 +3,7 @@ import { ArchiveRestore, Box, Palette, Ruler, ShoppingBag, Tag } from "lucide-re
 import { updateStatus } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
-import { DARK, LIGHT } from "../theme";
+import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord, ProductStatus } from "../types";
 
 const ACTIVE_STATUSES: ProductStatus[] = ["pending", "ai_enhanced", "published"];
@@ -140,7 +140,7 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
   );
 }
 
-export function statusBadge(status: ProductStatus, s: typeof DARK) {
+export function statusBadge(status: ProductStatus, s: ThemeStyles) {
   if (status === "pending")      return s.statusPending;
   if (status === "ai_enhanced")  return s.statusAiEnhanced;
   if (status === "published")    return s.statusPublished;

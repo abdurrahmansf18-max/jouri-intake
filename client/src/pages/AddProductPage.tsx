@@ -10,7 +10,7 @@ import {
 import { createProduct } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
-import { DARK, LIGHT } from "../theme";
+import { DARK, LIGHT, type ThemeStyles } from "../theme";
 
 type Draft = {
   titleRaw: string;
@@ -249,7 +249,7 @@ function Field({
   label, onChange, s, type = "text", value,
 }: {
   label: string; onChange: (v: string) => void;
-  s: typeof DARK; type?: "number" | "text"; value: string;
+  s: ThemeStyles; type?: "number" | "text"; value: string;
 }) {
   return (
     <label className="grid gap-1.5">
