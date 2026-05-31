@@ -111,7 +111,7 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
           </div>
 
           <h1 className={cn("text-3xl font-black tracking-tight", s.title)}>
-            {t.appTitle}
+            {t.loginTitle}
           </h1>
 
           {/* Admin badge */}

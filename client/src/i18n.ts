@@ -4,6 +4,7 @@ export const COPY = {
   tr: {
     dir: "ltr" as const,
     appTitle: "Jouri",
+    loginTitle: "Jouri Mağazası",
     subtitle: "Ürün Yönetim Paneli",
     // Nav
     navDashboard: "Panel",
@@ -196,7 +197,8 @@ export const COPY = {
   },
   ar: {
     dir: "rtl" as const,
-    appTitle: "جوري",
+    appTitle: "Jouri",
+    loginTitle: "متجر جوري",
     subtitle: "لوحة إدارة المنتجات",
     // Nav
     navDashboard: "لوحة التحكم",
