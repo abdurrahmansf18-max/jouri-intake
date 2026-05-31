@@ -119,7 +119,7 @@ export default function AddProductPage() {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <div className="grid gap-5">
       <form ref={formRef} onSubmit={handleSubmit} className={cn("rounded-xl border", s.panel)}>
         <div className={cn("flex items-center justify-between gap-3 border-b px-5 py-4", s.panelBorder)}>
           <div>
@@ -222,25 +222,6 @@ export default function AddProductPage() {
         </div>
       </form>
 
-      {/* Right sidebar hint */}
-      <aside className="grid content-start gap-4">
-        <div className={cn("rounded-xl border p-5", s.panel)}>
-          <h3 className={cn("mb-3 text-sm font-extrabold", s.title)}>{t.workflowTitle}</h3>
-          {[
-            { title: t.originalsTitle, text: t.originalsText },
-            { title: t.enhancedTitle,  text: t.enhancedText  },
-            { title: t.shopifyTitle,   text: t.shopifyText   },
-          ].map((step) => (
-            <div key={step.title} className={cn("mt-3 flex gap-3 border-t pt-3 first:border-t-0 first:pt-0", s.panelBorder)}>
-              <div className={cn("mt-0.5 size-2 shrink-0 rounded-full bg-violet-400 mt-2")} />
-              <div>
-                <div className={cn("text-xs font-extrabold", s.title)}>{step.title}</div>
-                <div className={cn("mt-0.5 text-xs", s.muted)}>{step.text}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </aside>
     </div>
   );
 }
