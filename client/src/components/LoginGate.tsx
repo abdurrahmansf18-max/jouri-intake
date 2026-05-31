@@ -33,9 +33,32 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
 
   return (
     <main
-      className={cn("min-h-screen flex flex-col items-center justify-center px-4 py-10", s.page)}
+      className={cn("relative min-h-screen flex flex-col items-center justify-center px-4 py-10 overflow-hidden", s.page)}
       dir={t.dir}
     >
+      {/* Renkli arka plan parıltıları */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className={cn(
+          "absolute -top-32 -start-32 h-96 w-96 rounded-full blur-[120px]",
+          isDark ? "bg-violet-600 opacity-40" : "bg-violet-400 opacity-25",
+        )} />
+        <div className={cn(
+          "absolute -bottom-32 -end-32 h-96 w-96 rounded-full blur-[120px]",
+          isDark ? "bg-indigo-600 opacity-40" : "bg-indigo-400 opacity-20",
+        )} />
+        <div className={cn(
+          "absolute top-1/2 start-1/2 -translate-x-1/2 -translate-y-1/2 h-72 w-72 rounded-full blur-[100px]",
+          isDark ? "bg-purple-700 opacity-30" : "bg-purple-400 opacity-15",
+        )} />
+        <div className={cn(
+          "absolute top-10 end-10 h-48 w-48 rounded-full blur-[80px]",
+          isDark ? "bg-blue-600 opacity-25" : "bg-blue-400 opacity-15",
+        )} />
+        <div className={cn(
+          "absolute bottom-10 start-10 h-48 w-48 rounded-full blur-[80px]",
+          isDark ? "bg-fuchsia-600 opacity-25" : "bg-fuchsia-400 opacity-15",
+        )} />
+      </div>
       {/* Controls — top */}
       <div className="mb-6 flex gap-2">
         <div className={cn("inline-flex items-center gap-1 rounded-xl border p-1", s.controlGroup)}>
