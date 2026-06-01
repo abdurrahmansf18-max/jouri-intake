@@ -918,7 +918,19 @@ def run_backup(
                 if not dst_file.exists() or item.stat().st_mtime > dst_file.stat().st_mtime:
                     _shutil.copy2(item, dst_file)
 
-        # 3. status.json güncelle
+        # 3. Google Drive sync (rclone)
+        import subprocess as _subprocess
+        drive_ok: bool | None = None
+        try:
+            result = _subprocess.run(
+                ["rclone", "sync", str(today_dir), f"gdrive:jouri-backups/{date_str}", "--quiet"],
+                capture_output=True, timeout=120,
+            )
+            drive_ok = result.returncode == 0
+        except (FileNotFoundError, _subprocess.TimeoutExpired):
+            drive_ok = False
+
+        # 4. status.json güncelle
         db_size = _dir_size(db_file)
         img_size = _dir_size(photos_dst) if photos_dst.exists() else "-"
 
@@ -940,7 +952,7 @@ def run_backup(
             "last_date": date_str,
             "last_db_size": db_size,
             "last_img_size": img_size,
-            "drive_ok": None,
+            "drive_ok": drive_ok,
             "backups": backups_list,
         }
         (BACKUP_ROOT / "status.json").write_text(
