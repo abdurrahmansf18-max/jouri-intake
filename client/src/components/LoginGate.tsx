@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Languages, Loader2, LockKeyhole, Moon, ShieldCheck, Sun } from "lucide-react";
+import { Eye, EyeOff, Languages, Loader2, LockKeyhole, Moon, ShieldCheck, Sun } from "lucide-react";
 import type { Locale, Theme } from "../types";
 import { cn, COPY } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -14,6 +14,7 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showCode, setShowCode] = useState(false);
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
   const isDark = theme === "dark";
@@ -134,8 +135,9 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
         <form className="grid gap-4" onSubmit={submit}>
           <label className="grid gap-2">
             <span className={cn("text-sm font-extrabold", s.strong)}>{t.accessCode}</span>
+            <div className="relative">
             <input
-              type="password"
+              type={showCode ? "text" : "password"}
               maxLength={32}
               value={code}
               onChange={e => setCode(e.target.value)}
@@ -143,11 +145,19 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
               autoComplete="one-time-code"
               required
               className={cn(
-                "min-h-12 rounded-xl border px-4 text-lg font-extrabold tracking-[0.4em] outline-none transition focus:ring-4 text-center",
+                "min-h-12 w-full rounded-xl border pe-10 ps-4 text-lg font-extrabold tracking-[0.4em] outline-none transition focus:ring-4 text-center",
                 s.input,
                 error && "border-red-400 focus:ring-red-500/15",
               )}
             />
+            <button
+              type="button"
+              onClick={() => setShowCode((v) => !v)}
+              className={cn("absolute inset-y-0 end-3 flex items-center", s.muted)}
+            >
+              {showCode ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+            </div>
           </label>
 
           {error && (
