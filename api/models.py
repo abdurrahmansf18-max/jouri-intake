@@ -84,6 +84,7 @@ class ParsedProductUpdate(BaseModel):
 class ProductUpdateRequest(BaseModel):
     notes: Optional[str] = None
     stockQuantity: Optional[int] = None
+    description: Optional[str] = None
     parsed: Optional[ParsedProductUpdate] = None
 
 

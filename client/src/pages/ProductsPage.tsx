@@ -141,6 +141,7 @@ export default function ProductsPage() {
               record={record}
               onOpen={() => setSelectedId(record.id)}
               onReplace={replaceRecord}
+              searchQuery={search}
             />
           ))}
         </div>

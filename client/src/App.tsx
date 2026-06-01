@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { checkAuth, clearCode, isAuthRequired, storeCode, verifyCode } from "./api";
+import { checkAuth, clearCode, isAuthRequired, logout, storeCode, verifyCode } from "./api";
 import { AppContext, useToastState } from "./context";
 import LoginGate from "./components/LoginGate";
 import AppLayout from "./layouts/AppLayout";
@@ -70,7 +70,8 @@ export default function App() {
     else throw new Error("ERR_WRONG_CODE");
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    try { await logout(); } catch { /* ignore */ }
     clearCode();
     setAuthed(false);
   }

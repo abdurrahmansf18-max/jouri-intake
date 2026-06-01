@@ -26,14 +26,19 @@ export default function ArchivePage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLocaleLowerCase();
-    if (!q) return records;
+    const tokens = norm(search).split(/\s+/).filter(Boolean);
+    if (!tokens.length) return records;
     return records.filter((r) => {
       const p = r.parsed;
-      return [p.titleRaw, p.germanTitleSuggestion, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes]
-        .join(" ").toLocaleLowerCase().includes(q);
+      const hay = norm([p.titleRaw, p.germanTitleSuggestion, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes, r.description].join(" "));
+      return tokens.every((tok) => hay.includes(tok));
     });
   }, [records, search]);
+
+  function norm(str: string): string {
+    return str.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[ً-ٰٟ]/g, "")
+      .replace(/[أإآٱ]/g, "ا").replace(/[ىئ]/g, "ي").replace(/ة/g, "ه").toLocaleLowerCase();
+  }
 
   function replaceRecord(updated: ProductRecord) {
     if (updated.status !== "sold_archive") {
@@ -96,6 +101,7 @@ export default function ArchivePage() {
               onOpen={() => setSelectedId(record.id)}
               onReplace={replaceRecord}
               showRestoreBtn
+              searchQuery={search}
             />
           ))}
         </div>

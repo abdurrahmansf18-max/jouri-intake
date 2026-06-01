@@ -84,6 +84,7 @@ export default function DashboardPage() {
       product_type: t.logFieldProductType,
       notes: t.logFieldNotes,
       currency: t.logFieldCurrency,
+      description: t.logFieldDescription,
     };
     return map[field] || field;
   }

@@ -42,6 +42,10 @@ export async function checkAuth(): Promise<boolean> {
   return res.ok;
 }
 
+export async function logout(): Promise<void> {
+  await fetch("/api/auth/logout", { method: "POST" });
+}
+
 export async function fetchProducts(): Promise<ProductRecord[]> {
   const res = await fetch("/api/products", { headers: headers() });
   return handleResponse<ProductRecord[]>(res);
@@ -50,6 +54,7 @@ export async function fetchProducts(): Promise<ProductRecord[]> {
 export interface ProductUpdate {
   notes?: string;
   stockQuantity?: number;
+  description?: string;
   parsed?: Partial<ParsedProduct>;
 }
 
@@ -133,6 +138,18 @@ export async function addProductImages(productId: string, images: File[]): Promi
     headers: headers(),
     body: form,
   });
+  return handleResponse<ProductRecord>(res);
+}
+
+export async function deleteProductImage(
+  productId: string,
+  kind: "originals" | "enhanced",
+  fileName: string,
+): Promise<ProductRecord> {
+  const res = await fetch(
+    `/api/products/${encodeURIComponent(productId)}/images/${kind}/${encodeURIComponent(fileName)}`,
+    { method: "DELETE", headers: headers() },
+  );
   return handleResponse<ProductRecord>(res);
 }
 

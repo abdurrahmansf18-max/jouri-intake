@@ -17,18 +17,21 @@ import {
 import {
   addProductImages,
   deleteProduct,
+  deleteProductImage,
   productImageUrl,
   resetSales,
   restoreProduct,
   sellProduct,
   updateProduct,
+  updateStatus,
 } from "../api";
 import { useApp } from "../context";
-import { COPY, cn } from "../i18n";
+import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
-import type { ProductRecord } from "../types";
-import { statusBadge } from "./ProductCard";
-import { statusLabel } from "../i18n";
+import type { ProductRecord, ProductStatus } from "../types";
+import { statusActiveBadge, statusBadge } from "./ProductCard";
+
+const ACTIVE_STATUSES: ProductStatus[] = ["pending", "ai_enhanced", "published"];
 
 type Draft = {
   titleRaw: string;
@@ -41,6 +44,7 @@ type Draft = {
   colorGermanSuggestion: string;
   sizesRaw: string;
   notes: string;
+  description: string;
   stockQuantity: string;
   restoreStock: string;
   saleQuantity: string;
@@ -59,9 +63,10 @@ function recordToDraft(r: ProductRecord): Draft {
     colorGermanSuggestion: r.parsed.colorGermanSuggestion,
     sizesRaw: r.parsed.sizesRaw,
     notes: r.notes || "",
+    description: r.description || "",
     stockQuantity: String(Math.max(0, r.stockQuantity)),
     restoreStock: String(Math.max(1, r.stockQuantity || 1)),
-    saleQuantity: "1",
+    saleQuantity: String(Math.max(1, r.stockQuantity)),
     saleNote: "",
   };
 }
@@ -82,6 +87,7 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
   const [draft, setDraft] = useState<Draft>(() => recordToDraft(record));
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
+  const [deletingImage, setDeletingImage] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<{ name: string; url: string }[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -111,6 +117,7 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
     try {
       const updated = await updateProduct(record.id, {
         notes: draft.notes,
+        description: draft.description,
         stockQuantity: num(draft.stockQuantity, 1),
         parsed: {
           titleRaw: draft.titleRaw,
@@ -129,6 +136,20 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
     } catch (err: unknown) {
       const code = err instanceof Error ? err.message : "ERR_GENERAL";
       showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStatusChange(status: ProductStatus) {
+    if (busy || record.status === status) return;
+    setBusy(true);
+    try {
+      const updated = await updateStatus(record.id, status);
+      onReplace(updated);
+      showToast(t.toastStatusUpdated, "success");
+    } catch {
+      showToast(t.errors.ERR_GENERAL, "error");
     } finally {
       setBusy(false);
     }
@@ -177,12 +198,25 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
       const updated = await addProductImages(record.id, imageFiles);
       onReplace(updated);
       setImageFiles([]);
-      setImagePreviews((curr) => { curr.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
+      setImagePreviews((curr) => { curr.forEach((p2) => URL.revokeObjectURL(p2.url)); return []; });
       showToast(t.toastImagesAdded, "success");
     } catch {
       showToast(t.errors.ERR_GENERAL, "error");
     } finally {
       setImageBusy(false);
+    }
+  }
+
+  async function handleDeleteImage(fileName: string) {
+    if (!window.confirm(t.deleteImage + "?")) return;
+    setDeletingImage(fileName);
+    try {
+      const updated = await deleteProductImage(record.id, "originals", fileName);
+      onReplace(updated);
+    } catch {
+      showToast(t.errors.ERR_GENERAL, "error");
+    } finally {
+      setDeletingImage(null);
     }
   }
 
@@ -229,30 +263,56 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           <div className="grid gap-5">
 
-            {/* Product header info */}
+            {/* Ürün başlığı + fiyat */}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className={cn("text-base font-extrabold", s.title)}>
                   {p.germanTitleSuggestion || p.titleRaw || record.folderName}
                 </h3>
+                {p.titleRaw && p.germanTitleSuggestion && (
+                  <p className={cn("mt-0.5 text-sm font-semibold", s.muted)} dir="auto">{p.titleRaw}</p>
+                )}
                 <p className={cn("mt-1 text-xs", s.muted)}>
                   {new Date(record.createdAt).toLocaleString(dateLocale)} · {t.imageCount(record.images.length)}
                 </p>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
-                {p.priceAmount && (
-                  <span className={cn("rounded-lg border px-2 py-1 text-xs font-black", s.success)}>
-                    {p.priceAmount} {p.currency}
-                  </span>
-                )}
-                <span className={cn("rounded-lg border px-2 py-0.5 text-[10px] font-black", statusBadge(record.status, s))}>
-                  {statusLabel(record.status, locale)}
+              {p.priceAmount && (
+                <span className={cn("rounded-lg border px-2.5 py-1 text-sm font-black shrink-0", s.success)}>
+                  {p.priceAmount} {p.currency}
                 </span>
-              </div>
+              )}
             </div>
 
-            {/* Sell / restore section */}
+            {/* Durum değiştirme */}
             {record.status !== "sold_archive" && (
+              <section className={cn("rounded-xl border p-4", s.subPanel)}>
+                <h3 className={cn("mb-3 text-xs font-black uppercase tracking-wide", s.muted)}>
+                  {t.changeStatus}
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {ACTIVE_STATUSES.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleStatusChange(status)}
+                      className={cn(
+                        "rounded-lg border px-3 py-1.5 text-xs font-extrabold",
+                        "transition-all active:scale-95 disabled:opacity-50",
+                        record.status === status
+                          ? statusActiveBadge(status, s)
+                          : cn(statusBadge(status, s), "opacity-60 hover:opacity-100"),
+                      )}
+                    >
+                      {statusLabel(status, locale)}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Satış bölümü */}
+            {record.status !== "sold_archive" ? (
               <section className={cn("rounded-xl border p-4", s.subPanel)}>
                 <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
                   <ReceiptText className="size-4 text-violet-400" />
@@ -271,22 +331,29 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
                     />
                   </label>
                 </div>
-              </section>
-            )}
-
-            {/* Action buttons */}
-            <div className="grid gap-2 sm:grid-cols-3">
-              {record.status !== "sold_archive" ? (
                 <button
                   type="button"
                   onClick={handleSell}
                   disabled={busy}
-                  className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-extrabold transition disabled:opacity-60", s.error)}
+                  className={cn("mt-3 inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-extrabold transition disabled:opacity-60", s.error)}
                 >
-                  <ShoppingBag className="size-4" />
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
                   {t.markSold}
                 </button>
-              ) : (
+                {record.soldQuantity > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetSales}
+                    disabled={busy}
+                    className={cn("mt-2 inline-flex w-full min-h-10 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-extrabold transition disabled:opacity-60", s.controlGroup, s.controlIdle)}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    {t.resetSales}
+                  </button>
+                )}
+              </section>
+            ) : (
+              <section className={cn("rounded-xl border p-4", s.subPanel)}>
                 <div className="grid gap-2">
                   <DetailField label={t.restoreStock} s={s} value={draft.restoreStock} type="number" onChange={(v) => patch("restoreStock", v)} />
                   <button
@@ -299,30 +366,21 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
                     {t.restoreProduct}
                   </button>
                 </div>
-              )}
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={busy}
-                className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-60 sm:col-span-2", s.primary)}
-              >
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                {t.saveChanges}
-              </button>
-              {record.soldQuantity > 0 && (
-                <button
-                  type="button"
-                  onClick={handleResetSales}
-                  disabled={busy}
-                  className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-extrabold transition disabled:opacity-60 sm:col-span-3", s.controlGroup, s.controlIdle)}
-                >
-                  <RotateCcw className="size-4" />
-                  {t.resetSales}
-                </button>
-              )}
-            </div>
+              </section>
+            )}
 
-            {/* Edit fields */}
+            {/* Kaydet butonu */}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={busy}
+              className={cn("inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-60", s.primary)}
+            >
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {t.saveChanges}
+            </button>
+
+            {/* Düzenleme alanları */}
             <section className={cn("rounded-xl border p-4", s.subPanel)}>
               <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
                 <Edit3 className="size-4 text-violet-400" />
@@ -340,6 +398,15 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
                 <DetailField label={t.stockQuantity}  s={s} value={draft.stockQuantity} type="number" onChange={(v) => patch("stockQuantity", v)} />
               </div>
               <label className="mt-3 grid gap-1.5">
+                <span className={cn("text-xs font-black", s.strong)}>{t.description}</span>
+                <textarea
+                  className={cn("min-h-24 rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
+                  value={draft.description}
+                  onChange={(e) => patch("description", e.target.value)}
+                  dir="auto"
+                />
+              </label>
+              <label className="mt-3 grid gap-1.5">
                 <span className={cn("text-xs font-black", s.strong)}>{t.notes}</span>
                 <textarea
                   className={cn("min-h-20 rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
@@ -351,7 +418,7 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
               </label>
             </section>
 
-            {/* Images section */}
+            {/* Görseller */}
             <section className={cn("rounded-xl border p-4", s.subPanel)}>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className={cn("flex items-center gap-2 text-sm font-extrabold", s.title)}>
@@ -370,6 +437,36 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
                   </button>
                 )}
               </div>
+
+              {/* Mevcut görseller — silme butonu ile */}
+              <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {record.images.map((img) => (
+                  <figure key={img.fileName} className={cn("group/img relative overflow-hidden rounded-xl border", s.panelBorder)}>
+                    <img
+                      src={productImageUrl(record.id, img.fileName)}
+                      alt={img.originalName}
+                      className="aspect-square w-full object-cover"
+                      loading="lazy"
+                    />
+                    <button
+                      type="button"
+                      disabled={deletingImage === img.fileName}
+                      onClick={() => handleDeleteImage(img.fileName)}
+                      className={cn(
+                        "absolute inset-0 flex items-center justify-center",
+                        "bg-black/0 opacity-0 transition-all",
+                        "group-hover/img:bg-black/50 group-hover/img:opacity-100",
+                      )}
+                    >
+                      {deletingImage === img.fileName
+                        ? <Loader2 className="size-5 animate-spin text-white" />
+                        : <Trash2 className="size-5 text-red-400" />}
+                    </button>
+                  </figure>
+                ))}
+              </div>
+
+              {/* Yeni görsel ekleme */}
               <label className={cn("mb-3 grid cursor-pointer place-items-center rounded-xl border border-dashed px-4 py-4 text-center transition", s.dropzone)}>
                 <input
                   className="sr-only"
@@ -392,7 +489,7 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
                 <span className={cn("mt-0.5 text-xs", s.muted)}>{t.addImagesHelp}</span>
               </label>
               {imagePreviews.length > 0 && (
-                <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {imagePreviews.map((prev) => (
                     <figure key={prev.name} className={cn("overflow-hidden rounded-xl border", s.panelBorder)}>
                       <img src={prev.url} alt={prev.name} className="aspect-square w-full object-cover" />
@@ -400,24 +497,9 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
                   ))}
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-2">
-                {record.images.map((img) => (
-                  <figure key={img.fileName} className={cn("overflow-hidden rounded-xl border", s.panelBorder)}>
-                    <img
-                      src={productImageUrl(record.id, img.fileName)}
-                      alt={img.originalName}
-                      className="aspect-square w-full object-cover"
-                      loading="lazy"
-                    />
-                    <figcaption className={cn("truncate px-2 py-1.5 text-[11px]", s.muted)} dir="ltr">
-                      {img.fileName}
-                    </figcaption>
-                  </figure>
-                ))}
-              </div>
             </section>
 
-            {/* Sale history */}
+            {/* Satış geçmişi */}
             {(record.saleHistory ?? []).length > 0 && (
               <section className={cn("rounded-xl border p-4", s.subPanel)}>
                 <h3 className={cn("mb-3 text-sm font-extrabold", s.title)}>{t.saleHistory}</h3>
@@ -434,7 +516,7 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
               </section>
             )}
 
-            {/* Folder info */}
+            {/* Klasör bilgisi */}
             <section className={cn("rounded-xl border p-4", s.subPanel)}>
               <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
                 <FolderOpen className="size-4 text-violet-400" />
@@ -452,7 +534,7 @@ export default function ProductDetail({ record, onClose, onReplace, onDelete }: 
               ))}
             </section>
 
-            {/* Delete */}
+            {/* Sil */}
             <section className={cn("rounded-xl border p-4", s.subPanel)}>
               {!deleteConfirm ? (
                 <button

@@ -35,7 +35,7 @@ from parser import parse_description
 TOTP_SECRET = os.environ.get("TOTP_SECRET", "").strip()
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
 AUTH_COOKIE_NAME = "jouri_session"
-SESSION_TTL = 60 * 60 * 24 * 7  # 7 gün
+SESSION_TTL = 60 * 60 * 24  # 24 saat
 
 # Bellek içi oturum deposu: {token: oluşturulma_zamanı}
 _sessions: dict[str, float] = {}
@@ -248,6 +248,12 @@ def auth_check(_: Annotated[None, Depends(verify_access)]):
     return {"authed": True}
 
 
+@app.post("/api/auth/logout")
+def auth_logout(response: Response):
+    response.delete_cookie(AUTH_COOKIE_NAME, path="/")
+    return {"ok": True}
+
+
 # ── Products ──────────────────────────────────────────────────────────────────
 
 @app.get("/api/products", response_model=list[ProductRecord])
@@ -394,6 +400,9 @@ def update_product(
         if new_val is not None and str(old_val) != str(new_val):
             changes[field] = {"from": str(old_val), "to": str(new_val)}
 
+    if body.description is not None:
+        track("description", p.description, body.description)
+        p.description = body.description
     if body.notes is not None:
         track("notes", p.notes, body.notes)
         p.notes = body.notes
@@ -585,6 +594,28 @@ def product_image(
         return FileResponse(path)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail={"code": "ERR_IMAGE_NOT_FOUND"})
+
+
+@app.delete("/api/products/{product_id}/images/{kind}/{file_name}", response_model=ProductRecord)
+def delete_product_image(
+    product_id: str,
+    kind: str,
+    file_name: str,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    p = _get_or_404(db, product_id)
+    try:
+        path = file_manager.resolve_image_path(p.folder_path, kind, file_name)
+        path.unlink()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "ERR_IMAGE_NOT_FOUND"})
+    p.images = [img for img in (p.images or []) if img.get("fileName") != file_name]
+    activity_logger.log(db, "update", product_id=p.id, product_title=p.title_raw or p.german_title,
+                        details={"changed": {"image_deleted": {"from": file_name, "to": ""}}})
+    db.commit()
+    db.refresh(p)
+    return _to_record(p)
 
 
 # ── Backup management ─────────────────────────────────────────────────────────

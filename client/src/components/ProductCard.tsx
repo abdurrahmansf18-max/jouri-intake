@@ -1,35 +1,33 @@
 import { useState } from "react";
-import { ArchiveRestore, Box, CalendarDays, ExternalLink, ImageOff, Palette, Ruler, ShoppingBag, Tag } from "lucide-react";
+import { ArchiveRestore, ExternalLink, ImageOff } from "lucide-react";
 import { productImageUrl, updateStatus } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord, ProductStatus } from "../types";
 
-const ACTIVE_STATUSES: ProductStatus[] = ["pending", "ai_enhanced", "published"];
-
 interface Props {
   record: ProductRecord;
   onOpen: () => void;
   onReplace: (updated: ProductRecord) => void;
   showRestoreBtn?: boolean;
+  searchQuery?: string;
 }
 
-export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn }: Props) {
+export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn, searchQuery }: Props) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
   const [busy, setBusy] = useState(false);
-  const dateLocale = locale === "ar" ? "ar" : "tr-TR";
 
-  async function handleStatusChange(status: ProductStatus, e: React.MouseEvent) {
+  async function handleRestore(e: React.MouseEvent) {
     e.stopPropagation();
-    if (busy || record.status === status) return;
+    if (busy) return;
     setBusy(true);
     try {
-      const updated = await updateStatus(record.id, status);
+      const updated = await updateStatus(record.id, "pending");
       onReplace(updated);
-      showToast(t.toastStatusUpdated, "success");
+      showToast(t.toastRestored, "success");
     } catch {
       showToast(t.errors.ERR_GENERAL, "error");
     } finally {
@@ -42,8 +40,8 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
   return (
     <article
       className={cn(
-        "group cursor-pointer rounded-xl border overflow-hidden transition-all duration-200",
-        "hover:-translate-y-1 hover:border-violet-400/50 hover:shadow-lg hover:shadow-violet-900/20",
+        "group cursor-pointer rounded-xl border overflow-hidden",
+        "transition-all duration-200 hover:-translate-y-1 hover:border-violet-400/50 hover:shadow-lg hover:shadow-violet-900/20",
         "select-none",
         s.subPanel,
       )}
@@ -73,119 +71,57 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
       )}
 
       {/* ── İçerik ── */}
-      <div className="p-4">
-
-        {/* Başlık + fiyat + durum */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            {p.germanTitleSuggestion && (
-              <h3 className={cn("line-clamp-1 text-sm font-extrabold leading-5", s.title)}>
-                {p.germanTitleSuggestion}
-              </h3>
+      <div className="p-3">
+        {/* Başlık */}
+        {p.germanTitleSuggestion && (
+          <h3 className={cn("line-clamp-2 text-sm font-extrabold leading-5", s.title)}>
+            <Highlight text={p.germanTitleSuggestion} query={searchQuery ?? ""} />
+          </h3>
+        )}
+        {p.titleRaw && (
+          <p
+            className={cn(
+              "line-clamp-1 text-xs font-semibold leading-5",
+              p.germanTitleSuggestion ? s.muted : cn(s.title, "font-extrabold text-sm"),
             )}
-            {p.titleRaw && (
-              <p
-                className={cn(
-                  "line-clamp-1 text-xs font-semibold leading-5",
-                  p.germanTitleSuggestion ? s.muted : cn(s.title, "font-extrabold text-sm"),
-                )}
-                dir="auto"
-              >
-                {p.titleRaw}
-              </p>
-            )}
-            {!p.germanTitleSuggestion && !p.titleRaw && (
-              <h3 className={cn("line-clamp-1 text-sm font-extrabold", s.muted)}>{record.folderName}</h3>
-            )}
-            {/* Tıklanabilir göstergesi */}
-            <span className={cn(
-              "mt-1 inline-flex items-center gap-1 text-[10px] font-bold opacity-0 transition-opacity group-hover:opacity-100",
-              "text-violet-400",
-            )}>
-              <ExternalLink className="size-2.5" />
-              {t.openDetail}
-            </span>
-          </div>
-
-          <div className="flex shrink-0 flex-col items-end gap-1.5">
-            {p.priceAmount && (
-              <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-sm font-black text-emerald-300">
-                {p.priceAmount} {p.currency}
-              </span>
-            )}
-            <span className={cn("rounded-lg border px-2 py-0.5 text-[10px] font-black", statusBadge(record.status, s))}>
-              {statusLabel(record.status, locale)}
-            </span>
-          </div>
-        </div>
-
-        {/* Meta: tarih · stok · satış */}
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400">
-            <CalendarDays className="size-3" />
-            {new Date(record.createdAt).toLocaleDateString(dateLocale)}
-          </span>
-          <span className={cn("text-[11px]", s.muted)}>·</span>
-          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-400/10 px-2 py-0.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-400/25">
-            <Box className="size-3" />
-            {t.activeStock(record.stockQuantity)}
-          </span>
-          {record.soldQuantity > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/10 px-2 py-0.5 text-[11px] font-bold text-amber-300 ring-1 ring-amber-400/25">
-              <ShoppingBag className="size-3" />
-              {record.soldQuantity}
-            </span>
-          )}
-        </div>
-
-        {/* Etiketler: kategori · renk · beden */}
-        {(p.categorySuggestion || p.colorRaw || p.sizesRaw) && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {p.categorySuggestion && (
-              <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold bg-violet-400/10 text-violet-300 ring-1 ring-violet-400/25">
-                <Tag className="size-3" /> {p.categorySuggestion}
-              </span>
-            )}
-            {p.colorRaw && (
-              <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold bg-fuchsia-400/10 text-fuchsia-300 ring-1 ring-fuchsia-400/25">
-                <Palette className="size-3" /> {p.colorRaw}
-              </span>
-            )}
-            {p.sizesRaw && (
-              <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold bg-sky-400/10 text-sky-300 ring-1 ring-sky-400/25">
-                <Ruler className="size-3" /> {p.sizesRaw}
-              </span>
-            )}
-          </div>
+            dir="auto"
+          >
+            <Highlight text={p.titleRaw} query={searchQuery ?? ""} />
+          </p>
+        )}
+        {!p.germanTitleSuggestion && !p.titleRaw && (
+          <h3 className={cn("line-clamp-1 text-sm font-extrabold", s.muted)}>{record.folderName}</h3>
         )}
 
-        {/* Aksiyon butonları — sadece durum değiştirme */}
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {!showRestoreBtn && ACTIVE_STATUSES.map((status) => (
-            <button
-              key={status}
-              type="button"
-              disabled={busy || record.status === "sold_archive"}
-              onClick={(e) => handleStatusChange(status, e)}
-              className={cn(
-                "rounded-lg border px-2.5 py-1 text-[11px] font-extrabold",
-                "transition-all duration-150 active:scale-95 disabled:pointer-events-none disabled:opacity-40",
-                record.status === status
-                  ? cn(statusActiveBadge(status, s), "shadow-sm")
-                  : cn(statusBadge(status, s), "opacity-50 hover:opacity-90 hover:shadow-sm"),
-              )}
-            >
-              {statusLabel(status, locale)}
-            </button>
-          ))}
+        {/* Fiyat + Durum */}
+        <div className="mt-2 flex items-center justify-between gap-2">
+          {p.priceAmount ? (
+            <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-sm font-black text-emerald-300">
+              {p.priceAmount} {p.currency}
+            </span>
+          ) : <span />}
+          <span className={cn("rounded-lg border px-2 py-0.5 text-[10px] font-black", statusBadge(record.status, s))}>
+            {statusLabel(record.status, locale)}
+          </span>
+        </div>
+
+        {/* Alt satır: hover göstergesi + restore butonu */}
+        <div className="mt-2 flex items-center justify-between">
+          <span className={cn(
+            "inline-flex items-center gap-1 text-[10px] font-bold text-violet-400",
+            "opacity-0 transition-opacity group-hover:opacity-100",
+          )}>
+            <ExternalLink className="size-2.5" />
+            {t.openDetail}
+          </span>
           {showRestoreBtn && (
             <button
               type="button"
               disabled={busy}
-              onClick={(e) => { e.stopPropagation(); onOpen(); }}
+              onClick={handleRestore}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold",
-                "transition-all duration-150 active:scale-95",
+                "transition-all active:scale-95 disabled:opacity-50",
                 s.success,
               )}
             >
@@ -196,6 +132,28 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn 
         </div>
       </div>
     </article>
+  );
+}
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  if (!query.trim() || !text) return <>{text}</>;
+  const tokens = query.trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return <>{text}</>;
+  const escaped = tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <mark key={i} className="rounded-sm bg-yellow-400/35 text-yellow-100 px-px not-italic">
+            {part}
+          </mark>
+        ) : (
+          part
+        ),
+      )}
+    </>
   );
 }
 
