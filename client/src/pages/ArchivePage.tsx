@@ -2,17 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { ArchiveIcon, Loader2, Search } from "lucide-react";
 import { fetchProducts } from "../api";
 import { useApp } from "../context";
-import { COPY, cn } from "../i18n";
+import { COPY, cn, normalizeText, searchTokens } from "../i18n";
 import { DARK, LIGHT } from "../theme";
 import type { ProductRecord } from "../types";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import { useProductSync } from "../hooks/useProductSync";
-
-function norm(str: string): string {
-  return str.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[ً-ٰٟ]/g, "")
-    .replace(/[أإآٱ]/g, "ا").replace(/[ىئ]/g, "ي").replace(/ة/g, "ه").toLocaleLowerCase();
-}
 
 export default function ArchivePage() {
   const { locale, theme } = useApp();
@@ -50,11 +45,11 @@ export default function ArchivePage() {
   });
 
   const filtered = useMemo(() => {
-    const tokens = norm(search).split(/\s+/).filter(Boolean);
+    const tokens = searchTokens(search);
     if (!tokens.length) return records;
     return records.filter((r) => {
       const p = r.parsed;
-      const hay = norm([p.titleRaw, p.germanTitleSuggestion, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes, r.description].join(" "));
+      const hay = normalizeText([p.titleRaw, p.germanTitleSuggestion, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes, r.description].join(" "));
       return tokens.every((tok) => hay.includes(tok));
     });
   }, [records, search]);
@@ -84,7 +79,7 @@ export default function ArchivePage() {
       <div className="flex flex-col gap-1">
         <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.archiveTitle}</h1>
         <p className={cn("text-sm font-medium", s.muted)}>
-          {locale === "ar" ? `${records.length} منتج في الأرشيف` : `${records.length} ürün arşivde`}
+          {t.archiveCount(records.length)}
         </p>
       </div>
 

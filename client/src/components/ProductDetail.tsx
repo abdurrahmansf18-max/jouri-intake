@@ -263,7 +263,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 <section className={cn("rounded-xl border p-4", s.subPanel)}>
                   <div className={cn("divide-y", s.divider)}>
                     {/* Tarih + görsel sayısı */}
-                    <InfoRow label={t.lastSoldAt.replace(":", "").trim() === t.lastSoldAt ? "" : ""}>
+                    <InfoRow>
                       <span className={cn("inline-flex items-center gap-1 text-xs font-bold text-amber-400")}>
                         <CalendarDays className="size-3" />
                         {new Date(record.createdAt).toLocaleDateString(dateLocale)}

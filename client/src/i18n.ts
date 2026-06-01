@@ -186,6 +186,7 @@ export const COPY = {
     toastSalesReset: "Satış bilgileri sıfırlandı.",
     toastStatusUpdated: "Durum güncellendi.",
     // Backup page
+    archiveCount: (n: number) => `${n} ürün arşivde`,
     navBackup: "Yedekler",
     backupTitle: "Yedekleme Durumu",
     backupLastRun: "Son yedekleme",
@@ -398,6 +399,7 @@ export const COPY = {
     toastSalesReset: "تم تصفير معلومات البيع.",
     toastStatusUpdated: "تم تحديث الحالة.",
     // Backup page
+    archiveCount: (n: number) => `${n} منتج في الأرشيف`,
     navBackup: "النسخ الاحتياطية",
     backupTitle: "حالة النسخ الاحتياطي",
     backupLastRun: "آخر نسخ احتياطي",
@@ -453,6 +455,22 @@ export function apiError(err: unknown, locale: Locale): string {
     if (t.errors[code]) return t.errors[code];
   }
   return t.errors.ERR_GENERAL;
+}
+
+// Arapça hareke + elif/ya normalizasyonu + Almanca/Latin aksan kaldırma
+export function normalizeText(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")       // Latin aksan işaretleri (ä→a, ö→o, ü→u)
+    .replace(/[ً-ٰٟ]/g, "") // Arapça hareke (تشكيل)
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/[ىئ]/g, "ي")
+    .replace(/ة/g, "ه")
+    .toLocaleLowerCase();
+}
+
+export function searchTokens(query: string): string[] {
+  return normalizeText(query).split(/\s+/).filter(Boolean);
 }
 
 export function logActionLabel(action: string, locale: Locale, details?: Record<string, unknown> | null): string {

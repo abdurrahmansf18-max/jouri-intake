@@ -33,11 +33,11 @@ function emptyDraft(): Draft {
     categorySuggestion: "",
     productTypeSuggestion: "",
     priceAmount: "",
-    currency: "EUR",
+    currency: "",
     colorRaw: "",
     colorGermanSuggestion: "",
     sizesRaw: "",
-    stockQuantity: "1",
+    stockQuantity: "",
     notes: "",
   };
 }

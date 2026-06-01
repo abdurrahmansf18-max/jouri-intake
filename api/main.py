@@ -540,6 +540,7 @@ def sell_product(
 def reset_sales(
     product_id: str,
     body: ResetSalesRequest,
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
@@ -553,7 +554,9 @@ def reset_sales(
     activity_logger.log(db, "reset_sales", product_id=p.id, product_title=p.title_raw or p.german_title)
     db.commit()
     db.refresh(p)
-    return _to_record(p)
+    record = _to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
 
 
 @app.post("/api/products/{product_id}/restore", response_model=ProductRecord)
@@ -613,7 +616,9 @@ async def add_product_images(
     )
     db.commit()
     db.refresh(p)
-    return _to_record(p)
+    record = _to_record(p)
+    await ws_manager.broadcast({"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
 
 
 @app.delete("/api/products/{product_id}")
@@ -757,7 +762,7 @@ def get_logs(
     limit: int = Query(default=50, le=200),
 ):
     # 30 günden eski logları otomatik sil
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     db.query(ActivityLog).filter(ActivityLog.created_at < cutoff).delete()
     db.commit()
 

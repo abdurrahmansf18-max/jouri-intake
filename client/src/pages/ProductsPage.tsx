@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ImagePlus, Loader2, Search } from "lucide-react";
 import { fetchProducts } from "../api";
 import { useApp } from "../context";
-import { COPY, cn, filterLabel } from "../i18n";
+import { COPY, cn, filterLabel, normalizeText, searchTokens } from "../i18n";
 import { DARK, LIGHT } from "../theme";
 import type { ProductRecord, StatusFilter } from "../types";
 import ProductCard from "../components/ProductCard";
@@ -11,21 +11,6 @@ import { useProductSync } from "../hooks/useProductSync";
 
 const FILTERS: StatusFilter[] = ["all", "pending", "ai_enhanced", "published"];
 
-// Arapça hareke + elif varyantları + Almanca/Latin aksan normalizasyonu
-function norm(str: string): string {
-  return str
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[ً-ٰٟ]/g, "")
-    .replace(/[أإآٱ]/g, "ا")
-    .replace(/[ىئ]/g, "ي")
-    .replace(/ة/g, "ه")
-    .toLocaleLowerCase();
-}
-
-function normalizeSearch(q: string): string[] {
-  return norm(q).split(/\s+/).filter(Boolean);
-}
 
 export default function ProductsPage() {
   const { locale, theme } = useApp();
@@ -79,12 +64,12 @@ export default function ProductsPage() {
   };
 
   const filtered = useMemo(() => {
-    const tokens = normalizeSearch(search);
+    const tokens = searchTokens(search);
     return records.filter((r) => {
       if (filter !== "all" && r.status !== filter) return false;
       if (tokens.length === 0) return true;
       const p = r.parsed;
-      const haystack = norm([
+      const haystack = normalizeText([
         p.titleRaw, p.germanTitleSuggestion, p.categorySuggestion,
         p.colorRaw, p.sizesRaw, p.priceAmount, p.productTypeSuggestion,
         r.notes, r.folderName, r.description,
