@@ -33,6 +33,7 @@ from models import (
 from parser import parse_description
 
 TOTP_SECRET = os.environ.get("TOTP_SECRET", "").strip()
+USER_PASSWORD = os.environ.get("USER_PASSWORD", "").strip()
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
 AUTH_COOKIE_NAME = "jouri_session"
 SESSION_TTL = 60 * 60 * 24  # 24 saat
@@ -249,11 +250,23 @@ def _get_or_404(db: Session, product_id: str) -> Product:
 
 @app.post("/api/auth/verify")
 def auth_verify(body: AuthRequest, response: Response):
-    if not TOTP_SECRET:
+    # Auth yapılandırılmamışsa serbest geç
+    if not TOTP_SECRET and not USER_PASSWORD:
         return {"ok": True}
-    totp = pyotp.TOTP(TOTP_SECRET)
-    if not totp.verify(body.code.strip(), valid_window=1):
+
+    code = body.code.strip()
+
+    # TOTP kontrolü (6 haneli sayı)
+    totp_ok = False
+    if TOTP_SECRET and code.isdigit() and len(code) == 6:
+        totp_ok = pyotp.TOTP(TOTP_SECRET).verify(code, valid_window=1)
+
+    # Sabit şifre kontrolü
+    password_ok = bool(USER_PASSWORD and code == USER_PASSWORD)
+
+    if not totp_ok and not password_ok:
         raise HTTPException(status_code=401, detail={"code": "ERR_WRONG_CODE"})
+
     token = _create_session()
     response.set_cookie(
         AUTH_COOKIE_NAME,

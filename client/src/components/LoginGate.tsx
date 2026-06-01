@@ -136,8 +136,7 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
             <span className={cn("text-sm font-extrabold", s.strong)}>{t.accessCode}</span>
             <input
               type="password"
-              inputMode="numeric"
-              maxLength={6}
+              maxLength={32}
               value={code}
               onChange={e => setCode(e.target.value)}
               placeholder={t.codePlaceholder}
