@@ -45,7 +45,7 @@ function recordToDraft(r: ProductRecord): Draft {
     description: r.description || "",
     stockQuantity: String(Math.max(0, r.stockQuantity)),
     restoreStock: String(Math.max(1, r.stockQuantity || 1)),
-    saleQuantity: String(Math.max(1, r.stockQuantity)),
+    saleQuantity: "1",
     saleNote: "",
   };
 }
@@ -127,7 +127,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), draft.saleNote);
       onReplace(updated);
       showToast(t.toastSold, "success");
-      patch("saleQuantity", String(Math.max(1, updated.stockQuantity)));
+      patch("saleQuantity", "1");
       patch("saleNote", "");
     } catch { showToast(t.errors.ERR_GENERAL, "error"); }
     finally { setBusy(false); }

@@ -503,8 +503,12 @@ def sell_product(
     p = _get_or_404(db, product_id)
     quantity = max(1, int(body.quantity))
     current_stock = max(0, p.stock_quantity)
-    sold_amount = min(quantity, max(current_stock, 1))
-    next_stock = max(0, current_stock - quantity)
+
+    if current_stock <= 0:
+        raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
+
+    sold_amount = min(quantity, current_stock)   # asla stoktan fazla satılamaz
+    next_stock  = current_stock - sold_amount    # tutarlı hesap
     now = datetime.now(timezone.utc)
 
     p.sale_history = list(p.sale_history or []) + [

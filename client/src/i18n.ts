@@ -173,6 +173,7 @@ export const COPY = {
       ERR_STOCK_REQUIRED: "Stok adedi zorunludur.",
       ERR_IMAGE_REQUIRED: "En az bir görsel seçmelisin.",
       ERR_DESCRIPTION_REQUIRED: "Açıklama boş olamaz.",
+      ERR_OUT_OF_STOCK: "Stok tükendi, satış yapılamaz.",
       ERR_GENERAL: "Bir hata oluştu. Lütfen tekrar deneyin.",
     } as Record<string, string>,
     // Toast success messages
@@ -384,6 +385,7 @@ export const COPY = {
       ERR_STOCK_REQUIRED: "كمية المخزون مطلوبة.",
       ERR_IMAGE_REQUIRED: "يجب اختيار صورة واحدة على الأقل.",
       ERR_DESCRIPTION_REQUIRED: "لا يمكن ترك الوصف فارغًا.",
+      ERR_OUT_OF_STOCK: "نفذ المخزون، لا يمكن البيع.",
       ERR_GENERAL: "حدث خطأ. يرجى المحاولة مرة أخرى.",
     } as Record<string, string>,
     // Toast success messages
