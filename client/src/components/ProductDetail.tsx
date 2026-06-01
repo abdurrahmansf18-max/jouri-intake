@@ -7,7 +7,7 @@ import {
 import {
   addProductImages, deleteProduct, deleteProductImage,
   productImageUrl, resetSales, restoreProduct,
-  sellProduct, updateProduct, updateStatus,
+  sellProduct, updateProduct, updateStatus, verifyEditLock,
 } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -72,6 +72,10 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [imagePreviews, setImagePreviews] = useState<{ name: string; url: string }[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [editUnlocked, setEditUnlocked] = useState(false);
+  const [unlockCode, setUnlockCode] = useState("");
+  const [unlockError, setUnlockError] = useState(false);
+  const [unlockBusy, setUnlockBusy] = useState(false);
 
   useEffect(() => {
     setDraft(recordToDraft(record));
@@ -79,6 +83,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setDeleteConfirm(false);
     setImageFiles([]);
     setLightboxIdx(null);
+    setEditUnlocked(false);
+    setUnlockCode("");
+    setUnlockError(false);
     setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
   }, [record.id, initialMode]);
 
@@ -195,13 +202,19 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const p = record.parsed;
   const isArchive = record.status === "sold_archive";
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
-  const isEditLocked = record.status === "ai_enhanced" || record.status === "published";
-  const lockReason = record.status === "published" ? t.editLockedPublished : t.editLockedAi;
+  // Yalnızca "yayınlandı" kilitli; ai_enhanced tam düzenlenebilir
+  const isPublishedLocked = record.status === "published" && !editUnlocked;
 
-  async function handleUnlockEdit() {
-    if (!window.confirm(t.unlockWarning)) return;
-    await handleStatusChange("pending");
-    // Durum pending'e alındıktan sonra edit modunda kal
+  async function handleVerifyUnlock(e: React.FormEvent) {
+    e.preventDefault();
+    setUnlockBusy(true);
+    setUnlockError(false);
+    try {
+      const ok = await verifyEditLock(unlockCode);
+      if (ok) { setEditUnlocked(true); setUnlockCode(""); }
+      else setUnlockError(true);
+    } catch { setUnlockError(true); }
+    finally { setUnlockBusy(false); }
   }
 
   return (
@@ -231,7 +244,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
               <button type="button" onClick={() => setMode("edit")}
                 className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-extrabold transition",
                   mode === "edit" ? s.controlActive : s.controlIdle)}>
-                {isEditLocked && <Lock className="size-3" />}
+                {isPublishedLocked && <Lock className="size-3" />}
                 {t.editBtn}
               </button>
             </div>
@@ -251,7 +264,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
             <button type="button" onClick={() => setMode("edit")}
               className={cn("flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 text-xs font-extrabold transition border-b-2",
                 mode === "edit" ? "border-violet-400 text-violet-400" : cn("border-transparent", s.muted))}>
-              {isEditLocked && <Lock className="size-3" />}
+              {isPublishedLocked && <Lock className="size-3" />}
               {t.editBtn}
             </button>
           </div>
@@ -448,29 +461,47 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </section>
                 )}
               </div>
-            ) : isEditLocked ? (
+            ) : isPublishedLocked ? (
               /* ────────────────── KİLİT EKRANI ────────────────── */
               <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
                 <div className={cn("flex size-16 items-center justify-center rounded-2xl border", s.subPanel)}>
-                  <Lock className={cn("size-8", record.status === "published" ? "text-emerald-400" : "text-blue-400")} />
+                  <Lock className="size-8 text-emerald-400" />
                 </div>
                 <div>
                   <h3 className={cn("text-base font-black mb-1", s.title)}>{t.editLocked}</h3>
-                  <p className={cn("text-sm leading-6 max-w-xs", s.muted)}>{lockReason}</p>
+                  <p className={cn("text-sm leading-6 max-w-xs", s.muted)}>{t.editLockedPublished}</p>
                 </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleUnlockEdit}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-extrabold transition",
-                    "border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 active:scale-95",
-                    busy && "opacity-50",
+                <form onSubmit={handleVerifyUnlock} className="grid gap-3 w-full max-w-xs">
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    value={unlockCode}
+                    onChange={(e) => { setUnlockCode(e.target.value); setUnlockError(false); }}
+                    placeholder={t.unlockCodePlaceholder}
+                    autoComplete="off"
+                    className={cn(
+                      "min-h-11 rounded-xl border px-3 text-center text-sm font-extrabold tracking-widest outline-none focus:ring-4",
+                      s.input,
+                      unlockError && "border-red-400 focus:ring-red-500/15",
+                    )}
+                  />
+                  {unlockError && (
+                    <p className={cn("rounded-xl border px-3 py-2 text-xs font-semibold text-center", s.error)}>
+                      {t.unlockWrongCode}
+                    </p>
                   )}
-                >
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : <Unlock className="size-4" />}
-                  {t.unlockToEdit}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={unlockBusy || !unlockCode}
+                    className={cn(
+                      "inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-extrabold transition",
+                      "border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 active:scale-95 disabled:opacity-50",
+                    )}
+                  >
+                    {unlockBusy ? <Loader2 className="size-4 animate-spin" /> : <Unlock className="size-4" />}
+                    {t.unlockSubmit}
+                  </button>
+                </form>
               </div>
             ) : (
               /* ────────────────── DÜZENLEME MODU ────────────────── */

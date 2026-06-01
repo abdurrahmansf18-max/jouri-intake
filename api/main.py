@@ -36,6 +36,7 @@ TOTP_SECRET = os.environ.get("TOTP_SECRET", "").strip()
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
 AUTH_COOKIE_NAME = "jouri_session"
 SESSION_TTL = 60 * 60 * 24  # 24 saat
+EDIT_LOCK_CODE = os.environ.get("EDIT_LOCK_CODE", "").strip()
 
 # Bellek içi oturum deposu: {token: oluşturulma_zamanı}
 _sessions: dict[str, float] = {}
@@ -278,6 +279,15 @@ def auth_check(_: Annotated[None, Depends(verify_access)]):
 @app.post("/api/auth/logout")
 def auth_logout(response: Response):
     response.delete_cookie(AUTH_COOKIE_NAME, path="/")
+    return {"ok": True}
+
+
+@app.post("/api/auth/verify-edit-lock")
+def verify_edit_lock(body: AuthRequest, _: Annotated[None, Depends(verify_access)]):
+    if not EDIT_LOCK_CODE:
+        return {"ok": True}
+    if body.code.strip() != EDIT_LOCK_CODE:
+        raise HTTPException(status_code=401, detail={"code": "ERR_WRONG_CODE"})
     return {"ok": True}
 
 

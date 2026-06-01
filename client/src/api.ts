@@ -46,6 +46,15 @@ export async function logout(): Promise<void> {
   await fetch("/api/auth/logout", { method: "POST" });
 }
 
+export async function verifyEditLock(code: string): Promise<boolean> {
+  const res = await fetch("/api/auth/verify-edit-lock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  return res.ok;
+}
+
 export async function fetchProducts(): Promise<ProductRecord[]> {
   const res = await fetch("/api/products", { headers: headers() });
   return handleResponse<ProductRecord[]>(res);
