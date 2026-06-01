@@ -88,7 +88,7 @@ export default function AddProductPage() {
           categorySuggestion: draft.categorySuggestion,
           productTypeSuggestion: draft.productTypeSuggestion,
           priceAmount: draft.priceAmount,
-          currency: draft.currency,
+          currency: "EUR",
           colorRaw: draft.colorRaw,
           colorGermanSuggestion: draft.colorGermanSuggestion,
           sizesRaw: draft.sizesRaw,
@@ -186,7 +186,6 @@ export default function AddProductPage() {
               <Field label={`${t.rawTitle} *`}   s={s} value={draft.titleRaw}    onChange={(v) => patch("titleRaw", v)} />
               <Field label={t.germanTitle}        s={s} value={draft.germanTitleSuggestion} onChange={(v) => patch("germanTitleSuggestion", v)} />
               <Field label={`${t.price} *`}       s={s} value={draft.priceAmount} onChange={(v) => patch("priceAmount", v)} />
-              <Field label={t.currency}           s={s} value={draft.currency}    onChange={(v) => patch("currency", v)} />
               <Field label={`${t.color} *`}       s={s} value={draft.colorRaw}    onChange={(v) => patch("colorRaw", v)} />
               <Field label={`${t.size} *`}        s={s} value={draft.sizesRaw}    onChange={(v) => patch("sizesRaw", v)} />
               <Field label={t.category}           s={s} value={draft.categorySuggestion}   onChange={(v) => patch("categorySuggestion", v)} />
