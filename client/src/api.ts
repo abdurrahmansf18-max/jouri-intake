@@ -212,6 +212,11 @@ export async function deleteBackup(date: string): Promise<void> {
   await handleResponse(res);
 }
 
+export async function runBackup(): Promise<{ status: BackupStatus; backups: BackupEntry[] }> {
+  const res = await fetch("/api/backups/run", { method: "POST", headers: headers() });
+  return handleResponse(res);
+}
+
 export function productImageUrl(
   productId: string,
   fileName: string,

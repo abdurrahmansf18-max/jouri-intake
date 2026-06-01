@@ -55,6 +55,7 @@ export default function AddProductPage() {
 
   function validate(): string | null {
     if (!files.length) return t.emptyImg;
+    if (files.length > 5) return t.errMaxImages;
     if (!draft.titleRaw.trim()) return t.errTitleRequired;
     if (!draft.priceAmount.trim()) return t.errPriceRequired;
     if (!draft.colorRaw.trim()) return t.errColorRequired;
@@ -130,15 +131,18 @@ export default function AddProductPage() {
               type="file"
               accept="image/*"
               multiple
-              onChange={(e) => handleFiles(Array.from(e.currentTarget.files ?? []))}
+              onChange={(e) => handleFiles(Array.from(e.currentTarget.files ?? []).slice(0, 5))}
             />
             <span className={cn("mb-3 flex size-12 items-center justify-center rounded-xl shadow-sm ring-1", s.dropIcon)}>
               <UploadCloud className="size-6" />
             </span>
             <span className={cn("text-base font-extrabold", s.title)}>{t.productImages}</span>
             <span className={cn("mt-1 text-sm", s.muted)}>{t.chooseGallery}</span>
+            <span className={cn("mt-1 text-xs font-semibold", s.muted)}>
+              {t.maxImages}
+            </span>
             {files.length > 0 && (
-              <span className={cn("mt-2 text-xs font-black", "text-violet-400")}>
+              <span className={cn("mt-1 text-xs font-black", files.length > 5 ? "text-red-400" : "text-violet-400")}>
                 {t.imageCount(files.length)}
               </span>
             )}

@@ -836,6 +836,123 @@ def get_backups(_: Annotated[None, Depends(verify_access)]):
     return {"status": status, "backups": backups}
 
 
+@app.post("/api/backups/run")
+def run_backup(
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    """Manuel yedekleme: DB JSON export + artımlı fotoğraf kopyalama."""
+    import json as _json
+    import shutil as _shutil
+
+    if not BACKUP_ROOT.exists():
+        raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
+
+    now = datetime.now(timezone.utc)
+    date_str = now.strftime("%Y-%m-%d")
+    started_str = now.strftime("%Y-%m-%dT%H:%M:%S")
+
+    today_dir = BACKUP_ROOT / date_str
+    today_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # 1. DB — JSON formatında export
+        products = db.query(Product).all()
+        logs = db.query(ActivityLog).all()
+        db_data = {
+            "exported_at": started_str,
+            "products": [
+                {
+                    "id": p.id,
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                    "folder_name": p.folder_name,
+                    "folder_path": p.folder_path,
+                    "description": p.description,
+                    "status": p.status,
+                    "notes": p.notes,
+                    "stock_quantity": p.stock_quantity,
+                    "sold_quantity": p.sold_quantity,
+                    "last_sold_at": p.last_sold_at.isoformat() if p.last_sold_at else None,
+                    "title_raw": p.title_raw,
+                    "german_title": p.german_title,
+                    "category": p.category,
+                    "product_type": p.product_type,
+                    "price_amount": p.price_amount,
+                    "currency": p.currency,
+                    "color_raw": p.color_raw,
+                    "color_german": p.color_german,
+                    "sizes_raw": p.sizes_raw,
+                    "tags": p.tags,
+                    "images": p.images,
+                    "sale_history": p.sale_history,
+                    "size_stocks": p.size_stocks,
+                }
+                for p in products
+            ],
+            "activity_logs": [
+                {
+                    "id": log.id,
+                    "created_at": log.created_at.isoformat() if log.created_at else None,
+                    "action": log.action,
+                    "product_id": log.product_id,
+                    "product_title": log.product_title,
+                    "details": log.details,
+                }
+                for log in logs
+            ],
+        }
+        db_file = today_dir / "db.json"
+        db_file.write_text(_json.dumps(db_data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # 2. Fotoğraflar — artımlı kopyalama (sadece yeni/değişen dosyalar)
+        photos_src = Path("/products_photo")
+        photos_dst = today_dir / "products_photo"
+        if photos_src.exists():
+            photos_dst.mkdir(exist_ok=True)
+            for item in photos_src.rglob("*"):
+                if not item.is_file():
+                    continue
+                rel = item.relative_to(photos_src)
+                dst_file = photos_dst / rel
+                dst_file.parent.mkdir(parents=True, exist_ok=True)
+                if not dst_file.exists() or item.stat().st_mtime > dst_file.stat().st_mtime:
+                    _shutil.copy2(item, dst_file)
+
+        # 3. status.json güncelle
+        db_size = _dir_size(db_file)
+        img_size = _dir_size(photos_dst) if photos_dst.exists() else "-"
+
+        backups_list = []
+        for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
+            if not entry.is_dir() or not entry.name.startswith("20"):
+                continue
+            db_f = entry / "db.sql"
+            if not db_f.exists():
+                db_f = entry / "db.json"
+            backups_list.append({
+                "date": entry.name,
+                "db_size": _dir_size(db_f),
+                "img_size": _dir_size(entry / "products_photo"),
+            })
+
+        status_data: dict = {
+            "last_run": started_str,
+            "last_date": date_str,
+            "last_db_size": db_size,
+            "last_img_size": img_size,
+            "drive_ok": None,
+            "backups": backups_list,
+        }
+        (BACKUP_ROOT / "status.json").write_text(
+            _json.dumps(status_data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        return {"status": status_data, "backups": backups_list}
+
+    except Exception as exc:
+        print(f"[backup] Manuel yedekleme hatası: {exc}")
+        raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
+
+
 @app.delete("/api/backups/{date}")
 def delete_backup(
     date: str,

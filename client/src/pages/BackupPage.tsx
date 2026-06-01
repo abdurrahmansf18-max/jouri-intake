@@ -9,9 +9,10 @@ import {
   Images,
   Loader2,
   RefreshCw,
+  Save,
   Trash2,
 } from "lucide-react";
-import { deleteBackup, fetchBackups, type BackupEntry, type BackupStatus } from "../api";
+import { deleteBackup, fetchBackups, runBackup, type BackupEntry, type BackupStatus } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -25,6 +26,7 @@ export default function BackupPage() {
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
 
@@ -42,6 +44,20 @@ export default function BackupPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  async function handleRunBackup() {
+    setRunning(true);
+    try {
+      const data = await runBackup();
+      setStatus(data.status);
+      setBackups(data.backups);
+      showToast(t.backupManualDone, "success");
+    } catch {
+      showToast(t.backupManualFail, "error");
+    } finally {
+      setRunning(false);
+    }
+  }
 
   async function handleDelete(date: string) {
     if (!window.confirm(t.backupDeleteConfirm)) return;
@@ -65,18 +81,39 @@ export default function BackupPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.backupTitle}</h1>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className={cn(
-            "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
-            s.controlGroup, s.controlIdle
-          )}
-        >
-          <RefreshCw className={cn("size-4", loading && "animate-spin")} />
-          {t.backupRefresh}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Manuel yedekle */}
+          <button
+            type="button"
+            onClick={handleRunBackup}
+            disabled={running || loading}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
+              "border-violet-400/30 bg-violet-400/10 text-violet-300 hover:bg-violet-400/20 active:scale-95 disabled:opacity-50",
+            )}
+          >
+            {running ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {running ? t.backupRunning : t.backupRunManual}
+          </button>
+          {/* Yenile */}
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
+              s.controlGroup, s.controlIdle
+            )}
+          >
+            <RefreshCw className={cn("size-4", loading && "animate-spin")} />
+            {t.backupRefresh}
+          </button>
+        </div>
+      </div>
+
+      {/* Manuel yedekleme açıklaması */}
+      <div className={cn("rounded-xl border px-4 py-3 text-xs font-semibold", s.subPanel)}>
+        <span className={cn(s.muted)}>{t.backupManualInfo}</span>
       </div>
 
       {/* Status cards — 2 col on mobile, 4 on large */}
