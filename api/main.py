@@ -1020,8 +1020,8 @@ def get_logs(
     db: Session = Depends(get_db),
     limit: int = Query(default=50, le=200),
 ):
-    # 30 günden eski logları otomatik sil
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    # 7 günden eski logları otomatik sil
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     db.query(ActivityLog).filter(ActivityLog.created_at < cutoff).delete()
     db.commit()
 
