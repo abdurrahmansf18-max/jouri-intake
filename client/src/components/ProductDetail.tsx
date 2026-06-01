@@ -387,6 +387,12 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {!isArchive && (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
                     <h3 className={cn("mb-3 text-xs font-black uppercase tracking-wide", s.muted)}>{t.changeStatus}</h3>
+                    {isPublishedLocked ? (
+                      <div className={cn("flex items-center gap-2 text-xs font-semibold", s.muted)}>
+                        <Lock className="size-3.5 text-emerald-400 shrink-0" />
+                        {t.editLockedPublished}
+                      </div>
+                    ) : (
                     <div className="flex flex-wrap gap-2">
                       {ACTIVE_STATUSES.map((st) => (
                         <button key={st} type="button" disabled={busy} onClick={() => handleStatusChange(st)}
@@ -396,6 +402,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         </button>
                       ))}
                     </div>
+                    )}
                   </section>
                 )}
 
