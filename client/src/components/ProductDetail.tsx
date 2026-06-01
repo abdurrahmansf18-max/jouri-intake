@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, Edit3, FolderOpen,
-  ImagePlus, Images, Loader2, Palette, Plus, ReceiptText,
-  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, X,
+  ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
+  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X,
 } from "lucide-react";
 import {
   addProductImages, deleteProduct, deleteProductImage,
@@ -195,6 +195,14 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const p = record.parsed;
   const isArchive = record.status === "sold_archive";
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
+  const isEditLocked = record.status === "ai_enhanced" || record.status === "published";
+  const lockReason = record.status === "published" ? t.editLockedPublished : t.editLockedAi;
+
+  async function handleUnlockEdit() {
+    if (!window.confirm(t.unlockWarning)) return;
+    await handleStatusChange("pending");
+    // Durum pending'e alındıktan sonra edit modunda kal
+  }
 
   return (
     <>
@@ -215,13 +223,17 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
             </div>
             {/* Masaüstü tab */}
             <div className={cn("hidden sm:inline-flex items-center gap-0.5 rounded-lg border p-0.5", s.controlGroup)}>
-              {(["view", "edit"] as Mode[]).map((m) => (
-                <button key={m} type="button" onClick={() => setMode(m)}
-                  className={cn("rounded-md px-3 py-1.5 text-xs font-extrabold transition",
-                    mode === m ? s.controlActive : s.controlIdle)}>
-                  {m === "view" ? t.viewDetails : t.editBtn}
-                </button>
-              ))}
+              <button type="button" onClick={() => setMode("view")}
+                className={cn("rounded-md px-3 py-1.5 text-xs font-extrabold transition",
+                  mode === "view" ? s.controlActive : s.controlIdle)}>
+                {t.viewDetails}
+              </button>
+              <button type="button" onClick={() => setMode("edit")}
+                className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-extrabold transition",
+                  mode === "edit" ? s.controlActive : s.controlIdle)}>
+                {isEditLocked && <Lock className="size-3" />}
+                {t.editBtn}
+              </button>
             </div>
             <button type="button" onClick={onClose}
               className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition", s.controlGroup, s.controlIdle)}>
@@ -231,13 +243,17 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
           {/* Mobil tab */}
           <div className={cn("flex sm:hidden border-b", s.panelBorder)}>
-            {(["view", "edit"] as Mode[]).map((m) => (
-              <button key={m} type="button" onClick={() => setMode(m)}
-                className={cn("flex-1 py-2.5 text-xs font-extrabold transition border-b-2",
-                  mode === m ? "border-violet-400 text-violet-400" : cn("border-transparent", s.muted))}>
-                {m === "view" ? t.viewDetails : t.editBtn}
-              </button>
-            ))}
+            <button type="button" onClick={() => setMode("view")}
+              className={cn("flex-1 py-2.5 text-xs font-extrabold transition border-b-2",
+                mode === "view" ? "border-violet-400 text-violet-400" : cn("border-transparent", s.muted))}>
+              {t.viewDetails}
+            </button>
+            <button type="button" onClick={() => setMode("edit")}
+              className={cn("flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 text-xs font-extrabold transition border-b-2",
+                mode === "edit" ? "border-violet-400 text-violet-400" : cn("border-transparent", s.muted))}>
+              {isEditLocked && <Lock className="size-3" />}
+              {t.editBtn}
+            </button>
           </div>
 
           {/* ── İçerik ── */}
@@ -431,6 +447,30 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     </div>
                   </section>
                 )}
+              </div>
+            ) : isEditLocked ? (
+              /* ────────────────── KİLİT EKRANI ────────────────── */
+              <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
+                <div className={cn("flex size-16 items-center justify-center rounded-2xl border", s.subPanel)}>
+                  <Lock className={cn("size-8", record.status === "published" ? "text-emerald-400" : "text-blue-400")} />
+                </div>
+                <div>
+                  <h3 className={cn("text-base font-black mb-1", s.title)}>{t.editLocked}</h3>
+                  <p className={cn("text-sm leading-6 max-w-xs", s.muted)}>{lockReason}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={handleUnlockEdit}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-extrabold transition",
+                    "border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 active:scale-95",
+                    busy && "opacity-50",
+                  )}
+                >
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : <Unlock className="size-4" />}
+                  {t.unlockToEdit}
+                </button>
               </div>
             ) : (
               /* ────────────────── DÜZENLEME MODU ────────────────── */
