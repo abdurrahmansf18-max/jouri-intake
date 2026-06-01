@@ -205,6 +205,7 @@ export const COPY = {
       ERR_DESCRIPTION_REQUIRED: "Açıklama boş olamaz.",
       ERR_OUT_OF_STOCK: "Bu bedenin stoğu tükendi.",
       ERR_BACKUP_FAILED: "Yedekleme başarısız oldu.",
+      ERR_RATE_LIMITED: "Çok fazla deneme. Lütfen birkaç dakika bekle.",
       ERR_GENERAL: "Bir hata oluştu. Lütfen tekrar deneyin.",
     } as Record<string, string>,
     // Toast success messages
@@ -454,6 +455,7 @@ export const COPY = {
       ERR_DESCRIPTION_REQUIRED: "لا يمكن ترك الوصف فارغًا.",
       ERR_OUT_OF_STOCK: "نفذ مخزون هذا المقاس.",
       ERR_BACKUP_FAILED: "فشل النسخ الاحتياطي.",
+      ERR_RATE_LIMITED: "محاولات كثيرة جداً. يرجى الانتظار بضع دقائق.",
       ERR_GENERAL: "حدث خطأ. يرجى المحاولة مرة أخرى.",
     } as Record<string, string>,
     // Toast success messages

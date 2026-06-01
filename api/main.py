@@ -8,7 +8,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import pyotp
-from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Query, Response, UploadFile, WebSocket, WebSocketDisconnect
+from collections import defaultdict
+from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy import text
@@ -217,11 +218,27 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Jouri Intake API", lifespan=lifespan)
+# Auth endpoint rate limiter: IP başına 10 deneme / 60 saniye, sonra 5 dk ban
+_auth_attempts: dict[str, list[float]] = defaultdict(list)
+_AUTH_MAX = 10
+_AUTH_WINDOW = 60
+_AUTH_LOCKOUT = 300
+
+def _auth_rate_ok(ip: str) -> bool:
+    now = time.time()
+    attempts = [t for t in _auth_attempts[ip] if now - t < _AUTH_WINDOW]
+    _auth_attempts[ip] = attempts
+    if len(attempts) >= _AUTH_MAX:
+        return False
+    attempts.append(now)
+    return True
+
+
+app = FastAPI(title="Jouri Intake API", lifespan=lifespan, docs_url=None, redoc_url=None)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://syncra.website", "https://www.syncra.website"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -285,10 +302,14 @@ def _get_or_404(db: Session, product_id: str) -> Product:
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
 @app.post("/api/auth/verify")
-def auth_verify(body: AuthRequest, response: Response):
+def auth_verify(body: AuthRequest, response: Response, request: Request):
     # Auth yapılandırılmamışsa serbest geç
     if not TOTP_SECRET and not USER_PASSWORD:
         return {"ok": True}
+
+    client_ip = (request.client.host if request.client else "unknown")
+    if not _auth_rate_ok(client_ip):
+        raise HTTPException(status_code=429, detail={"code": "ERR_RATE_LIMITED"})
 
     code = body.code.strip()
 
