@@ -8,7 +8,6 @@ interface Props {
   value: SizeStockRow[];
   onChange: (rows: SizeStockRow[]) => void;
   s: ThemeStyles;
-  sizeLabel: string;
   sizeNamePlaceholder: string;
   sizeQtyPlaceholder: string;
   addRowLabel: string;

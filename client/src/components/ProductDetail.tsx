@@ -103,16 +103,22 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   function num(val: string, fb: number) { const n = parseInt(val, 10); return Number.isFinite(n) ? n : fb; }
 
   async function handleSave() {
+    const validSizes = sizeRows
+      .filter((r) => r.size.trim())
+      .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
+
+    if (validSizes.length === 0) {
+      showToast(t.errSaveNeedSize, "error");
+      return;
+    }
+
     setBusy(true);
     try {
-      const validSizes = sizeRows
-        .filter((r) => r.size.trim())
-        .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
 
       const updated = await updateProduct(record.id, {
         notes: draft.notes,
         description: draft.description,
-        sizeStocks: validSizes,
+        sizeStocks: validSizes.length > 0 ? validSizes : undefined,
         parsed: {
           titleRaw: draft.titleRaw,
           germanTitleSuggestion: draft.germanTitleSuggestion,
@@ -474,28 +480,39 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <div className="grid gap-3">
                       {/* Beden seçimi (sizeStocks varsa) */}
                       {record.sizeStocks.length > 0 && (
-                        <label className="grid gap-1.5">
-                          <span className={cn("text-xs font-black", s.strong)}>{t.selectSizeForSale} *</span>
-                          <select
-                            value={draft.saleSize}
-                            onChange={(e) => { patch("saleSize", e.target.value); setSellError(""); }}
-                            className={cn(
-                              "min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4 appearance-none",
-                              s.input,
-                              sellError ? "border-red-400 focus:ring-red-500/15" : "",
+                        availableSizes.length === 0 ? (
+                          /* Tüm bedenler tükendi */
+                          <div className={cn(
+                            "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold",
+                            s.error,
+                          )}>
+                            <ShoppingBag className="size-4 shrink-0" />
+                            {t.allSizesOutOfStock}
+                          </div>
+                        ) : (
+                          <label className="grid gap-1.5">
+                            <span className={cn("text-xs font-black", s.strong)}>{t.selectSizeForSale} *</span>
+                            <select
+                              value={draft.saleSize}
+                              onChange={(e) => { patch("saleSize", e.target.value); setSellError(""); }}
+                              className={cn(
+                                "min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4",
+                                s.input,
+                                sellError ? "border-red-400 focus:ring-red-500/15" : "",
+                              )}
+                            >
+                              <option value="">— {t.selectSizeForSale} —</option>
+                              {availableSizes.map((ss) => (
+                                <option key={ss.size} value={ss.size}>
+                                  {t.sizeStockDisplay(ss.size, ss.qty)}
+                                </option>
+                              ))}
+                            </select>
+                            {sellError && (
+                              <p className={cn("text-xs font-semibold text-red-400")}>{sellError}</p>
                             )}
-                          >
-                            <option value="">— {t.selectSizeForSale} —</option>
-                            {availableSizes.map((ss) => (
-                              <option key={ss.size} value={ss.size}>
-                                {t.sizeStockDisplay(ss.size, ss.qty)}
-                              </option>
-                            ))}
-                          </select>
-                          {sellError && (
-                            <p className={cn("text-xs font-semibold", "text-red-400")}>{sellError}</p>
-                          )}
-                        </label>
+                          </label>
+                        )
                       )}
 
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -518,7 +535,8 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       </div>
                     </div>
 
-                    <button type="button" onClick={handleSell} disabled={busy}
+                    <button type="button" onClick={handleSell}
+                      disabled={busy || (record.sizeStocks.length > 0 && availableSizes.length === 0)}
                       className={cn("mt-3 inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border text-sm font-extrabold transition disabled:opacity-60", s.error)}>
                       {busy ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
                       {t.markSold}
@@ -532,11 +550,14 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </section>
                 ) : (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
-                    <label className="grid gap-1.5 mb-3">
+                    <label className="grid gap-1.5 mb-2">
                       <span className={cn("text-xs font-black", s.strong)}>{t.restoreStock}</span>
                       <input type="number" min={1} value={draft.restoreStock} onChange={(e) => patch("restoreStock", e.target.value)}
                         className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
                     </label>
+                    {record.sizeStocks.length > 0 && (
+                      <p className={cn("mb-3 text-xs font-semibold", s.muted)}>{t.restoreStockNote}</p>
+                    )}
                     <button type="button" onClick={handleRestore} disabled={busy}
                       className={cn("inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border text-sm font-extrabold transition disabled:opacity-60", s.success)}>
                       <ArchiveRestore className="size-4" /> {t.restoreProduct}
@@ -648,7 +669,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       value={sizeRows}
                       onChange={setSizeRows}
                       s={s}
-                      sizeLabel={t.size}
                       sizeNamePlaceholder={t.sizeNamePlaceholder}
                       sizeQtyPlaceholder={t.sizeQtyPlaceholder}
                       addRowLabel={t.addSizeRow}

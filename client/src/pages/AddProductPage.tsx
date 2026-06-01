@@ -198,7 +198,6 @@ export default function AddProductPage() {
                 value={sizeRows}
                 onChange={setSizeRows}
                 s={s}
-                sizeLabel={t.size}
                 sizeNamePlaceholder={t.sizeNamePlaceholder}
                 sizeQtyPlaceholder={t.sizeQtyPlaceholder}
                 addRowLabel={t.addSizeRow}

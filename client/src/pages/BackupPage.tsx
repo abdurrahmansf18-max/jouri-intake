@@ -81,7 +81,7 @@ export default function BackupPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.backupTitle}</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Manuel yedekle */}
           <button
             type="button"
@@ -93,7 +93,7 @@ export default function BackupPage() {
             )}
           >
             {running ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            {running ? t.backupRunning : t.backupRunManual}
+            <span>{running ? t.backupRunning : t.backupRunManual}</span>
           </button>
           {/* Yenile */}
           <button
@@ -102,11 +102,11 @@ export default function BackupPage() {
             disabled={loading}
             className={cn(
               "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
-              s.controlGroup, s.controlIdle
+              s.controlGroup, s.controlIdle,
             )}
           >
             <RefreshCw className={cn("size-4", loading && "animate-spin")} />
-            {t.backupRefresh}
+            <span>{t.backupRefresh}</span>
           </button>
         </div>
       </div>

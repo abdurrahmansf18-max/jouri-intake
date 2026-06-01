@@ -179,6 +179,7 @@ export const COPY = {
     errMaxImages: "En fazla 5 görsel ekleyebilirsin.",
     errSizeRequired: "En az bir beden ve stok eklemelisin.",
     errSizeSelectRequired: "Hangi bedenden satıldığını seçmelisin.",
+    errSaveNeedSize: "En az bir beden girmelisin.",
     // Size stocks UI
     sizeStocksLabel: "Bedenler ve Stok",
     addSizeRow: "+ Beden ekle",
@@ -186,6 +187,8 @@ export const COPY = {
     sizeQtyPlaceholder: "Adet",
     selectSizeForSale: "Satılacak beden",
     sizeStockDisplay: (size: string, qty: number) => `${size}: ${qty} adet`,
+    allSizesOutOfStock: "Tüm bedenler tükendi — stok yok.",
+    restoreStockNote: "Stok bedenler arasında eşit dağıtılır, sonra düzenleyebilirsin.",
     // API error codes → messages
     errors: {
       ERR_UNAUTHORIZED: "Yetkisiz erişim.",
@@ -201,6 +204,7 @@ export const COPY = {
       ERR_IMAGE_REQUIRED: "En az bir görsel seçmelisin.",
       ERR_DESCRIPTION_REQUIRED: "Açıklama boş olamaz.",
       ERR_OUT_OF_STOCK: "Bu bedenin stoğu tükendi.",
+      ERR_BACKUP_FAILED: "Yedekleme başarısız oldu.",
       ERR_GENERAL: "Bir hata oluştu. Lütfen tekrar deneyin.",
     } as Record<string, string>,
     // Toast success messages
@@ -232,7 +236,7 @@ export const COPY = {
     backupRunning: "Yedekleniyor...",
     backupManualDone: "Manuel yedekleme tamamlandı.",
     backupManualFail: "Yedekleme başarısız.",
-    backupManualInfo: "DB + fotoğraflar (sadece değişenler). Drive sync otomatik çalışır.",
+    backupManualInfo: "DB + fotoğraflar (sadece değişenler) + Drive sync dahil.",
     backupDriveStorage: "Google Drive'a yüklendi",
     backupLocalStorage: "VPS'te saklanıyor",
     backupRefresh: "Yenile",
@@ -240,7 +244,7 @@ export const COPY = {
     backupHowTitle: "Yedekleme nasıl çalışır?",
     backupHow1: "Her gece 02:00'de otomatik çalışır",
     backupHow2: "Veritabanı: tüm ürünler, satışlar, loglar",
-    backupHow3: "Görseller: artımlı kopyalama (sadece yeni dosyalar)",
+    backupHow3: "Görseller: artımlı kopyalama (sadece yeni/değişen dosyalar)",
     backupHow4: "Google Drive'a otomatik yüklenir",
     backupHow5: "30 günden eski yedekler otomatik silinir",
     // Sample
@@ -424,6 +428,7 @@ export const COPY = {
     errMaxImages: "يمكنك إضافة 5 صور كحد أقصى.",
     errSizeRequired: "يجب إضافة مقاس واحد على الأقل مع الكمية.",
     errSizeSelectRequired: "يجب تحديد المقاس المباع.",
+    errSaveNeedSize: "يجب إدخال مقاس واحد على الأقل.",
     // Size stocks UI
     sizeStocksLabel: "المقاسات والمخزون",
     addSizeRow: "+ إضافة مقاس",
@@ -431,6 +436,8 @@ export const COPY = {
     sizeQtyPlaceholder: "الكمية",
     selectSizeForSale: "المقاس المباع",
     sizeStockDisplay: (size: string, qty: number) => `${size}: ${qty} قطعة`,
+    allSizesOutOfStock: "نفدت جميع المقاسات — لا يوجد مخزون.",
+    restoreStockNote: "سيتم توزيع المخزون بالتساوي على المقاسات، ويمكنك تعديله لاحقاً.",
     // API error codes → messages
     errors: {
       ERR_UNAUTHORIZED: "وصول غير مصرح.",
@@ -446,6 +453,7 @@ export const COPY = {
       ERR_IMAGE_REQUIRED: "يجب اختيار صورة واحدة على الأقل.",
       ERR_DESCRIPTION_REQUIRED: "لا يمكن ترك الوصف فارغًا.",
       ERR_OUT_OF_STOCK: "نفذ مخزون هذا المقاس.",
+      ERR_BACKUP_FAILED: "فشل النسخ الاحتياطي.",
       ERR_GENERAL: "حدث خطأ. يرجى المحاولة مرة أخرى.",
     } as Record<string, string>,
     // Toast success messages
@@ -477,7 +485,7 @@ export const COPY = {
     backupRunning: "جار النسخ الاحتياطي...",
     backupManualDone: "اكتمل النسخ الاحتياطي اليدوي.",
     backupManualFail: "فشل النسخ الاحتياطي.",
-    backupManualInfo: "قاعدة البيانات + الصور (الملفات المتغيرة فقط). مزامنة Drive تعمل تلقائياً.",
+    backupManualInfo: "قاعدة البيانات + الصور (المتغيرة فقط) + مزامنة Drive مشمولة.",
     backupDriveStorage: "تم الرفع إلى Google Drive",
     backupLocalStorage: "محفوظ على الخادم",
     backupRefresh: "تحديث",
@@ -485,7 +493,7 @@ export const COPY = {
     backupHowTitle: "كيف يعمل النسخ الاحتياطي؟",
     backupHow1: "يعمل تلقائياً كل ليلة الساعة 02:00",
     backupHow2: "قاعدة البيانات: كل المنتجات والمبيعات والسجلات",
-    backupHow3: "الصور: نسخ تدريجي (الملفات الجديدة فقط)",
+    backupHow3: "الصور: نسخ تدريجي (الملفات الجديدة والمتغيرة فقط)",
     backupHow4: "يُرفع إلى Google Drive تلقائياً",
     backupHow5: "يُحذف تلقائياً بعد 30 يوماً",
     // Sample
