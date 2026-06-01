@@ -7,6 +7,7 @@ import { DARK, LIGHT } from "../theme";
 import type { ProductRecord, StatusFilter } from "../types";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
+import { useProductSync } from "../hooks/useProductSync";
 
 const FILTERS: StatusFilter[] = ["all", "pending", "ai_enhanced", "published"];
 
@@ -14,11 +15,11 @@ const FILTERS: StatusFilter[] = ["all", "pending", "ai_enhanced", "published"];
 function norm(str: string): string {
   return str
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")       // Latin aksan işaretleri (ä→a, ö→o, ü→u)
-    .replace(/[ً-ٰٟ]/g, "") // Arapça hareke (تشكيل)
-    .replace(/[أإآٱ]/g, "ا")              // Elif varyantları
-    .replace(/[ىئ]/g, "ي")               // Ya varyantları
-    .replace(/ة/g, "ه")                  // Te merbuta
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[ً-ٰٟ]/g, "")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/[ىئ]/g, "ي")
+    .replace(/ة/g, "ه")
     .toLocaleLowerCase();
 }
 
@@ -36,6 +37,7 @@ export default function ProductsPage() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
 
   useEffect(() => {
     fetchProducts()
@@ -43,6 +45,30 @@ export default function ProductsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useProductSync({
+    onProductUpdated: (updated) => {
+      if (updated.status === "sold_archive") {
+        setRecords((prev) => prev.filter((r) => r.id !== updated.id));
+      } else {
+        setRecords((prev) => {
+          const exists = prev.find((r) => r.id === updated.id);
+          return exists
+            ? prev.map((r) => r.id === updated.id ? updated : r)
+            : [updated, ...prev];
+        });
+      }
+    },
+    onProductCreated: (created) => {
+      if (created.status !== "sold_archive") {
+        setRecords((prev) => [created, ...prev.filter((r) => r.id !== created.id)]);
+      }
+    },
+    onProductDeleted: (id) => {
+      setRecords((prev) => prev.filter((r) => r.id !== id));
+      setSelectedId((cur) => cur === id ? null : cur);
+    },
+  });
 
   const counts: Record<StatusFilter, number> = {
     all: records.length,
@@ -68,13 +94,21 @@ export default function ProductsPage() {
   }, [records, filter, search]);
 
   function replaceRecord(updated: ProductRecord) {
-    setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    if (updated.status === "sold_archive") {
+      setRecords((prev) => prev.filter((r) => r.id !== updated.id));
+      setSelectedId(null);
+    } else {
+      setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    }
   }
 
   function removeRecord(id: string) {
     setRecords((prev) => prev.filter((r) => r.id !== id));
     if (selectedId === id) setSelectedId(null);
   }
+
+  function openView(id: string) { setSelectedId(id); setDetailMode("view"); }
+  function openEdit(id: string) { setSelectedId(id); setDetailMode("edit"); }
 
   const selected = records.find((r) => r.id === selectedId) ?? null;
 
@@ -93,20 +127,14 @@ export default function ProductsPage() {
         <div className="text-sm font-bold text-violet-400">{t.imageCount(records.reduce((n, r) => n + r.images.length, 0))}</div>
       </div>
 
-      {/* Filters + search */}
+      {/* Filtreler + arama */}
       <div className={cn("rounded-xl border p-4", s.panel)}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex flex-wrap gap-1.5">
             {FILTERS.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition",
-                  filter === f ? s.filterActive : s.filterIdle,
-                )}
-              >
+              <button key={f} type="button" onClick={() => setFilter(f)}
+                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition",
+                  filter === f ? s.filterActive : s.filterIdle)}>
                 {filterLabel(f, locale)}
                 <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black", filter === f ? "bg-white/20" : "bg-white/5")}>
                   {counts[f]}
@@ -116,13 +144,9 @@ export default function ProductsPage() {
           </div>
           <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
             <Search className="size-4 shrink-0 text-violet-400" />
-            <input
-              className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t.searchPlaceholder}
-              dir="auto"
-            />
+            <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder={t.searchPlaceholder} dir="auto" />
           </label>
         </div>
       </div>
@@ -139,7 +163,8 @@ export default function ProductsPage() {
             <ProductCard
               key={record.id}
               record={record}
-              onOpen={() => setSelectedId(record.id)}
+              onOpen={() => openView(record.id)}
+              onEdit={() => openEdit(record.id)}
               onReplace={replaceRecord}
               searchQuery={search}
             />
@@ -150,6 +175,7 @@ export default function ProductsPage() {
       {selected && (
         <ProductDetail
           record={selected}
+          initialMode={detailMode}
           onClose={() => setSelectedId(null)}
           onReplace={replaceRecord}
           onDelete={removeRecord}

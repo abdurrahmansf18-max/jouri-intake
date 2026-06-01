@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArchiveRestore, ExternalLink, ImageOff } from "lucide-react";
+import { ArchiveRestore, ExternalLink, ImageOff, Pencil } from "lucide-react";
 import { productImageUrl, updateStatus } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -9,12 +9,13 @@ import type { ProductRecord, ProductStatus } from "../types";
 interface Props {
   record: ProductRecord;
   onOpen: () => void;
+  onEdit: () => void;
   onReplace: (updated: ProductRecord) => void;
   showRestoreBtn?: boolean;
   searchQuery?: string;
 }
 
-export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn, searchQuery }: Props) {
+export default function ProductCard({ record, onOpen, onEdit, onReplace, showRestoreBtn, searchQuery }: Props) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
@@ -105,16 +106,16 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn,
           </span>
         </div>
 
-        {/* Alt satır: hover göstergesi + restore butonu */}
-        <div className="mt-2 flex items-center justify-between">
+        {/* Alt satır: detay göstergesi + düzenle/geri al butonu */}
+        <div className="mt-2 flex items-center justify-between gap-2">
           <span className={cn(
             "inline-flex items-center gap-1 text-[10px] font-bold text-violet-400",
             "opacity-0 transition-opacity group-hover:opacity-100",
           )}>
             <ExternalLink className="size-2.5" />
-            {t.openDetail}
+            {t.viewDetails}
           </span>
-          {showRestoreBtn && (
+          {showRestoreBtn ? (
             <button
               type="button"
               disabled={busy}
@@ -127,6 +128,19 @@ export default function ProductCard({ record, onOpen, onReplace, showRestoreBtn,
             >
               <ArchiveRestore className="size-3" />
               {t.restoreProduct}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold",
+                "transition-all active:scale-95",
+                "border-violet-400/30 bg-violet-400/10 text-violet-300 hover:bg-violet-400/20",
+              )}
+            >
+              <Pencil className="size-3" />
+              {t.editBtn}
             </button>
           )}
         </div>

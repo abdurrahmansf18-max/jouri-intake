@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { deleteLog, fetchLogs, fetchProducts } from "../api";
+import { useProductSync } from "../hooks/useProductSync";
 import { useApp } from "../context";
 import { COPY, cn, logActionLabel } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -26,6 +27,21 @@ export default function DashboardPage() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  useProductSync({
+    onProductUpdated: (updated) => {
+      setProducts((prev) => {
+        const exists = prev.find((p) => p.id === updated.id);
+        return exists ? prev.map((p) => p.id === updated.id ? updated : p) : [updated, ...prev];
+      });
+    },
+    onProductCreated: (created) => {
+      setProducts((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
+    },
+    onProductDeleted: (id) => {
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    },
+  });
 
   useEffect(() => {
     Promise.all([fetchProducts(), fetchLogs(30)])

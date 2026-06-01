@@ -7,6 +7,12 @@ import { DARK, LIGHT } from "../theme";
 import type { ProductRecord } from "../types";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
+import { useProductSync } from "../hooks/useProductSync";
+
+function norm(str: string): string {
+  return str.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[ً-ٰٟ]/g, "")
+    .replace(/[أإآٱ]/g, "ا").replace(/[ىئ]/g, "ي").replace(/ة/g, "ه").toLocaleLowerCase();
+}
 
 export default function ArchivePage() {
   const { locale, theme } = useApp();
@@ -17,6 +23,7 @@ export default function ArchivePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
 
   useEffect(() => {
     fetchProducts()
@@ -24,6 +31,23 @@ export default function ArchivePage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useProductSync({
+    onProductUpdated: (updated) => {
+      if (updated.status === "sold_archive") {
+        setRecords((prev) => {
+          const exists = prev.find((r) => r.id === updated.id);
+          return exists ? prev.map((r) => r.id === updated.id ? updated : r) : [updated, ...prev];
+        });
+      } else {
+        setRecords((prev) => prev.filter((r) => r.id !== updated.id));
+      }
+    },
+    onProductDeleted: (id) => {
+      setRecords((prev) => prev.filter((r) => r.id !== id));
+      setSelectedId((cur) => cur === id ? null : cur);
+    },
+  });
 
   const filtered = useMemo(() => {
     const tokens = norm(search).split(/\s+/).filter(Boolean);
@@ -35,14 +59,10 @@ export default function ArchivePage() {
     });
   }, [records, search]);
 
-  function norm(str: string): string {
-    return str.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[ً-ٰٟ]/g, "")
-      .replace(/[أإآٱ]/g, "ا").replace(/[ىئ]/g, "ي").replace(/ة/g, "ه").toLocaleLowerCase();
-  }
-
   function replaceRecord(updated: ProductRecord) {
     if (updated.status !== "sold_archive") {
       setRecords((prev) => prev.filter((r) => r.id !== updated.id));
+      setSelectedId(null);
     } else {
       setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     }
@@ -56,11 +76,7 @@ export default function ArchivePage() {
   const selected = records.find((r) => r.id === selectedId) ?? null;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-8 animate-spin text-violet-400" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-20"><Loader2 className="size-8 animate-spin text-violet-400" /></div>;
   }
 
   return (
@@ -72,25 +88,17 @@ export default function ArchivePage() {
         </p>
       </div>
 
-      {/* Search */}
       <label className={cn("flex min-h-11 items-center gap-2 rounded-xl border px-3", s.input)}>
         <Search className="size-4 shrink-0 text-violet-400" />
-        <input
-          className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t.searchPlaceholder}
-          dir="auto"
-        />
+        <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder={t.searchPlaceholder} dir="auto" />
       </label>
 
-      {/* Grid */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16">
           <ArchiveIcon className={cn("size-12", s.emptyIcon)} />
-          <p className={cn("text-sm font-semibold", s.muted)}>
-            {records.length === 0 ? t.noRecords : t.noFiltered}
-          </p>
+          <p className={cn("text-sm font-semibold", s.muted)}>{records.length === 0 ? t.noRecords : t.noFiltered}</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -98,7 +106,8 @@ export default function ArchivePage() {
             <ProductCard
               key={record.id}
               record={record}
-              onOpen={() => setSelectedId(record.id)}
+              onOpen={() => { setSelectedId(record.id); setDetailMode("view"); }}
+              onEdit={() => { setSelectedId(record.id); setDetailMode("edit"); }}
               onReplace={replaceRecord}
               showRestoreBtn
               searchQuery={search}
@@ -110,6 +119,7 @@ export default function ArchivePage() {
       {selected && (
         <ProductDetail
           record={selected}
+          initialMode={detailMode}
           onClose={() => setSelectedId(null)}
           onReplace={replaceRecord}
           onDelete={removeRecord}

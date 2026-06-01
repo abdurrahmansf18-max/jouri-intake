@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import pyotp
-from fastapi import Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Query, Response, UploadFile
+from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Query, Response, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -39,6 +39,33 @@ SESSION_TTL = 60 * 60 * 24  # 24 saat
 
 # Bellek içi oturum deposu: {token: oluşturulma_zamanı}
 _sessions: dict[str, float] = {}
+
+
+# ── WebSocket bağlantı yöneticisi ─────────────────────────────────────────────
+
+class ConnectionManager:
+    def __init__(self) -> None:
+        self._conns: list[WebSocket] = []
+
+    async def connect(self, ws: WebSocket) -> None:
+        await ws.accept()
+        self._conns.append(ws)
+
+    def disconnect(self, ws: WebSocket) -> None:
+        if ws in self._conns:
+            self._conns.remove(ws)
+
+    async def broadcast(self, data: dict) -> None:
+        dead: list[WebSocket] = []
+        for ws in list(self._conns):
+            try:
+                await ws.send_json(data)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(ws)
+
+ws_manager = ConnectionManager()
 
 
 def _create_session() -> str:
@@ -254,6 +281,22 @@ def auth_logout(response: Response):
     return {"ok": True}
 
 
+@app.websocket("/ws")
+async def websocket_endpoint(
+    ws: WebSocket,
+    jouri_session: Annotated[str | None, Cookie()] = None,
+):
+    if TOTP_SECRET and not _is_valid_session(jouri_session):
+        await ws.close(code=4001)
+        return
+    await ws_manager.connect(ws)
+    try:
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(ws)
+
+
 # ── Products ──────────────────────────────────────────────────────────────────
 
 @app.get("/api/products", response_model=list[ProductRecord])
@@ -359,6 +402,7 @@ async def create_product(
 def update_status(
     product_id: str,
     body: StatusUpdateRequest,
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
@@ -381,13 +425,16 @@ def update_status(
     )
     db.commit()
     db.refresh(p)
-    return _to_record(p)
+    record = _to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
 
 
 @app.patch("/api/products/{product_id}", response_model=ProductRecord)
 def update_product(
     product_id: str,
     body: ProductUpdateRequest,
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
@@ -440,13 +487,16 @@ def update_product(
     )
     db.commit()
     db.refresh(p)
-    return _to_record(p)
+    record = _to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
 
 
 @app.post("/api/products/{product_id}/sell", response_model=ProductRecord)
 def sell_product(
     product_id: str,
     body: SellProductRequest,
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
@@ -477,7 +527,9 @@ def sell_product(
     )
     db.commit()
     db.refresh(p)
-    return _to_record(p)
+    record = _to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
 
 
 @app.post("/api/products/{product_id}/sales/reset", response_model=ProductRecord)
@@ -504,6 +556,7 @@ def reset_sales(
 def restore_product(
     product_id: str,
     body: RestoreProductRequest,
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
@@ -521,7 +574,9 @@ def restore_product(
     )
     db.commit()
     db.refresh(p)
-    return _to_record(p)
+    record = _to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
 
 
 @app.post("/api/products/{product_id}/images", response_model=ProductRecord)
@@ -560,6 +615,7 @@ async def add_product_images(
 @app.delete("/api/products/{product_id}")
 def delete_product(
     product_id: str,
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
@@ -577,6 +633,7 @@ def delete_product(
         pass
 
     db.commit()
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_deleted", "id": product_id})
     return {"ok": True}
 
 
@@ -601,6 +658,7 @@ def delete_product_image(
     product_id: str,
     kind: str,
     file_name: str,
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
@@ -615,7 +673,9 @@ def delete_product_image(
                         details={"changed": {"image_deleted": {"from": file_name, "to": ""}}})
     db.commit()
     db.refresh(p)
-    return _to_record(p)
+    record = _to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
 
 
 # ── Backup management ─────────────────────────────────────────────────────────
