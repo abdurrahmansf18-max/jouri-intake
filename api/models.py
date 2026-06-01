@@ -10,6 +10,11 @@ class ProductStatus(str, Enum):
     sold_archive = "sold_archive"
 
 
+class SizeStock(BaseModel):
+    size: str
+    qty: int
+
+
 class ParsedProduct(BaseModel):
     titleRaw: str = ""
     germanTitleSuggestion: str = ""
@@ -34,6 +39,7 @@ class SavedImage(BaseModel):
 class SaleRecord(BaseModel):
     soldAt: str
     quantity: int = 1
+    size: Optional[str] = None
     note: str = ""
 
 
@@ -62,6 +68,7 @@ class ProductRecord(BaseModel):
     soldQuantity: int = 0
     lastSoldAt: Optional[str] = None
     saleHistory: list[SaleRecord] = Field(default_factory=list)
+    sizeStocks: list[SizeStock] = Field(default_factory=list)
 
 
 class StatusUpdateRequest(BaseModel):
@@ -85,11 +92,13 @@ class ProductUpdateRequest(BaseModel):
     notes: Optional[str] = None
     stockQuantity: Optional[int] = None
     description: Optional[str] = None
+    sizeStocks: Optional[list[SizeStock]] = None
     parsed: Optional[ParsedProductUpdate] = None
 
 
 class SellProductRequest(BaseModel):
     quantity: int = 1
+    size: Optional[str] = None
     note: Optional[str] = None
 
 

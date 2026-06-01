@@ -28,6 +28,7 @@ class Product(Base):
     tags = Column(JSON, nullable=False, default=list)
     images = Column(JSON, nullable=False, default=list)
     sale_history = Column(JSON, nullable=False, default=list)
+    size_stocks = Column(JSON, nullable=True, default=None)
 
 
 class ActivityLog(Base):

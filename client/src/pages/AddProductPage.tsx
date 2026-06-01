@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Edit3,
   Loader2,
+  Ruler,
   Save,
   UploadCloud,
 } from "lucide-react";
@@ -11,33 +12,24 @@ import { createProduct } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
+import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEditor";
 
 type Draft = {
   titleRaw: string;
-  germanTitleSuggestion: string;
   categorySuggestion: string;
   productTypeSuggestion: string;
   priceAmount: string;
-  currency: string;
   colorRaw: string;
-  colorGermanSuggestion: string;
-  sizesRaw: string;
-  stockQuantity: string;
   notes: string;
 };
 
 function emptyDraft(): Draft {
   return {
     titleRaw: "",
-    germanTitleSuggestion: "",
     categorySuggestion: "",
     productTypeSuggestion: "",
     priceAmount: "",
-    currency: "",
     colorRaw: "",
-    colorGermanSuggestion: "",
-    sizesRaw: "",
-    stockQuantity: "",
     notes: "",
   };
 }
@@ -53,6 +45,7 @@ export default function AddProductPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<{ name: string; url: string }[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [sizeRows, setSizeRows] = useState<SizeStockRow[]>([{ size: "", qty: "1" }]);
   const [submitting, setSubmitting] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
@@ -65,9 +58,8 @@ export default function AddProductPage() {
     if (!draft.titleRaw.trim()) return t.errTitleRequired;
     if (!draft.priceAmount.trim()) return t.errPriceRequired;
     if (!draft.colorRaw.trim()) return t.errColorRequired;
-    if (!draft.sizesRaw.trim()) return t.errSizeRequired;
-    const stock = parseInt(draft.stockQuantity, 10);
-    if (!Number.isFinite(stock) || stock < 1) return t.errStockRequired;
+    const validSizes = sizeRows.filter((r) => r.size.trim() && parseInt(r.qty, 10) >= 1);
+    if (!validSizes.length) return t.errSizeRequired;
     if (!description.trim()) return t.emptyDesc;
     return null;
   }
@@ -79,25 +71,27 @@ export default function AddProductPage() {
     setFieldError(null);
     setSubmitting(true);
     try {
+      const validSizes = sizeRows
+        .filter((r) => r.size.trim())
+        .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
+
       await createProduct(description, files, {
         notes: draft.notes,
-        stockQuantity: parseInt(draft.stockQuantity, 10),
+        sizeStocks: validSizes,
         parsed: {
           titleRaw: draft.titleRaw,
-          germanTitleSuggestion: draft.germanTitleSuggestion,
           categorySuggestion: draft.categorySuggestion,
           productTypeSuggestion: draft.productTypeSuggestion,
           priceAmount: draft.priceAmount,
           currency: "EUR",
           colorRaw: draft.colorRaw,
-          colorGermanSuggestion: draft.colorGermanSuggestion,
-          sizesRaw: draft.sizesRaw,
         },
       });
       showToast(t.toastCreated, "success");
       setDescription("");
       setDraft(emptyDraft());
       setFiles([]);
+      setSizeRows([{ size: "", qty: "1" }]);
       setPreviews((curr) => { curr.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
       formRef.current?.reset();
       navigate("/products");
@@ -129,7 +123,7 @@ export default function AddProductPage() {
         </div>
 
         <div className="grid gap-5 p-5">
-          {/* Image upload */}
+          {/* Görsel yükleme */}
           <label className={cn("group relative grid min-h-44 cursor-pointer place-items-center rounded-xl border border-dashed px-4 py-6 text-center transition", s.dropzone)}>
             <input
               className="sr-only"
@@ -160,7 +154,7 @@ export default function AddProductPage() {
             </div>
           )}
 
-          {/* Description */}
+          {/* Açıklama */}
           <label className="grid gap-2">
             <span className={cn("flex items-center gap-2 text-sm font-bold", s.label)}>
               <ClipboardList className="size-4 text-violet-400" />
@@ -176,22 +170,37 @@ export default function AddProductPage() {
             <span className={cn("text-xs", s.muted)}>{t.descriptionHelp(description.length)}</span>
           </label>
 
-          {/* Required fields */}
+          {/* Zorunlu alanlar */}
           <section className={cn("rounded-xl border p-4", s.subPanel)}>
             <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
               <Edit3 className="size-4 text-violet-400" />
               {t.createDetailsTitle}
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label={`${t.rawTitle} *`}   s={s} value={draft.titleRaw}    onChange={(v) => patch("titleRaw", v)} />
-              <Field label={t.germanTitle}        s={s} value={draft.germanTitleSuggestion} onChange={(v) => patch("germanTitleSuggestion", v)} />
-              <Field label={`${t.price} *`}       s={s} value={draft.priceAmount} onChange={(v) => patch("priceAmount", v)} />
-              <Field label={`${t.color} *`}       s={s} value={draft.colorRaw}    onChange={(v) => patch("colorRaw", v)} />
-              <Field label={`${t.size} *`}        s={s} value={draft.sizesRaw}    onChange={(v) => patch("sizesRaw", v)} />
-              <Field label={t.category}           s={s} value={draft.categorySuggestion}   onChange={(v) => patch("categorySuggestion", v)} />
-              <Field label={t.productType}        s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} />
-              <Field label={`${t.stockQuantity} *`} s={s} value={draft.stockQuantity} type="number" onChange={(v) => patch("stockQuantity", v)} />
+              <Field label={`${t.rawTitle} *`}       s={s} value={draft.titleRaw}              onChange={(v) => patch("titleRaw", v)} />
+              <Field label={`${t.price} *`}           s={s} value={draft.priceAmount}           onChange={(v) => patch("priceAmount", v)} />
+              <Field label={`${t.color} *`}           s={s} value={draft.colorRaw}              onChange={(v) => patch("colorRaw", v)} />
+              <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} />
+              <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} />
             </div>
+
+            {/* Beden + stok editörü */}
+            <div className="mt-3 grid gap-1.5">
+              <span className={cn("flex items-center gap-2 text-xs font-black", s.strong)}>
+                <Ruler className="size-3.5 text-sky-400" />
+                {t.sizeStocksLabel} *
+              </span>
+              <SizeStockEditor
+                value={sizeRows}
+                onChange={setSizeRows}
+                s={s}
+                sizeLabel={t.size}
+                sizeNamePlaceholder={t.sizeNamePlaceholder}
+                sizeQtyPlaceholder={t.sizeQtyPlaceholder}
+                addRowLabel={t.addSizeRow}
+              />
+            </div>
+
             <label className="mt-3 grid gap-1.5">
               <span className={cn("text-xs font-black", s.strong)}>{t.notes}</span>
               <textarea
@@ -220,7 +229,6 @@ export default function AddProductPage() {
           </button>
         </div>
       </form>
-
     </div>
   );
 }

@@ -12,9 +12,10 @@ import {
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
-import type { ProductRecord, ProductStatus } from "../types";
+import type { ProductRecord, ProductStatus, SizeStock } from "../types";
 import { statusActiveBadge, statusBadge } from "./ProductCard";
 import ImageLightbox from "./ImageLightbox";
+import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
 
 const ACTIVE_STATUSES: ProductStatus[] = ["pending", "ai_enhanced", "published"];
 
@@ -23,11 +24,12 @@ type Mode = "view" | "edit";
 type Draft = {
   titleRaw: string; germanTitleSuggestion: string;
   categorySuggestion: string; productTypeSuggestion: string;
-  priceAmount: string; currency: string;
+  priceAmount: string;
   colorRaw: string; colorGermanSuggestion: string;
-  sizesRaw: string; notes: string; description: string;
-  stockQuantity: string; restoreStock: string;
+  notes: string; description: string;
+  restoreStock: string;
   saleQuantity: string; saleNote: string;
+  saleSize: string;
 };
 
 function recordToDraft(r: ProductRecord): Draft {
@@ -37,17 +39,19 @@ function recordToDraft(r: ProductRecord): Draft {
     categorySuggestion: r.parsed.categorySuggestion,
     productTypeSuggestion: r.parsed.productTypeSuggestion,
     priceAmount: r.parsed.priceAmount,
-    currency: r.parsed.currency || "EUR",
     colorRaw: r.parsed.colorRaw,
     colorGermanSuggestion: r.parsed.colorGermanSuggestion,
-    sizesRaw: r.parsed.sizesRaw,
     notes: r.notes || "",
     description: r.description || "",
-    stockQuantity: String(Math.max(0, r.stockQuantity)),
     restoreStock: String(Math.max(1, r.stockQuantity || 1)),
     saleQuantity: "1",
     saleNote: "",
+    saleSize: "",
   };
+}
+
+function sizeStocksToRows(ss: SizeStock[]): SizeStockRow[] {
+  return ss.map((s) => ({ size: s.size, qty: String(s.qty) }));
 }
 
 interface Props {
@@ -65,6 +69,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [draft, setDraft] = useState<Draft>(() => recordToDraft(record));
+  const [sizeRows, setSizeRows] = useState<SizeStockRow[]>(() => sizeStocksToRows(record.sizeStocks));
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [deletingImage, setDeletingImage] = useState<string | null>(null);
@@ -76,9 +81,11 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [unlockCode, setUnlockCode] = useState("");
   const [unlockError, setUnlockError] = useState(false);
   const [unlockBusy, setUnlockBusy] = useState(false);
+  const [sellError, setSellError] = useState("");
 
   useEffect(() => {
     setDraft(recordToDraft(record));
+    setSizeRows(sizeStocksToRows(record.sizeStocks));
     setMode(initialMode);
     setDeleteConfirm(false);
     setImageFiles([]);
@@ -86,6 +93,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setEditUnlocked(false);
     setUnlockCode("");
     setUnlockError(false);
+    setSellError("");
     setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
   }, [record.id, initialMode]);
 
@@ -97,15 +105,23 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   async function handleSave() {
     setBusy(true);
     try {
+      const validSizes = sizeRows
+        .filter((r) => r.size.trim())
+        .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
+
       const updated = await updateProduct(record.id, {
-        notes: draft.notes, description: draft.description,
-        stockQuantity: num(draft.stockQuantity, 1),
+        notes: draft.notes,
+        description: draft.description,
+        sizeStocks: validSizes,
         parsed: {
-          titleRaw: draft.titleRaw, germanTitleSuggestion: draft.germanTitleSuggestion,
-          categorySuggestion: draft.categorySuggestion, productTypeSuggestion: draft.productTypeSuggestion,
-          priceAmount: draft.priceAmount, currency: "EUR",
-          colorRaw: draft.colorRaw, colorGermanSuggestion: draft.colorGermanSuggestion,
-          sizesRaw: draft.sizesRaw,
+          titleRaw: draft.titleRaw,
+          germanTitleSuggestion: draft.germanTitleSuggestion,
+          categorySuggestion: draft.categorySuggestion,
+          productTypeSuggestion: draft.productTypeSuggestion,
+          priceAmount: draft.priceAmount,
+          currency: "EUR",
+          colorRaw: draft.colorRaw,
+          colorGermanSuggestion: draft.colorGermanSuggestion,
         },
       });
       onReplace(updated);
@@ -129,14 +145,24 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   }
 
   async function handleSell() {
+    const hasSizeStocks = record.sizeStocks.length > 0;
+    if (hasSizeStocks && !draft.saleSize) {
+      setSellError(t.errSizeSelectRequired);
+      return;
+    }
+    setSellError("");
     setBusy(true);
     try {
-      const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), draft.saleNote);
+      const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), draft.saleSize, draft.saleNote);
       onReplace(updated);
       showToast(t.toastSold, "success");
       patch("saleQuantity", "1");
       patch("saleNote", "");
-    } catch { showToast(t.errors.ERR_GENERAL, "error"); }
+      patch("saleSize", "");
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
+    }
     finally { setBusy(false); }
   }
 
@@ -202,8 +228,10 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const p = record.parsed;
   const isArchive = record.status === "sold_archive";
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
-  // Yalnızca "yayınlandı" kilitli; ai_enhanced tam düzenlenebilir
   const isPublishedLocked = record.status === "published" && !editUnlocked;
+
+  // Satış için geçerli bedenler (stok > 0)
+  const availableSizes = record.sizeStocks.filter((ss) => ss.qty > 0);
 
   async function handleVerifyUnlock(e: React.FormEvent) {
     e.preventDefault();
@@ -288,7 +316,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </div>
                 )}
 
-                {/* Tüm ürün bilgileri */}
+                {/* Ürün bilgileri */}
                 <section className={cn("rounded-xl border p-4", s.subPanel)}>
                   <div className={cn("divide-y", s.divider)}>
                     {/* Tarih + görsel sayısı */}
@@ -328,11 +356,57 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       </span>
                     </InfoRow>}
 
-                    {/* Beden */}
-                    {p.sizesRaw && <InfoRow label={t.size} s={s}>
-                      <span className="inline-flex items-center gap-1">
-                        <Ruler className="size-3 text-sky-400" />
-                        {p.sizesRaw}
+                    {/* Beden başına stok */}
+                    {record.sizeStocks.length > 0 ? (
+                      <InfoRow label={t.sizeStocksLabel} s={s}>
+                        <div className="flex flex-wrap gap-1.5">
+                          {record.sizeStocks.map((ss) => (
+                            <span key={ss.size}
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-extrabold",
+                                ss.qty > 0
+                                  ? "bg-emerald-400/15 text-emerald-400 ring-1 ring-emerald-400/30"
+                                  : "bg-slate-400/10 text-slate-400 line-through ring-1 ring-slate-400/20",
+                              )}>
+                              <Ruler className="size-2.5" />
+                              {t.sizeStockDisplay(ss.size, ss.qty)}
+                            </span>
+                          ))}
+                        </div>
+                      </InfoRow>
+                    ) : (
+                      /* Eski sistem — beden metin + toplam stok */
+                      <>
+                        {p.sizesRaw && <InfoRow label={t.size} s={s}>
+                          <span className="inline-flex items-center gap-1">
+                            <Ruler className="size-3 text-sky-400" />
+                            {p.sizesRaw}
+                          </span>
+                        </InfoRow>}
+                        <InfoRow label={t.stockQuantity} s={s}>
+                          <span className="inline-flex items-center gap-1">
+                            <Box className="size-3 text-emerald-400" />
+                            <span className="font-black text-emerald-400">{record.stockQuantity}</span>
+                          </span>
+                        </InfoRow>
+                      </>
+                    )}
+
+                    {/* Toplam stok (sizeStocks varsa) */}
+                    {record.sizeStocks.length > 0 && (
+                      <InfoRow label={t.stockQuantity} s={s}>
+                        <span className="inline-flex items-center gap-1">
+                          <Box className="size-3 text-emerald-400" />
+                          <span className="font-black text-emerald-400">{record.stockQuantity}</span>
+                        </span>
+                      </InfoRow>
+                    )}
+
+                    {/* Satılan */}
+                    {record.soldQuantity > 0 && <InfoRow label={t.soldQuantity} s={s}>
+                      <span className="inline-flex items-center gap-1 text-amber-400 font-bold">
+                        <ShoppingBag className="size-3" />
+                        {record.soldQuantity}
                       </span>
                     </InfoRow>}
 
@@ -347,22 +421,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     {/* Ürün tipi */}
                     {p.productTypeSuggestion && <InfoRow label={t.productType} s={s}>
                       <span>{p.productTypeSuggestion}</span>
-                    </InfoRow>}
-
-                    {/* Stok */}
-                    <InfoRow label={t.stockQuantity} s={s}>
-                      <span className="inline-flex items-center gap-1">
-                        <Box className="size-3 text-emerald-400" />
-                        <span className="font-black text-emerald-400">{record.stockQuantity}</span>
-                      </span>
-                    </InfoRow>
-
-                    {/* Satılan */}
-                    {record.soldQuantity > 0 && <InfoRow label={t.soldQuantity} s={s}>
-                      <span className="inline-flex items-center gap-1 text-amber-400 font-bold">
-                        <ShoppingBag className="size-3" />
-                        {record.soldQuantity}
-                      </span>
                     </InfoRow>}
                   </div>
                 </section>
@@ -393,15 +451,15 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         {t.editLockedPublished}
                       </div>
                     ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {ACTIVE_STATUSES.map((st) => (
-                        <button key={st} type="button" disabled={busy} onClick={() => handleStatusChange(st)}
-                          className={cn("rounded-lg border px-3 py-1.5 text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50",
-                            record.status === st ? statusActiveBadge(st, s) : cn(statusBadge(st, s), "opacity-60 hover:opacity-100"))}>
-                          {statusLabel(st, locale)}
-                        </button>
-                      ))}
-                    </div>
+                      <div className="flex flex-wrap gap-2">
+                        {ACTIVE_STATUSES.map((st) => (
+                          <button key={st} type="button" disabled={busy} onClick={() => handleStatusChange(st)}
+                            className={cn("rounded-lg border px-3 py-1.5 text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50",
+                              record.status === st ? statusActiveBadge(st, s) : cn(statusBadge(st, s), "opacity-60 hover:opacity-100"))}>
+                            {statusLabel(st, locale)}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </section>
                 )}
@@ -412,19 +470,54 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
                       <ReceiptText className="size-4 text-violet-400" /> {t.saleInfoTitle}
                     </h3>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="grid gap-1.5">
-                        <span className={cn("text-xs font-black", s.strong)}>{t.saleQuantity}</span>
-                        <input type="number" min={1} value={draft.saleQuantity} onChange={(e) => patch("saleQuantity", e.target.value)}
-                          className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
-                      </label>
-                      <label className="grid gap-1.5">
-                        <span className={cn("text-xs font-black", s.strong)}>{t.saleNote}</span>
-                        <input value={draft.saleNote} onChange={(e) => patch("saleNote", e.target.value)}
-                          placeholder={t.saleNotePlaceholder} dir="auto"
-                          className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
-                      </label>
+
+                    <div className="grid gap-3">
+                      {/* Beden seçimi (sizeStocks varsa) */}
+                      {record.sizeStocks.length > 0 && (
+                        <label className="grid gap-1.5">
+                          <span className={cn("text-xs font-black", s.strong)}>{t.selectSizeForSale} *</span>
+                          <select
+                            value={draft.saleSize}
+                            onChange={(e) => { patch("saleSize", e.target.value); setSellError(""); }}
+                            className={cn(
+                              "min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4 appearance-none",
+                              s.input,
+                              sellError ? "border-red-400 focus:ring-red-500/15" : "",
+                            )}
+                          >
+                            <option value="">— {t.selectSizeForSale} —</option>
+                            {availableSizes.map((ss) => (
+                              <option key={ss.size} value={ss.size}>
+                                {t.sizeStockDisplay(ss.size, ss.qty)}
+                              </option>
+                            ))}
+                          </select>
+                          {sellError && (
+                            <p className={cn("text-xs font-semibold", "text-red-400")}>{sellError}</p>
+                          )}
+                        </label>
+                      )}
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="grid gap-1.5">
+                          <span className={cn("text-xs font-black", s.strong)}>{t.saleQuantity}</span>
+                          <input type="number" min={1}
+                            max={draft.saleSize
+                              ? record.sizeStocks.find((ss) => ss.size === draft.saleSize)?.qty ?? undefined
+                              : undefined}
+                            value={draft.saleQuantity}
+                            onChange={(e) => patch("saleQuantity", e.target.value)}
+                            className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
+                        </label>
+                        <label className="grid gap-1.5">
+                          <span className={cn("text-xs font-black", s.strong)}>{t.saleNote}</span>
+                          <input value={draft.saleNote} onChange={(e) => patch("saleNote", e.target.value)}
+                            placeholder={t.saleNotePlaceholder} dir="auto"
+                            className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
+                        </label>
+                      </div>
                     </div>
+
                     <button type="button" onClick={handleSell} disabled={busy}
                       className={cn("mt-3 inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border text-sm font-extrabold transition disabled:opacity-60", s.error)}>
                       {busy ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
@@ -458,8 +551,18 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <div className="grid gap-2">
                       {[...record.saleHistory].reverse().map((sale, i) => (
                         <div key={`${sale.soldAt}-${i}`} className={cn("rounded-lg border px-3 py-2 text-xs", s.panelBorder)}>
-                          <div className={cn("font-extrabold", s.title)}>
-                            {new Date(sale.soldAt).toLocaleString(dateLocale)} · {sale.quantity} {t.soldQuantity.toLowerCase()}
+                          <div className={cn("font-extrabold flex flex-wrap items-center gap-1", s.title)}>
+                            {new Date(sale.soldAt).toLocaleString(dateLocale)}
+                            <span className="text-violet-400">·</span>
+                            <span>{sale.quantity} {t.soldQuantity.toLowerCase()}</span>
+                            {sale.size && (
+                              <>
+                                <span className="text-violet-400">·</span>
+                                <span className="inline-flex items-center gap-0.5 text-sky-400">
+                                  <Ruler className="size-2.5" />{sale.size}
+                                </span>
+                              </>
+                            )}
                           </div>
                           {sale.note && <div className={cn("mt-0.5", s.muted)} dir="auto">{sale.note}</div>}
                         </div>
@@ -531,11 +634,27 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <DetailField label={t.germanTitle}         s={s} value={draft.germanTitleSuggestion}  onChange={(v) => patch("germanTitleSuggestion", v)} />
                     <DetailField label={t.price}               s={s} value={draft.priceAmount}            onChange={(v) => patch("priceAmount", v)} />
                     <DetailField label={t.color}               s={s} value={draft.colorRaw}               onChange={(v) => patch("colorRaw", v)} />
-                    <DetailField label={t.size}                s={s} value={draft.sizesRaw}               onChange={(v) => patch("sizesRaw", v)} />
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />
                     <DetailField label={t.productType}         s={s} value={draft.productTypeSuggestion}  onChange={(v) => patch("productTypeSuggestion", v)} />
-                    <DetailField label={t.stockQuantity}       s={s} value={draft.stockQuantity} type="number" onChange={(v) => patch("stockQuantity", v)} />
                   </div>
+
+                  {/* Beden + stok editörü */}
+                  <div className="mt-3 grid gap-1.5">
+                    <span className={cn("flex items-center gap-2 text-xs font-black", s.strong)}>
+                      <Ruler className="size-3.5 text-sky-400" />
+                      {t.sizeStocksLabel}
+                    </span>
+                    <SizeStockEditor
+                      value={sizeRows}
+                      onChange={setSizeRows}
+                      s={s}
+                      sizeLabel={t.size}
+                      sizeNamePlaceholder={t.sizeNamePlaceholder}
+                      sizeQtyPlaceholder={t.sizeQtyPlaceholder}
+                      addRowLabel={t.addSizeRow}
+                    />
+                  </div>
+
                   <label className="mt-3 grid gap-1.5">
                     <span className={cn("text-xs font-black", s.strong)}>{t.description}</span>
                     <textarea className={cn("min-h-24 rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
@@ -564,7 +683,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     )}
                   </div>
 
-                  {/* Mevcut görseller — çöp ikon her zaman görünür */}
                   {record.images.length > 0 && (
                     <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
                       {record.images.map((img, i) => (
@@ -587,7 +705,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     </div>
                   )}
 
-                  {/* Yeni görsel ekle */}
                   <label className={cn("mb-3 grid cursor-pointer place-items-center rounded-xl border border-dashed px-4 py-4 text-center transition", s.dropzone)}>
                     <input className="sr-only" type="file" accept="image/*" multiple
                       onChange={(e) => {
@@ -680,8 +797,8 @@ function InfoRow({ label, s, children }: { label?: string; s?: ThemeStyles; chil
     return <div className="flex items-center gap-2 py-2">{children}</div>;
   }
   return (
-    <div className="flex items-baseline gap-2 py-2">
-      <span className={cn("w-28 shrink-0 text-xs font-black", s?.strong ?? "text-slate-400")}>{label}</span>
+    <div className="flex items-start gap-2 py-2">
+      <span className={cn("w-28 shrink-0 text-xs font-black pt-0.5", s?.strong ?? "text-slate-400")}>{label}</span>
       <span className={cn("min-w-0 flex-1 text-sm font-semibold", s?.title ?? "text-white")}>{children}</span>
     </div>
   );

@@ -24,9 +24,15 @@ export interface SavedImage {
 export interface ImageFolder { path: string; relativePath: string; }
 export interface ImageFolders { originals: ImageFolder; enhanced: ImageFolder; }
 
+export interface SizeStock {
+  size: string;
+  qty: number;
+}
+
 export interface SaleRecord {
   soldAt: string;
   quantity: number;
+  size?: string | null;
   note: string;
 }
 
@@ -45,6 +51,7 @@ export interface ProductRecord {
   soldQuantity: number;
   lastSoldAt?: string | null;
   saleHistory: SaleRecord[];
+  sizeStocks: SizeStock[];
 }
 
 export interface ActivityLog {

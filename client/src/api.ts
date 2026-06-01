@@ -1,4 +1,4 @@
-import type { ActivityLog, ParsedProduct, ProductRecord, ProductStatus } from "./types";
+import type { ActivityLog, ParsedProduct, ProductRecord, ProductStatus, SizeStock } from "./types";
 
 // Kimlik doğrulama artık session cookie ile yapılıyor (TOTP)
 export function getStoredCode(): string { return ""; }
@@ -64,20 +64,27 @@ export interface ProductUpdate {
   notes?: string;
   stockQuantity?: number;
   description?: string;
+  sizeStocks?: SizeStock[];
   parsed?: Partial<ParsedProduct>;
 }
 
 export async function createProduct(
   description: string,
   images: File[],
-  details?: ProductUpdate & { titleRaw?: string; priceAmount?: string; colorRaw?: string; sizesRaw?: string; stockQuantity?: number }
+  details?: {
+    notes?: string;
+    sizeStocks?: SizeStock[];
+    parsed?: Partial<ParsedProduct>;
+  }
 ): Promise<ProductRecord> {
   const form = new FormData();
   form.append("description", description);
   for (const img of images) form.append("images", img);
   if (details) {
     if (details.notes !== undefined) form.append("notes", details.notes);
-    if (details.stockQuantity !== undefined) form.append("stockQuantity", String(details.stockQuantity));
+    if (details.sizeStocks !== undefined) {
+      form.append("sizeStocksJson", JSON.stringify(details.sizeStocks));
+    }
     if (details.parsed) {
       for (const [key, value] of Object.entries(details.parsed)) {
         if (value !== undefined && value !== null && !Array.isArray(value)) {
@@ -112,11 +119,11 @@ export async function updateProduct(productId: string, update: ProductUpdate): P
   return handleResponse<ProductRecord>(res);
 }
 
-export async function sellProduct(productId: string, quantity = 1, note = ""): Promise<ProductRecord> {
+export async function sellProduct(productId: string, quantity = 1, size = "", note = ""): Promise<ProductRecord> {
   const res = await fetch(`/api/products/${productId}/sell`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ quantity, note }),
+    body: JSON.stringify({ quantity, size: size || undefined, note }),
   });
   return handleResponse<ProductRecord>(res);
 }

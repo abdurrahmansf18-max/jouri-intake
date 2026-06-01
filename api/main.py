@@ -11,6 +11,7 @@ import pyotp
 from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Query, Response, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 import activity_logger
@@ -28,6 +29,7 @@ from models import (
     SaleRecord,
     SavedImage,
     SellProductRequest,
+    SizeStock,
     StatusUpdateRequest,
 )
 from parser import parse_description
@@ -176,9 +178,42 @@ def _import_from_filesystem(db: Session) -> int:
     return imported
 
 
+def _migrate_size_stocks() -> None:
+    """PostgreSQL'e size_stocks kolonu ekle ve mevcut ürünleri migrate et."""
+    db = SessionLocal()
+    try:
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS size_stocks JSON"))
+        db.commit()
+
+        # size_stocks'u olmayan ürünleri otomatik migrate et
+        products = db.query(Product).filter(Product.size_stocks == None).all()  # noqa: E711
+        for p in products:
+            sizes = [s.strip() for s in (p.sizes_raw or "").split(",") if s.strip()]
+            total = max(0, p.stock_quantity)
+            if not sizes:
+                p.size_stocks = [{"size": "—", "qty": total}] if total > 0 else []
+            elif len(sizes) == 1:
+                p.size_stocks = [{"size": sizes[0], "qty": total}]
+            else:
+                per_size = total // len(sizes)
+                remainder = total % len(sizes)
+                p.size_stocks = [
+                    {"size": s, "qty": per_size + (1 if i < remainder else 0)}
+                    for i, s in enumerate(sizes)
+                ]
+        db.commit()
+        print(f"[startup] size_stocks migration done ({len(products)} products updated).")
+    except Exception as exc:
+        print(f"[startup] size_stocks migration warning: {exc}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     _startup_migrate()
+    _migrate_size_stocks()
     yield
 
 
@@ -236,6 +271,7 @@ def _to_record(p: Product) -> ProductRecord:
         soldQuantity=max(0, p.sold_quantity),
         lastSoldAt=p.last_sold_at.isoformat() if p.last_sold_at else None,
         saleHistory=[SaleRecord(**s) for s in (p.sale_history or [])],
+        sizeStocks=[SizeStock(**ss) for ss in (p.size_stocks or [])],
     )
 
 
@@ -345,9 +381,8 @@ async def create_product(
     currency: Annotated[str | None, Form()] = None,
     colorRaw: Annotated[str | None, Form()] = None,
     colorGermanSuggestion: Annotated[str | None, Form()] = None,
-    sizesRaw: Annotated[str | None, Form()] = None,
+    sizeStocksJson: Annotated[str | None, Form()] = None,
     notes: Annotated[str | None, Form()] = None,
-    stockQuantity: Annotated[int | None, Form()] = None,
 ):
     # Required field validation
     if not titleRaw or not titleRaw.strip():
@@ -356,14 +391,24 @@ async def create_product(
         raise HTTPException(status_code=422, detail={"code": "ERR_PRICE_REQUIRED"})
     if not colorRaw or not colorRaw.strip():
         raise HTTPException(status_code=422, detail={"code": "ERR_COLOR_REQUIRED"})
-    if not sizesRaw or not sizesRaw.strip():
+
+    # sizeStocks validasyonu
+    size_stocks_data: list[dict] = []
+    if sizeStocksJson:
+        try:
+            size_stocks_data = json.loads(sizeStocksJson)
+        except Exception:
+            raise HTTPException(status_code=422, detail={"code": "ERR_SIZE_REQUIRED"})
+    if not size_stocks_data or not any(int(ss.get("qty", 0)) >= 1 for ss in size_stocks_data):
         raise HTTPException(status_code=422, detail={"code": "ERR_SIZE_REQUIRED"})
-    if stockQuantity is None or stockQuantity < 1:
-        raise HTTPException(status_code=422, detail={"code": "ERR_STOCK_REQUIRED"})
+
     if not images:
         raise HTTPException(status_code=422, detail={"code": "ERR_IMAGE_REQUIRED"})
     if not description.strip():
         raise HTTPException(status_code=422, detail={"code": "ERR_DESCRIPTION_REQUIRED"})
+
+    total_stock = sum(max(0, int(ss.get("qty", 0))) for ss in size_stocks_data)
+    sizes_raw_derived = ", ".join(ss.get("size", "") for ss in size_stocks_data if ss.get("size"))
 
     parsed = parse_description(description)
     overrides = {
@@ -375,7 +420,7 @@ async def create_product(
         "currency": currency.strip() if currency else (parsed.currency or "EUR"),
         "colorRaw": colorRaw.strip() if colorRaw else parsed.colorRaw,
         "colorGermanSuggestion": colorGermanSuggestion.strip() if colorGermanSuggestion else parsed.colorGermanSuggestion,
-        "sizesRaw": sizesRaw.strip() if sizesRaw else parsed.sizesRaw,
+        "sizesRaw": sizes_raw_derived or parsed.sizesRaw,
     }
     parsed = parsed.model_copy(update=overrides)
 
@@ -395,7 +440,7 @@ async def create_product(
         description=description,
         status="pending",
         notes=notes or "",
-        stock_quantity=max(1, stockQuantity),
+        stock_quantity=total_stock,
         sold_quantity=0,
         title_raw=parsed.titleRaw,
         german_title=parsed.germanTitleSuggestion,
@@ -409,6 +454,7 @@ async def create_product(
         tags=parsed.tags,
         images=[img.model_dump() for img in saved_images],
         sale_history=[],
+        size_stocks=size_stocks_data,
     )
     db.add(product)
     activity_logger.log(
@@ -438,7 +484,12 @@ def update_status(
         p.folder_path = new_path
 
     p.status = new_status
-    p.stock_quantity = 0 if new_status == "sold_archive" else max(1, p.stock_quantity)
+    if new_status == "sold_archive":
+        p.stock_quantity = 0
+        if p.size_stocks:
+            p.size_stocks = [{"size": ss["size"], "qty": 0} for ss in p.size_stocks]
+    else:
+        p.stock_quantity = max(1, p.stock_quantity)
 
     activity_logger.log(
         db, "status_change",
@@ -476,7 +527,14 @@ def update_product(
     if body.notes is not None:
         track("notes", p.notes, body.notes)
         p.notes = body.notes
-    if body.stockQuantity is not None:
+    if body.sizeStocks is not None:
+        new_ss = [ss.model_dump() for ss in body.sizeStocks]
+        p.size_stocks = new_ss
+        new_total = sum(ss.qty for ss in body.sizeStocks)
+        track("stock", p.stock_quantity, new_total)
+        p.stock_quantity = new_total
+        p.sizes_raw = ", ".join(ss.size for ss in body.sizeStocks if ss.size)
+    elif body.stockQuantity is not None:
         track("stock", p.stock_quantity, max(0, int(body.stockQuantity)))
         p.stock_quantity = max(0, int(body.stockQuantity))
     if body.parsed:
@@ -525,17 +583,40 @@ def sell_product(
 ):
     p = _get_or_404(db, product_id)
     quantity = max(1, int(body.quantity))
-    current_stock = max(0, p.stock_quantity)
-
-    if current_stock <= 0:
-        raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
-
-    sold_amount = min(quantity, current_stock)   # asla stoktan fazla satılamaz
-    next_stock  = current_stock - sold_amount    # tutarlı hesap
+    size_stocks = list(p.size_stocks or [])
     now = datetime.now(timezone.utc)
 
+    if size_stocks:
+        # Beden bazlı stok takibi
+        if not body.size:
+            raise HTTPException(status_code=400, detail={"code": "ERR_SIZE_REQUIRED"})
+        size_entry = next((ss for ss in size_stocks if ss["size"] == body.size), None)
+        if not size_entry:
+            raise HTTPException(status_code=400, detail={"code": "ERR_SIZE_NOT_FOUND"})
+        if size_entry["qty"] <= 0:
+            raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
+        sold_amount = min(quantity, size_entry["qty"])
+        new_size_stocks = [
+            {"size": ss["size"], "qty": ss["qty"] - sold_amount if ss["size"] == body.size else ss["qty"]}
+            for ss in size_stocks
+        ]
+        p.size_stocks = new_size_stocks
+        next_stock = sum(ss["qty"] for ss in new_size_stocks)
+    else:
+        # Eski sistem (beden yoksa toplam stok)
+        current_stock = max(0, p.stock_quantity)
+        if current_stock <= 0:
+            raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
+        sold_amount = min(quantity, current_stock)
+        next_stock = current_stock - sold_amount
+
     p.sale_history = list(p.sale_history or []) + [
-        {"soldAt": now.isoformat(), "quantity": sold_amount, "note": (body.note or "").strip()}
+        {
+            "soldAt": now.isoformat(),
+            "quantity": sold_amount,
+            "size": body.size or "",
+            "note": (body.note or "").strip(),
+        }
     ]
     p.sold_quantity = (p.sold_quantity or 0) + sold_amount
     p.last_sold_at = now
@@ -595,6 +676,17 @@ def restore_product(
     p.folder_path = new_path
     p.status = "pending"
     p.stock_quantity = max(1, int(body.stockQuantity))
+
+    # Stoku mevcut bedenler arasında eşit dağıt
+    if p.size_stocks:
+        sizes = [ss["size"] for ss in p.size_stocks]
+        total = p.stock_quantity
+        per_size = total // len(sizes)
+        remainder = total % len(sizes)
+        p.size_stocks = [
+            {"size": s, "qty": per_size + (1 if i < remainder else 0)}
+            for i, s in enumerate(sizes)
+        ]
 
     activity_logger.log(
         db, "restore",
