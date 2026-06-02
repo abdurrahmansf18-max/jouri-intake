@@ -106,20 +106,23 @@ export default function BulkProductForm() {
   }
 
   // ── Doğrulama ─────────────────────────────────────────────────────────────
+  // NOT: setCards(fn) içinde closure mutation güvenilir değil (React 18).
+  // Bunun yerine cards.map() ile senkron hesapla, sonra setCards çağır.
 
   function validate(): boolean {
-    let valid = true;
-    setCards((prev) => prev.map((c) => {
-      if (c.submitted) return c; // zaten başarıyla eklenmiş
-      if (!c.files.length) { valid = false; return { ...c, error: t.emptyImg }; }
-      if (!c.titleRaw.trim()) { valid = false; return { ...c, error: t.errTitleRequired }; }
-      if (!c.priceAmount.trim()) { valid = false; return { ...c, error: t.errPriceRequired }; }
-      if (!c.colorRaw.trim()) { valid = false; return { ...c, error: t.errColorRequired }; }
+    const checked = cards.map((c) => {
+      if (c.submitted) return c;
+      if (!c.files.length) return { ...c, error: t.emptyImg };
+      if (!c.titleRaw.trim()) return { ...c, error: t.errTitleRequired };
+      if (!c.priceAmount.trim()) return { ...c, error: t.errPriceRequired };
+      if (!c.colorRaw.trim()) return { ...c, error: t.errColorRequired };
       const validSizes = c.sizeRows.filter((r) => r.size.trim() && parseInt(r.qty, 10) >= 1);
-      if (!validSizes.length) { valid = false; return { ...c, error: t.errSizeRequired }; }
-      return c;
-    }));
-    return valid;
+      if (!validSizes.length) return { ...c, error: t.errSizeRequired };
+      return { ...c, error: undefined };
+    });
+    const hasErrors = checked.some((c) => !!c.error);
+    if (hasErrors) setCards(checked);
+    return !hasErrors;
   }
 
   // ── Gönderim ──────────────────────────────────────────────────────────────
