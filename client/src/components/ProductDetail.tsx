@@ -377,7 +377,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <span className="inline-flex items-center gap-1">
                         <Palette className="size-3 text-fuchsia-400" />
                         <span dir="auto">{p.colorRaw}</span>
-                        {p.colorGermanSuggestion && <span className={cn("text-xs", s.muted)}>({p.colorGermanSuggestion})</span>}
                       </span>
                     </InfoRow>}
 
