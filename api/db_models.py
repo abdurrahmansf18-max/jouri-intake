@@ -17,7 +17,6 @@ class Product(Base):
     sold_quantity = Column(Integer, nullable=False, default=0)
     last_sold_at = Column(DateTime(timezone=True), nullable=True)
     title_raw = Column(String, nullable=False, default="")
-    german_title = Column(String, nullable=False, default="")
     category = Column(String, nullable=False, default="")
     product_type = Column(String, nullable=False, default="")
     price_amount = Column(String, nullable=False, default="")

@@ -22,7 +22,7 @@ const ACTIVE_STATUSES: ProductStatus[] = ["pending", "ai_enhanced", "published"]
 type Mode = "view" | "edit";
 
 type Draft = {
-  titleRaw: string; germanTitleSuggestion: string;
+  titleRaw: string;
   categorySuggestion: string; productTypeSuggestion: string;
   priceAmount: string;
   colorRaw: string; colorGermanSuggestion: string;
@@ -35,7 +35,6 @@ type Draft = {
 function recordToDraft(r: ProductRecord): Draft {
   return {
     titleRaw: r.parsed.titleRaw,
-    germanTitleSuggestion: r.parsed.germanTitleSuggestion,
     categorySuggestion: r.parsed.categorySuggestion,
     productTypeSuggestion: r.parsed.productTypeSuggestion,
     priceAmount: r.parsed.priceAmount,
@@ -121,7 +120,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
         sizeStocks: validSizes.length > 0 ? validSizes : undefined,
         parsed: {
           titleRaw: draft.titleRaw,
-          germanTitleSuggestion: "",
           categorySuggestion: draft.categorySuggestion,
           productTypeSuggestion: draft.productTypeSuggestion,
           priceAmount: draft.priceAmount,

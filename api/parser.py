@@ -49,8 +49,6 @@ def parse_description(description: str) -> ParsedProduct:
     if has_dress:
         product_type = "Kleid mit Bolero" if has_bolero else "Kleid"
 
-    german_title = _build_german_title(title_raw, has_dress, has_girl, has_bolero)
-
     price_amount = ""
     currency = ""
     if price_match:
@@ -61,7 +59,6 @@ def parse_description(description: str) -> ParsedProduct:
 
     return ParsedProduct(
         titleRaw=title_raw,
-        germanTitleSuggestion=german_title,
         categorySuggestion=category,
         productTypeSuggestion=product_type,
         priceAmount=price_amount,
@@ -71,16 +68,6 @@ def parse_description(description: str) -> ParsedProduct:
         sizesRaw=_clean(sizes_match.group(1)) if sizes_match else "",
         tags=tags,
     )
-
-
-def _build_german_title(title: str, has_dress: bool, has_girl: bool, has_bolero: bool) -> str:
-    if has_dress and has_girl and has_bolero:
-        return "Mädchenkleid mit Bolero"
-    if has_dress and has_girl:
-        return "Mädchenkleid"
-    if has_dress and has_bolero:
-        return "Kleid mit Bolero"
-    return title
 
 
 def _clean(value: str) -> str:

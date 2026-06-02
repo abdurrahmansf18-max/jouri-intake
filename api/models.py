@@ -17,7 +17,6 @@ class SizeStock(BaseModel):
 
 class ParsedProduct(BaseModel):
     titleRaw: str = ""
-    germanTitleSuggestion: str = ""
     categorySuggestion: str = ""
     productTypeSuggestion: str = ""
     priceAmount: str = ""
@@ -77,7 +76,6 @@ class StatusUpdateRequest(BaseModel):
 
 class ParsedProductUpdate(BaseModel):
     titleRaw: Optional[str] = None
-    germanTitleSuggestion: Optional[str] = None
     categorySuggestion: Optional[str] = None
     productTypeSuggestion: Optional[str] = None
     priceAmount: Optional[str] = None

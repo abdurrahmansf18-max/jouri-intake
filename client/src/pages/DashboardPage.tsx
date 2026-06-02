@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Activity, AlertTriangle, ArchiveIcon, Bot, Box,
+  Activity, AlertTriangle, ArchiveIcon, Box,
   CheckCircle2, Clock, DollarSign, Images, Loader2,
   PackageCheck, PackageX, ShoppingBag, Tag, Trash2,
 } from "lucide-react";
@@ -69,11 +69,10 @@ export default function DashboardPage() {
 
   // İnceleme gerektiren ürünler
   const attention = {
-    noGermanName: active.filter((p) => !p.parsed.germanTitleSuggestion).length,
-    noPrice:      active.filter((p) => !p.parsed.priceAmount).length,
-    noImages:     active.filter((p) => p.images.length === 0).length,
+    noPrice:  active.filter((p) => !p.parsed.priceAmount).length,
+    noImages: active.filter((p) => p.images.length === 0).length,
   };
-  const hasAttention = attention.noGermanName > 0 || attention.noPrice > 0 || attention.noImages > 0;
+  const hasAttention = attention.noPrice > 0 || attention.noImages > 0;
 
   // Son eklenen ürünler (arşiv hariç, en yeni 6)
   const recentProducts = [...active]
@@ -106,7 +105,7 @@ export default function DashboardPage() {
 
   function fieldLabel(field: string): string {
     const map: Record<string, string> = {
-      title: t.logFieldTitle, german_title: t.logFieldGermanTitle,
+      title: t.logFieldTitle,
       price: t.logFieldPrice, color: t.logFieldColor, size: t.logFieldSize,
       stock: t.logFieldStock, category: t.logFieldCategory,
       product_type: t.logFieldProductType, notes: t.logFieldNotes,
@@ -232,13 +231,6 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid divide-y" style={{ borderColor: "inherit" }}>
-            {attention.noGermanName > 0 && (
-              <AttentionRow
-                icon={<Bot className="size-4 text-blue-400" />}
-                text={t.dashNoGermanName(attention.noGermanName)}
-                s={s}
-              />
-            )}
             {attention.noPrice > 0 && (
               <AttentionRow
                 icon={<DollarSign className="size-4 text-amber-400" />}

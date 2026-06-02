@@ -2,7 +2,6 @@ export type ProductStatus = "pending" | "ai_enhanced" | "published" | "sold_arch
 
 export interface ParsedProduct {
   titleRaw: string;
-  germanTitleSuggestion: string;
   categorySuggestion: string;
   productTypeSuggestion: string;
   priceAmount: string;

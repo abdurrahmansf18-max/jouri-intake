@@ -160,7 +160,6 @@ def _import_from_filesystem(db: Session) -> int:
                     sold_quantity=max(0, int(data.get("soldQuantity", 0))),
                     last_sold_at=last_sold,
                     title_raw=parsed.get("titleRaw", ""),
-                    german_title=parsed.get("germanTitleSuggestion", ""),
                     category=parsed.get("categorySuggestion", ""),
                     product_type=parsed.get("productTypeSuggestion", ""),
                     price_amount=parsed.get("priceAmount", ""),
@@ -184,6 +183,7 @@ def _migrate_size_stocks() -> None:
     db = SessionLocal()
     try:
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS size_stocks JSON"))
+        db.execute(text("ALTER TABLE products DROP COLUMN IF EXISTS german_title"))
         db.commit()
 
         # size_stocks'u olmayan ürünleri otomatik migrate et
@@ -271,7 +271,6 @@ def _to_record(p: Product) -> ProductRecord:
         description=p.description,
         parsed=ParsedProduct(
             titleRaw=p.title_raw,
-            germanTitleSuggestion=p.german_title,
             categorySuggestion=p.category,
             productTypeSuggestion=p.product_type,
             priceAmount=p.price_amount,
@@ -395,7 +394,6 @@ async def create_product(
     description: Annotated[str, Form()] = "",
     images: Annotated[list[UploadFile], File()] = [],
     titleRaw: Annotated[str | None, Form()] = None,
-    germanTitleSuggestion: Annotated[str | None, Form()] = None,
     categorySuggestion: Annotated[str | None, Form()] = None,
     productTypeSuggestion: Annotated[str | None, Form()] = None,
     priceAmount: Annotated[str | None, Form()] = None,
@@ -434,7 +432,6 @@ async def create_product(
     parsed = parse_description(description)
     overrides = {
         "titleRaw": titleRaw.strip() if titleRaw else parsed.titleRaw,
-        "germanTitleSuggestion": "",
         "categorySuggestion": categorySuggestion.strip() if categorySuggestion else parsed.categorySuggestion,
         "productTypeSuggestion": productTypeSuggestion.strip() if productTypeSuggestion else parsed.productTypeSuggestion,
         "priceAmount": priceAmount.strip() if priceAmount else parsed.priceAmount,
@@ -464,7 +461,6 @@ async def create_product(
         stock_quantity=total_stock,
         sold_quantity=0,
         title_raw=parsed.titleRaw,
-        german_title=parsed.germanTitleSuggestion,
         category=parsed.categorySuggestion,
         product_type=parsed.productTypeSuggestion,
         price_amount=parsed.priceAmount,
@@ -481,7 +477,7 @@ async def create_product(
     activity_logger.log(
         db, "create",
         product_id=folder_name,
-        product_title=parsed.titleRaw or parsed.germanTitleSuggestion,
+        product_title=parsed.titleRaw,
     )
     db.commit()
     db.refresh(product)
@@ -515,7 +511,7 @@ def update_status(
     activity_logger.log(
         db, "status_change",
         product_id=p.id,
-        product_title=p.title_raw or p.german_title,
+        product_title=p.title_raw,
         details={"from": old_status, "to": new_status},
     )
     db.commit()
@@ -562,8 +558,6 @@ def update_product(
         pd = body.parsed
         if pd.titleRaw is not None:
             track("title", p.title_raw, pd.titleRaw); p.title_raw = pd.titleRaw
-        if pd.germanTitleSuggestion is not None:
-            track("german_title", p.german_title, pd.germanTitleSuggestion); p.german_title = pd.germanTitleSuggestion
         if pd.categorySuggestion is not None:
             track("category", p.category, pd.categorySuggestion); p.category = pd.categorySuggestion
         if pd.productTypeSuggestion is not None:
@@ -584,7 +578,7 @@ def update_product(
     activity_logger.log(
         db, "update",
         product_id=p.id,
-        product_title=p.title_raw or p.german_title,
+        product_title=p.title_raw,
         details={"changed": changes} if changes else None,
     )
     db.commit()
@@ -651,7 +645,7 @@ def sell_product(
     activity_logger.log(
         db, "sell",
         product_id=p.id,
-        product_title=p.title_raw or p.german_title,
+        product_title=p.title_raw,
         details={"quantity": sold_amount, "note": body.note or ""},
     )
     db.commit()
@@ -676,7 +670,7 @@ def reset_sales(
     if body.stockQuantity is not None:
         p.stock_quantity = max(0, int(body.stockQuantity))
 
-    activity_logger.log(db, "reset_sales", product_id=p.id, product_title=p.title_raw or p.german_title)
+    activity_logger.log(db, "reset_sales", product_id=p.id, product_title=p.title_raw)
     db.commit()
     db.refresh(p)
     record = _to_record(p)
@@ -712,7 +706,7 @@ def restore_product(
     activity_logger.log(
         db, "restore",
         product_id=p.id,
-        product_title=p.title_raw or p.german_title,
+        product_title=p.title_raw,
         details={"stock": p.stock_quantity},
     )
     db.commit()
@@ -747,7 +741,7 @@ async def add_product_images(
     activity_logger.log(
         db, "add_images",
         product_id=p.id,
-        product_title=p.title_raw or p.german_title,
+        product_title=p.title_raw,
         details={"count": len(new_images)},
     )
     db.commit()
@@ -765,7 +759,7 @@ def delete_product(
     db: Session = Depends(get_db),
 ):
     p = _get_or_404(db, product_id)
-    title = p.title_raw or p.german_title or product_id
+    title = p.title_raw or product_id
     folder_path = p.folder_path
 
     activity_logger.log(db, "delete", product_id=p.id, product_title=title)
@@ -814,7 +808,7 @@ def delete_product_image(
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail={"code": "ERR_IMAGE_NOT_FOUND"})
     p.images = [img for img in (p.images or []) if img.get("fileName") != file_name]
-    activity_logger.log(db, "update", product_id=p.id, product_title=p.title_raw or p.german_title,
+    activity_logger.log(db, "update", product_id=p.id, product_title=p.title_raw,
                         details={"changed": {"image_deleted": {"from": file_name, "to": ""}}})
     db.commit()
     db.refresh(p)
@@ -895,7 +889,6 @@ def run_backup(
                     "sold_quantity": p.sold_quantity,
                     "last_sold_at": p.last_sold_at.isoformat() if p.last_sold_at else None,
                     "title_raw": p.title_raw,
-                    "german_title": p.german_title,
                     "category": p.category,
                     "product_type": p.product_type,
                     "price_amount": p.price_amount,

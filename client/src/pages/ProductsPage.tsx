@@ -70,7 +70,7 @@ export default function ProductsPage() {
       if (tokens.length === 0) return true;
       const p = r.parsed;
       const haystack = normalizeText([
-        p.titleRaw, p.germanTitleSuggestion, p.categorySuggestion,
+        p.titleRaw, p.categorySuggestion,
         p.colorRaw, p.sizesRaw, p.priceAmount, p.productTypeSuggestion,
         r.notes, r.folderName, r.description,
       ].join(" "));

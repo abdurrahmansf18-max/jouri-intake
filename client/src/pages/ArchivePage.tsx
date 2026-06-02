@@ -49,7 +49,7 @@ export default function ArchivePage() {
     if (!tokens.length) return records;
     return records.filter((r) => {
       const p = r.parsed;
-      const hay = normalizeText([p.titleRaw, p.germanTitleSuggestion, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes, r.description].join(" "));
+      const hay = normalizeText([p.titleRaw, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes, r.description].join(" "));
       return tokens.every((tok) => hay.includes(tok));
     });
   }, [records, search]);
