@@ -26,7 +26,7 @@ services:
     environment:
       PRODUCTS_BASE: /products_photo
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     restart: unless-stopped
     depends_on:
       db:
@@ -41,7 +41,7 @@ services:
       - /app/node_modules
     env_file: .env
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     depends_on:
       - api
     restart: unless-stopped
