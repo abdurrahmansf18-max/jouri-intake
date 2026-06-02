@@ -406,6 +406,7 @@ async def create_product(
     colorGermanSuggestion: Annotated[str | None, Form()] = None,
     sizeStocksJson: Annotated[str | None, Form()] = None,
     notes: Annotated[str | None, Form()] = None,
+    source: Annotated[str | None, Form()] = None,
 ):
     # Required field validation
     if not titleRaw or not titleRaw.strip():
@@ -482,6 +483,7 @@ async def create_product(
         db, "create",
         product_id=folder_name,
         product_title=parsed.titleRaw,
+        details={"source": source} if source else None,
     )
     db.commit()
     db.refresh(product)

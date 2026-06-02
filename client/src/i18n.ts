@@ -55,6 +55,7 @@ export const COPY = {
     logFieldCurrency: "Para birimi",
     // Log actions
     logCreate: "Ürün oluşturuldu",
+    logBulkCreate: "Toplu ekleme",
     logUpdate: "Ürün güncellendi",
     logDelete: "Ürün silindi",
     logSell: (n: number) => `${n} adet satıldı`,
@@ -317,6 +318,7 @@ export const COPY = {
     logFieldCurrency: "العملة",
     // Log actions
     logCreate: "تم إنشاء المنتج",
+    logBulkCreate: "إضافة جماعية",
     logUpdate: "تم تحديث المنتج",
     logDelete: "تم حذف المنتج",
     logSell: (n: number) => `تم بيع ${n} قطعة`,
@@ -574,7 +576,7 @@ export function searchTokens(query: string): string[] {
 export function logActionLabel(action: string, locale: Locale, details?: Record<string, unknown> | null): string {
   const t = COPY[locale];
   switch (action) {
-    case "create": return t.logCreate;
+    case "create": return details?.source === "bulk" ? t.logBulkCreate : t.logCreate;
     case "update": return t.logUpdate;
     case "delete": return t.logDelete;
     case "sell": {

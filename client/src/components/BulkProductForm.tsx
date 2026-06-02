@@ -164,7 +164,7 @@ export default function BulkProductForm() {
             currency: "EUR",
             colorRaw: card.colorRaw,
           },
-        });
+        }, "bulk");
         results.push({ id: card.id, ok: true });
       } catch {
         results.push({ id: card.id, ok: false });

@@ -75,11 +75,13 @@ export async function createProduct(
     notes?: string;
     sizeStocks?: SizeStock[];
     parsed?: Partial<ParsedProduct>;
-  }
+  },
+  source?: string,
 ): Promise<ProductRecord> {
   const form = new FormData();
   form.append("description", description);
   for (const img of images) form.append("images", img);
+  if (source) form.append("source", source);
   if (details) {
     if (details.notes !== undefined) form.append("notes", details.notes);
     if (details.sizeStocks !== undefined) {
