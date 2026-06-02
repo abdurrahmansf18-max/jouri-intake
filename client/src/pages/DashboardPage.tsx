@@ -142,29 +142,28 @@ export default function DashboardPage() {
       <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.dashTitle}</h1>
 
       {/* ── 1. İş Akışı Boru Hattı ── */}
-      <div className={cn("rounded-xl border p-4", s.panel)}>
-        <div className={cn("mb-4 flex items-center gap-2", s.muted)}>
+      <div className={cn("rounded-xl border p-3 sm:p-4", s.panel)}>
+        <div className={cn("mb-3 flex items-center gap-2", s.muted)}>
           <Tag className="size-4" />
           <span className="text-xs font-black uppercase tracking-wide">{t.dashWorkflow}</span>
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="grid grid-cols-3 gap-2">
           {workflowSteps.map((step, i) => {
             const pct = activeTotal > 0 ? Math.round((step.count / activeTotal) * 100) : 0;
             return (
-              <div key={step.label} className={cn("rounded-xl border p-3 sm:p-4", step.border, "bg-white/2")}>
-                <div className={cn("text-2xl sm:text-3xl font-black", step.text)}>{step.count}</div>
-                <div className={cn("mt-0.5 text-xs font-bold", s.muted)}>{step.label}</div>
-                {/* Progress bar */}
-                <div className="mt-2 h-1.5 w-full rounded-full bg-white/5">
+              <div key={step.label} className={cn("rounded-xl border p-2.5 sm:p-4", step.border, "bg-white/2")}>
+                <div className={cn("text-xl sm:text-3xl font-black", step.text)}>{step.count}</div>
+                <div className={cn("mt-0.5 truncate text-[10px] sm:text-xs font-bold", s.muted)}>{step.label}</div>
+                <div className="mt-2 h-1 w-full rounded-full bg-white/5">
                   <div
-                    className={cn("h-1.5 rounded-full transition-all", step.color)}
+                    className={cn("h-1 rounded-full transition-all", step.color)}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
                 <div className={cn("mt-1 text-[10px] font-bold", s.muted)}>{pct}%</div>
                 {i < workflowSteps.length - 1 && (
-                  <div className={cn("mt-2 text-[10px] font-bold", s.muted)}>
-                    {locale === "ar" ? "↓" : "→"}
+                  <div className={cn("mt-1.5 text-[10px] font-bold", s.muted)}>
+                    {locale === "ar" ? "←" : "→"}
                   </div>
                 )}
               </div>
@@ -221,7 +220,7 @@ export default function DashboardPage() {
       {/* ── 4. İnceleme Gerekiyor — sadece sorun varsa göster ── */}
       {hasAttention && (
       <div className={cn("rounded-xl border", s.panel)}>
-        <div className={cn("flex items-center gap-3 border-b px-5 py-4", s.panelBorder)}>
+        <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
           <AlertTriangle className="size-5 text-amber-400" />
           <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashNeedsAttention}</h2>
         </div>
@@ -247,7 +246,7 @@ export default function DashboardPage() {
       {/* ── 5. Son Eklenen Ürünler ── */}
       {recentProducts.length > 0 && (
         <div className={cn("rounded-xl border", s.panel)}>
-          <div className={cn("flex items-center gap-3 border-b px-5 py-4", s.panelBorder)}>
+          <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
             <PackageCheck className="size-5 text-violet-400" />
             <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashRecentProducts}</h2>
           </div>
@@ -292,7 +291,7 @@ export default function DashboardPage() {
 
       {/* ── 6. Son İşlemler ── */}
       <div className={cn("rounded-xl border", s.panel)}>
-        <div className={cn("flex items-center gap-3 border-b px-5 py-4", s.panelBorder)}>
+        <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
           <Activity className="size-5 text-violet-400" />
           <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashRecentActivity}</h2>
         </div>
@@ -311,7 +310,7 @@ export default function DashboardPage() {
               return (
                 <div
                   key={log.id}
-                  className={cn("flex items-start gap-3 border-b px-5 py-3 last:border-b-0", s.panelBorder)}
+                  className={cn("flex items-start gap-2 sm:gap-3 border-b px-3 sm:px-5 py-3 last:border-b-0", s.panelBorder)}
                 >
                   <div className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg", s.subPanel)}>
                     {actionIcon(log.action)}
@@ -331,9 +330,12 @@ export default function DashboardPage() {
                         {Object.entries(changed).map(([field, ch]) => (
                           <span
                             key={field}
-                            className="inline-flex items-center gap-1 rounded-md bg-blue-400/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-300 ring-1 ring-blue-400/20"
+                            className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-400/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-300 ring-1 ring-blue-400/20"
                           >
-                            {fieldLabel(field)}: <span className="opacity-60 line-through">{ch.from}</span> → {ch.to}
+                            <span className="shrink-0">{fieldLabel(field)}:</span>
+                            <span className="truncate max-w-[60px] opacity-60 line-through">{ch.from}</span>
+                            <span className="shrink-0">→</span>
+                            <span className="truncate max-w-[60px]">{ch.to}</span>
                           </span>
                         ))}
                       </div>
@@ -375,10 +377,10 @@ function MetricCard({
   value: string | number; color: string; bg: string; small?: boolean;
 }) {
   return (
-    <div className={cn("rounded-xl border p-4", bg)}>
+    <div className={cn("rounded-xl border p-3 sm:p-4", bg)}>
       <div className="mb-1 flex items-center gap-1.5">{icon}</div>
-      <div className={cn("font-black", small ? "text-xl" : "text-3xl", color)}>{value}</div>
-      <div className="mt-1 text-xs font-bold text-slate-400">{label}</div>
+      <div className={cn("font-black leading-none", small ? "text-base sm:text-xl" : "text-2xl sm:text-3xl", color)}>{value}</div>
+      <div className="mt-1.5 text-[10px] sm:text-xs font-bold text-slate-400 leading-snug">{label}</div>
     </div>
   );
 }
@@ -387,7 +389,7 @@ function AttentionRow({ icon, text, s }: {
   icon: React.ReactNode; text: string; s: ReturnType<typeof Object.assign>;
 }) {
   return (
-    <div className={cn("flex items-center gap-3 px-5 py-3", s.panelBorder)}>
+    <div className={cn("flex items-center gap-3 px-4 sm:px-5 py-3", s.panelBorder)}>
       <span className="shrink-0">{icon}</span>
       <span className={cn("text-sm font-semibold", s.muted)}>{text}</span>
     </div>
