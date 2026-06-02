@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
@@ -70,6 +70,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
 
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>(initialMode);
   const [draft, setDraft] = useState<Draft>(() => recordToDraft(record));
   const [sizeRows, setSizeRows] = useState<SizeStockRow[]>(() => sizeStocksToRows(record.sizeStocks));
@@ -89,6 +90,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [sellError, setSellError] = useState("");
 
   useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: "instant" });
     setDraft(recordToDraft(record));
     setSizeRows(sizeStocksToRows(record.sizeStocks));
     setSelectedVariantIds(record.relatedProducts ?? []);
@@ -325,7 +327,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           </div>
 
           {/* ── İçerik ── */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
             {mode === "view" ? (
               /* ────────────────── GÖRÜNTÜLEME MODU ────────────────── */
               <div className="grid gap-4">
