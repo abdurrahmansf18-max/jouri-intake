@@ -387,15 +387,24 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           <span className={cn("block mb-2 text-xs font-black", s.strong)}>{t.sizeStocksLabel}</span>
                           <div className="flex flex-wrap gap-1.5">
                             {record.sizeStocks.map((ss) => (
-                              <span key={ss.size}
+                              <span key={ss.size} dir="ltr"
                                 className={cn(
-                                  "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-extrabold",
-                                  ss.qty > 0
-                                    ? "bg-emerald-400/15 text-emerald-400 ring-1 ring-emerald-400/30"
-                                    : "bg-slate-400/10 text-slate-400 line-through ring-1 ring-slate-400/20",
+                                  "inline-flex items-center overflow-hidden rounded-lg text-xs font-extrabold",
+                                  ss.qty > 0 ? "ring-1 ring-emerald-400/30" : "ring-1 ring-slate-400/20",
                                 )}>
-                                <Ruler className="size-2.5" />
-                                {t.sizeStockDisplay(ss.size, ss.qty)}
+                                <span className={cn(
+                                  "flex items-center gap-1 px-2 py-1",
+                                  ss.qty > 0 ? "bg-emerald-400/15 text-emerald-400" : "bg-slate-400/10 text-slate-400 line-through",
+                                )}>
+                                  <Ruler className="size-2.5 shrink-0" />
+                                  {ss.size}
+                                </span>
+                                <span className={cn(
+                                  "px-2 py-1",
+                                  ss.qty > 0 ? "bg-emerald-400/30 text-emerald-200" : "bg-slate-400/20 text-slate-500",
+                                )}>
+                                  ×{ss.qty}
+                                </span>
                               </span>
                             ))}
                           </div>
