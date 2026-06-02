@@ -54,6 +54,7 @@ export const COPY = {
     logFieldNotes: "Notlar",
     logFieldCurrency: "Para birimi",
     // Log actions
+    logLogin: (user: string) => `Giriş yapıldı · ${user}`,
     logCreate: "Ürün oluşturuldu",
     logBulkCreate: "Toplu ekleme",
     logUpdate: "Ürün güncellendi",
@@ -323,6 +324,7 @@ export const COPY = {
     logFieldNotes: "الملاحظات",
     logFieldCurrency: "العملة",
     // Log actions
+    logLogin: (user: string) => `تم تسجيل الدخول · ${user}`,
     logCreate: "تم إنشاء المنتج",
     logBulkCreate: "إضافة جماعية",
     logUpdate: "تم تحديث المنتج",
@@ -588,6 +590,10 @@ export function searchTokens(query: string): string[] {
 export function logActionLabel(action: string, locale: Locale, details?: Record<string, unknown> | null): string {
   const t = COPY[locale];
   switch (action) {
+    case "login": {
+      const user = typeof details?.user === "string" ? details.user : "";
+      return t.logLogin(user);
+    }
     case "create": return details?.source === "bulk" ? t.logBulkCreate : t.logCreate;
     case "update": return t.logUpdate;
     case "delete": return t.logDelete;

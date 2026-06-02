@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, ArchiveIcon, Box,
   CheckCircle2, Clock, DollarSign, Images, Loader2,
-  PackageCheck, PackageX, ShoppingBag, Tag, Trash2,
+  LogIn, PackageCheck, PackageX, ShoppingBag, Tag, Trash2,
 } from "lucide-react";
 import { deleteLog, fetchLogs, fetchProducts, productImageUrl } from "../api";
 import { useProductSync } from "../hooks/useProductSync";
@@ -117,6 +117,7 @@ export default function DashboardPage() {
   function actionIcon(action: string) {
     const cls = "size-4";
     switch (action) {
+      case "login":        return <LogIn        className={cn(cls, "text-violet-400")} />;
       case "create":       return <PackageCheck className={cn(cls, "text-emerald-400")} />;
       case "update":       return <Activity     className={cn(cls, "text-blue-400")} />;
       case "delete":       return <Trash2       className={cn(cls, "text-red-400")} />;

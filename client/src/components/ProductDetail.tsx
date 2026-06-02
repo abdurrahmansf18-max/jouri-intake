@@ -589,13 +589,13 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                               : undefined}
                             value={draft.saleQuantity}
                             onChange={(e) => patch("saleQuantity", e.target.value)}
-                            className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
+                            className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
                         </label>
                         <label className="grid gap-1.5">
                           <span className={cn("text-xs font-black", s.strong)}>{t.saleNote}</span>
                           <input value={draft.saleNote} onChange={(e) => patch("saleNote", e.target.value)}
                             placeholder={t.saleNotePlaceholder} dir="auto"
-                            className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
+                            className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
                         </label>
                       </div>
                     </div>
@@ -619,7 +619,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <label className="grid gap-1.5 mb-3">
                         <span className={cn("text-xs font-black", s.strong)}>{t.restoreStock}</span>
                         <input type="number" min={1} value={draft.restoreStock} onChange={(e) => patch("restoreStock", e.target.value)}
-                          className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
+                          className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
                       </label>
                     )}
                     <button type="button" onClick={handleRestore} disabled={busy}
@@ -931,7 +931,7 @@ function DetailField({ label, onChange, s, type = "text", value }: {
   return (
     <label className="grid gap-1.5">
       <span className={cn("text-xs font-black", s.strong)}>{label}</span>
-      <input className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
+      <input className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
         type={type} min={type === "number" ? 0 : undefined}
         value={value} onChange={(e) => onChange(e.target.value)} dir="auto" />
     </label>

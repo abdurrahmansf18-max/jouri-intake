@@ -514,7 +514,7 @@ function BulkField({ label, value, onChange, s, disabled, placeholder, className
       <span className={cn("text-[10px] font-black leading-none", s.strong)}>{label}</span>
       <input
         className={cn(
-          "min-h-9 rounded-lg border px-2.5 text-xs font-semibold outline-none focus:ring-2",
+          "min-h-9 w-full rounded-lg border px-2.5 text-xs font-semibold outline-none focus:ring-2",
           s.input,
         )}
         value={value}

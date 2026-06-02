@@ -332,7 +332,7 @@ function Field({
     <label className="grid gap-1.5">
       <span className={cn("text-xs font-black", s.strong)}>{label}</span>
       <input
-        className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
+        className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
         type={type}
         min={type === "number" ? 0 : undefined}
         value={value}

@@ -40,6 +40,7 @@ from parser import parse_description
 
 TOTP_SECRET = os.environ.get("TOTP_SECRET", "").strip()
 USER_PASSWORD = os.environ.get("USER_PASSWORD", "").strip()
+USER_PASSWORD_2 = os.environ.get("USER_PASSWORD_2", "").strip()
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
 AUTH_COOKIE_NAME = "jouri_session"
 SESSION_TTL = 60 * 60 * 24  # 24 saat
@@ -325,10 +326,28 @@ def auth_verify(body: AuthRequest, response: Response, request: Request):
         totp_ok = pyotp.TOTP(TOTP_SECRET).verify(code, valid_window=1)
 
     # Sabit şifre kontrolü
-    password_ok = bool(USER_PASSWORD and code == USER_PASSWORD)
+    pw1_ok = bool(USER_PASSWORD and code == USER_PASSWORD)
+    pw2_ok = bool(USER_PASSWORD_2 and code == USER_PASSWORD_2)
+    password_ok = pw1_ok or pw2_ok
 
     if not totp_ok and not password_ok:
         raise HTTPException(status_code=401, detail={"code": "ERR_WRONG_CODE"})
+
+    # Giriş yapan kullanıcıyı logla
+    if totp_ok:
+        login_user = "TOTP"
+    elif pw1_ok:
+        login_user = "Kullanıcı 1"
+    else:
+        login_user = "Kullanıcı 2"
+
+    try:
+        log_db = SessionLocal()
+        activity_logger.log(log_db, "login", product_id=None, product_title=None, details={"user": login_user})
+        log_db.commit()
+        log_db.close()
+    except Exception:
+        pass  # Loglama hatası girişi engellemez
 
     token = _create_session()
     response.set_cookie(
