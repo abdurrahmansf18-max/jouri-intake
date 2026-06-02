@@ -118,7 +118,7 @@ export default function AppLayout({ children, onLogout }: Props) {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0 overflow-auto pb-20 md:pb-0">
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-20 md:pb-0">
           <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
             {children}
           </div>
