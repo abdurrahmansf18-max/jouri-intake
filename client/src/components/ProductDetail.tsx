@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  ArchiveRestore, Box, CalendarDays, Edit3, FolderOpen,
+  ArchiveRestore, Box, CalendarDays, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
   RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X,
 } from "lucide-react";
@@ -737,21 +737,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       ))}
                     </div>
                   )}
-                </section>
-
-                {/* Klasörler */}
-                <section className={cn("rounded-xl border p-4", s.subPanel)}>
-                  <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
-                    <FolderOpen className="size-4 text-violet-400" /> {t.folders}
-                  </h3>
-                  {[[t.originalFolder, record.imageFolders.originals.relativePath],
-                    [t.aiFolderLabel,  record.imageFolders.enhanced.relativePath]].map(([label, val]) => (
-                    <div key={label} className={cn("flex min-w-0 items-start gap-2 border-t py-2 first:border-t-0 first:pt-0 text-xs", s.folderLine)}>
-                      <FolderOpen className={cn("mt-0.5 size-4 shrink-0", s.folderIcon)} />
-                      <span className={cn("shrink-0 font-black", s.strong)}>{label}:</span>
-                      <span className={cn("min-w-0 break-all", s.muted)} dir="ltr">{val}</span>
-                    </div>
-                  ))}
                 </section>
 
                 {/* Sil */}

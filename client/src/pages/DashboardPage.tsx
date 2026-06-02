@@ -218,36 +218,31 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── 4. İnceleme Gerekiyor ── */}
+      {/* ── 4. İnceleme Gerekiyor — sadece sorun varsa göster ── */}
+      {hasAttention && (
       <div className={cn("rounded-xl border", s.panel)}>
         <div className={cn("flex items-center gap-3 border-b px-5 py-4", s.panelBorder)}>
-          <AlertTriangle className={cn("size-5", hasAttention ? "text-amber-400" : "text-emerald-400")} />
+          <AlertTriangle className="size-5 text-amber-400" />
           <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashNeedsAttention}</h2>
         </div>
-        {!hasAttention ? (
-          <div className="flex items-center gap-3 px-5 py-4">
-            <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
-            <span className={cn("text-sm font-semibold", s.muted)}>{t.dashAllGood}</span>
-          </div>
-        ) : (
-          <div className="grid divide-y" style={{ borderColor: "inherit" }}>
-            {attention.noPrice > 0 && (
-              <AttentionRow
-                icon={<DollarSign className="size-4 text-amber-400" />}
-                text={t.dashNoPrice(attention.noPrice)}
-                s={s}
-              />
-            )}
-            {attention.noImages > 0 && (
-              <AttentionRow
-                icon={<Images className="size-4 text-red-400" />}
-                text={t.dashNoImages(attention.noImages)}
-                s={s}
-              />
-            )}
-          </div>
-        )}
+        <div className="grid divide-y" style={{ borderColor: "inherit" }}>
+          {attention.noPrice > 0 && (
+            <AttentionRow
+              icon={<DollarSign className="size-4 text-amber-400" />}
+              text={t.dashNoPrice(attention.noPrice)}
+              s={s}
+            />
+          )}
+          {attention.noImages > 0 && (
+            <AttentionRow
+              icon={<Images className="size-4 text-red-400" />}
+              text={t.dashNoImages(attention.noImages)}
+              s={s}
+            />
+          )}
+        </div>
       </div>
+      )}
 
       {/* ── 5. Son Eklenen Ürünler ── */}
       {recentProducts.length > 0 && (

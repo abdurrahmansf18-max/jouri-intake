@@ -246,7 +246,7 @@ export const COPY = {
     backupHow4: "Google Drive'a otomatik yüklenir",
     backupHow5: "30 günden eski yedekler otomatik silinir",
     // Sample
-    sampleDesc: "فستان بناتي مع بوليرو\nبلون واحد تفاحي\nالقياسات :3/2\n40€",
+    sampleDesc: "",
   },
   ar: {
     dir: "rtl" as const,
@@ -493,7 +493,7 @@ export const COPY = {
     backupHow4: "يُرفع إلى Google Drive تلقائياً",
     backupHow5: "يُحذف تلقائياً بعد 30 يوماً",
     // Sample
-    sampleDesc: "فستان بناتي مع بوليرو\nبلون واحد تفاحي\nالقياسات :3/2\n40€",
+    sampleDesc: "",
   },
 } as const;
 
