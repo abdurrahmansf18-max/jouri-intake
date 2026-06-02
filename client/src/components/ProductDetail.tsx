@@ -177,6 +177,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       const updated = await restoreProduct(record.id, num(draft.restoreStock, 1));
       onReplace(updated);
       showToast(t.toastRestored, "success");
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
     } finally { setBusy(false); }
   }
 

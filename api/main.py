@@ -652,7 +652,7 @@ def sell_product(
     p.last_sold_at = now
     p.stock_quantity = next_stock
 
-    if next_stock == 0:
+    if next_stock == 0 and p.status != "sold_archive":
         new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, "sold_archive")
         p.folder_path = new_path
         p.status = "sold_archive"
