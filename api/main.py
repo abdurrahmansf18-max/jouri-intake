@@ -758,15 +758,17 @@ def restore_product_size(
     if not any(s["size"] == size_name for s in sold):
         raise HTTPException(status_code=404, detail={"code": "ERR_SIZE_NOT_FOUND"})
 
-    # sold_sizes'tan kaldır
-    p.sold_sizes = [s for s in sold if s["size"] != size_name]
+    # sold_sizes'tan kaldır — yeni dict objeleri oluştur (SQLAlchemy JSON mutation tuzağından kaçın)
+    p.sold_sizes = [{"size": s["size"], "soldAt": s["soldAt"], "note": s.get("note", "")} for s in sold if s["size"] != size_name]
 
-    # sizeStocks'a 1 adet olarak geri ekle
-    stocks = list(p.size_stocks or [])
-    existing = next((s for s in stocks if s["size"] == size_name), None)
-    if existing:
-        existing["qty"] += 1
-    else:
+    # sizeStocks'a 1 adet olarak geri ekle — sell endpoint gibi yeni dict objeleri yarat
+    current_stocks = list(p.size_stocks or [])
+    size_exists = any(s["size"] == size_name for s in current_stocks)
+    stocks = [
+        {"size": s["size"], "qty": s["qty"] + 1} if s["size"] == size_name else {"size": s["size"], "qty": s["qty"]}
+        for s in current_stocks
+    ]
+    if not size_exists:
         stocks.append({"size": size_name, "qty": 1})
     p.size_stocks = stocks
     p.stock_quantity = sum(s["qty"] for s in stocks)

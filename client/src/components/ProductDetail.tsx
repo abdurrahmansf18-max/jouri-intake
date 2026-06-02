@@ -59,9 +59,10 @@ interface Props {
   onClose: () => void;
   onReplace: (updated: ProductRecord) => void;
   onDelete: (id: string) => void;
+  showRestoreSizes?: boolean;
 }
 
-export default function ProductDetail({ record, initialMode = "view", onClose, onReplace, onDelete }: Props) {
+export default function ProductDetail({ record, initialMode = "view", onClose, onReplace, onDelete, showRestoreSizes = false }: Props) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
@@ -572,8 +573,8 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </section>
                 )}
 
-                {/* Satılan bedenler — geri al butonu ile */}
-                {record.soldSizes.length > 0 && (
+                {/* Satılan bedenler — sadece arşiv bölümünden geri alınabilir */}
+                {showRestoreSizes && record.soldSizes.length > 0 && (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
                     <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
                       <Ruler className="size-4 text-amber-400" />

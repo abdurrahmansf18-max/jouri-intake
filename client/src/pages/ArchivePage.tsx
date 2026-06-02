@@ -124,6 +124,7 @@ export default function ArchivePage() {
           onClose={() => setSelectedId(null)}
           onReplace={replaceRecord}
           onDelete={removeRecord}
+          showRestoreSizes
         />
       )}
     </div>
