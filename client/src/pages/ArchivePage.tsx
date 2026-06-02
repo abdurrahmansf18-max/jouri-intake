@@ -7,7 +7,10 @@ import { DARK, LIGHT } from "../theme";
 import type { ProductRecord } from "../types";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
+import Pagination from "../components/Pagination";
 import { useProductSync } from "../hooks/useProductSync";
+
+const PAGE_SIZE = 30;
 
 function isArchived(r: ProductRecord) {
   return r.status === "sold_archive" || r.soldSizes.length > 0;
@@ -23,6 +26,7 @@ export default function ArchivePage() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     fetchProducts()
@@ -48,6 +52,9 @@ export default function ArchivePage() {
     },
   });
 
+  // Arama değişince sayfa 1'e dön
+  useEffect(() => { setPage(1); }, [search]);
+
   const filtered = useMemo(() => {
     const tokens = searchTokens(search);
     if (!tokens.length) return records;
@@ -58,6 +65,12 @@ export default function ArchivePage() {
       return tokens.every((tok) => hay.includes(tok));
     });
   }, [records, search]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   function replaceRecord(updated: ProductRecord) {
     if (!isArchived(updated)) {
@@ -101,20 +114,30 @@ export default function ArchivePage() {
           <p className={cn("text-sm font-semibold", s.muted)}>{records.length === 0 ? t.noRecords : t.noFiltered}</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((record) => (
-            <ProductCard
-              key={record.id}
-              record={record}
-              onOpen={() => { setSelectedId(record.id); setDetailMode("view"); }}
-              onEdit={() => { setSelectedId(record.id); setDetailMode("edit"); }}
-              onReplace={replaceRecord}
-              showRestoreBtn={record.status === "sold_archive"}
-              showSoldSizes
-              searchQuery={search}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {paginated.map((record) => (
+              <ProductCard
+                key={record.id}
+                record={record}
+                onOpen={() => { setSelectedId(record.id); setDetailMode("view"); }}
+                onEdit={() => { setSelectedId(record.id); setDetailMode("edit"); }}
+                onReplace={replaceRecord}
+                showRestoreBtn={record.status === "sold_archive"}
+                showSoldSizes
+                searchQuery={search}
+              />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalCount={filtered.length}
+            pageSize={PAGE_SIZE}
+            onChange={setPage}
+            s={s}
+          />
+        </>
       )}
 
       {selected && (

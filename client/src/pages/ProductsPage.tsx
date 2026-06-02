@@ -7,7 +7,10 @@ import { DARK, LIGHT } from "../theme";
 import type { ProductRecord, StatusFilter } from "../types";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
+import Pagination from "../components/Pagination";
 import { useProductSync } from "../hooks/useProductSync";
+
+const PAGE_SIZE = 30;
 
 const FILTERS: StatusFilter[] = ["all", "pending", "ai_enhanced", "published"];
 
@@ -23,6 +26,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     fetchProducts()
@@ -63,6 +67,9 @@ export default function ProductsPage() {
     sold_archive: 0,
   };
 
+  // Filtre veya arama değişince sayfa 1'e dön
+  useEffect(() => { setPage(1); }, [filter, search]);
+
   const filtered = useMemo(() => {
     const tokens = searchTokens(search);
     return records.filter((r) => {
@@ -77,6 +84,12 @@ export default function ProductsPage() {
       return tokens.every((tok) => haystack.includes(tok));
     });
   }, [records, filter, search]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   function replaceRecord(updated: ProductRecord) {
     if (updated.status === "sold_archive") {
@@ -143,18 +156,28 @@ export default function ProductsPage() {
           <p className={cn("text-sm font-semibold", s.muted)}>{records.length === 0 ? t.noRecords : t.noFiltered}</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((record) => (
-            <ProductCard
-              key={record.id}
-              record={record}
-              onOpen={() => openView(record.id)}
-              onEdit={() => openEdit(record.id)}
-              onReplace={replaceRecord}
-              searchQuery={search}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {paginated.map((record) => (
+              <ProductCard
+                key={record.id}
+                record={record}
+                onOpen={() => openView(record.id)}
+                onEdit={() => openEdit(record.id)}
+                onReplace={replaceRecord}
+                searchQuery={search}
+              />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalCount={filtered.length}
+            pageSize={PAGE_SIZE}
+            onChange={setPage}
+            s={s}
+          />
+        </>
       )}
 
       {selected && (
