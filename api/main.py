@@ -31,6 +31,7 @@ from models import (
     SavedImage,
     SellProductRequest,
     SizeStock,
+    SoldSizeEntry,
     StatusUpdateRequest,
 )
 from parser import parse_description
@@ -184,6 +185,7 @@ def _migrate_size_stocks() -> None:
     try:
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS size_stocks JSON"))
         db.execute(text("ALTER TABLE products DROP COLUMN IF EXISTS german_title"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_sizes JSON"))
         db.commit()
 
         # size_stocks'u olmayan ürünleri otomatik migrate et
@@ -288,6 +290,7 @@ def _to_record(p: Product) -> ProductRecord:
         lastSoldAt=p.last_sold_at.isoformat() if p.last_sold_at else None,
         saleHistory=[SaleRecord(**s) for s in (p.sale_history or [])],
         sizeStocks=[SizeStock(**ss) for ss in (p.size_stocks or [])],
+        soldSizes=[SoldSizeEntry(**ss) for ss in (p.sold_sizes or [])],
     )
 
 
@@ -617,6 +620,17 @@ def sell_product(
         ]
         p.size_stocks = new_size_stocks
         next_stock = sum(ss["qty"] for ss in new_size_stocks)
+
+        # Beden tamamen bitti → sold_sizes'a ekle / güncelle
+        sold_qty_after = next((ss["qty"] for ss in new_size_stocks if ss["size"] == body.size), 0)
+        if sold_qty_after == 0:
+            sold_sizes_list = [s for s in (p.sold_sizes or []) if s["size"] != body.size]
+            sold_sizes_list.append({
+                "size": body.size,
+                "soldAt": now.isoformat(),
+                "note": (body.note or "").strip(),
+            })
+            p.sold_sizes = sold_sizes_list
     else:
         # Eski sistem (beden yoksa toplam stok)
         current_stock = max(0, p.stock_quantity)
@@ -900,6 +914,7 @@ def run_backup(
                     "images": p.images,
                     "sale_history": p.sale_history,
                     "size_stocks": p.size_stocks,
+                    "sold_sizes": p.sold_sizes,
                 }
                 for p in products
             ],

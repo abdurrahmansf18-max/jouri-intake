@@ -28,6 +28,12 @@ export interface SizeStock {
   qty: number;
 }
 
+export interface SoldSizeEntry {
+  size: string;
+  soldAt: string;
+  note: string;
+}
+
 export interface SaleRecord {
   soldAt: string;
   quantity: number;
@@ -51,6 +57,7 @@ export interface ProductRecord {
   lastSoldAt?: string | null;
   saleHistory: SaleRecord[];
   sizeStocks: SizeStock[];
+  soldSizes: SoldSizeEntry[];
 }
 
 export interface ActivityLog {

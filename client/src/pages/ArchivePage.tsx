@@ -9,6 +9,10 @@ import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import { useProductSync } from "../hooks/useProductSync";
 
+function isArchived(r: ProductRecord) {
+  return r.status === "sold_archive" || r.soldSizes.length > 0;
+}
+
 export default function ArchivePage() {
   const { locale, theme } = useApp();
   const t = COPY[locale];
@@ -22,14 +26,14 @@ export default function ArchivePage() {
 
   useEffect(() => {
     fetchProducts()
-      .then((all) => setRecords(all.filter((p) => p.status === "sold_archive")))
+      .then((all) => setRecords(all.filter(isArchived)))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   useProductSync({
     onProductUpdated: (updated) => {
-      if (updated.status === "sold_archive") {
+      if (isArchived(updated)) {
         setRecords((prev) => {
           const exists = prev.find((r) => r.id === updated.id);
           return exists ? prev.map((r) => r.id === updated.id ? updated : r) : [updated, ...prev];
@@ -49,13 +53,14 @@ export default function ArchivePage() {
     if (!tokens.length) return records;
     return records.filter((r) => {
       const p = r.parsed;
-      const hay = normalizeText([p.titleRaw, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes, r.description].join(" "));
+      const soldSizeNames = r.soldSizes.map((ss) => ss.size).join(" ");
+      const hay = normalizeText([p.titleRaw, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes, r.description, soldSizeNames].join(" "));
       return tokens.every((tok) => hay.includes(tok));
     });
   }, [records, search]);
 
   function replaceRecord(updated: ProductRecord) {
-    if (updated.status !== "sold_archive") {
+    if (!isArchived(updated)) {
       setRecords((prev) => prev.filter((r) => r.id !== updated.id));
       setSelectedId(null);
     } else {
@@ -104,7 +109,8 @@ export default function ArchivePage() {
               onOpen={() => { setSelectedId(record.id); setDetailMode("view"); }}
               onEdit={() => { setSelectedId(record.id); setDetailMode("edit"); }}
               onReplace={replaceRecord}
-              showRestoreBtn
+              showRestoreBtn={record.status === "sold_archive"}
+              showSoldSizes
               searchQuery={search}
             />
           ))}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArchiveRestore, ExternalLink, ImageOff, Pencil } from "lucide-react";
+import { ArchiveRestore, ExternalLink, ImageOff, Pencil, Ruler } from "lucide-react";
 import { productImageUrl, updateStatus } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -12,10 +12,11 @@ interface Props {
   onEdit: () => void;
   onReplace: (updated: ProductRecord) => void;
   showRestoreBtn?: boolean;
+  showSoldSizes?: boolean;
   searchQuery?: string;
 }
 
-export default function ProductCard({ record, onOpen, onEdit, onReplace, showRestoreBtn, searchQuery }: Props) {
+export default function ProductCard({ record, onOpen, onEdit, onReplace, showRestoreBtn, showSoldSizes, searchQuery }: Props) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
@@ -80,6 +81,19 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
           </h3>
         ) : (
           <h3 className={cn("line-clamp-1 text-sm font-extrabold", s.muted)}>{record.folderName}</h3>
+        )}
+
+        {/* Satılan bedenler (arşiv görünümünde) */}
+        {showSoldSizes && record.soldSizes.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {record.soldSizes.map((ss) => (
+              <span key={ss.size}
+                className="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-400 ring-1 ring-amber-400/25">
+                <Ruler className="size-2.5" />
+                {ss.size}
+              </span>
+            ))}
+          </div>
         )}
 
         {/* Fiyat + Durum */}

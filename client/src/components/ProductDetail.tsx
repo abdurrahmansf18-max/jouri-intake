@@ -556,6 +556,25 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </section>
                 )}
 
+                {/* Satılan bedenler (kısmen satılmış ürün) */}
+                {record.soldSizes.length > 0 && record.status !== "sold_archive" && (
+                  <section className={cn("rounded-xl border p-4", s.subPanel)}>
+                    <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold text-amber-400", s.title)}>
+                      <Ruler className="size-4 text-amber-400" /> {t.soldSizesLabel}
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {record.soldSizes.map((ss) => (
+                        <div key={ss.size} className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-1.5">
+                          <span className="text-sm font-extrabold text-amber-400">{ss.size}</span>
+                          <span className={cn("ml-2 text-xs", s.muted)}>
+                            {new Date(ss.soldAt).toLocaleDateString(dateLocale)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
                 {/* Satış geçmişi */}
                 {(record.saleHistory ?? []).length > 0 && (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>

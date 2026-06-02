@@ -185,6 +185,8 @@ export const COPY = {
     selectSizeForSale: "Satılacak beden",
     sizeStockDisplay: (size: string, qty: number) => `${size}: ${qty} adet`,
     allSizesOutOfStock: "Tüm bedenler tükendi — stok yok.",
+    soldSizesLabel: "Satılan bedenler",
+    partiallySold: "Kısmen satıldı",
     restoreStockNote: "Stok bedenler arasında eşit dağıtılır, sonra düzenleyebilirsin.",
     // API error codes → messages
     errors: {
@@ -432,6 +434,8 @@ export const COPY = {
     selectSizeForSale: "المقاس المباع",
     sizeStockDisplay: (size: string, qty: number) => `${size}: ${qty} قطعة`,
     allSizesOutOfStock: "نفدت جميع المقاسات — لا يوجد مخزون.",
+    soldSizesLabel: "المقاسات المباعة",
+    partiallySold: "مباع جزئياً",
     restoreStockNote: "سيتم توزيع المخزون بالتساوي على المقاسات، ويمكنك تعديله لاحقاً.",
     // API error codes → messages
     errors: {

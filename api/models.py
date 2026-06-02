@@ -15,6 +15,12 @@ class SizeStock(BaseModel):
     qty: int
 
 
+class SoldSizeEntry(BaseModel):
+    size: str
+    soldAt: str
+    note: str = ""
+
+
 class ParsedProduct(BaseModel):
     titleRaw: str = ""
     categorySuggestion: str = ""
@@ -68,6 +74,7 @@ class ProductRecord(BaseModel):
     lastSoldAt: Optional[str] = None
     saleHistory: list[SaleRecord] = Field(default_factory=list)
     sizeStocks: list[SizeStock] = Field(default_factory=list)
+    soldSizes: list[SoldSizeEntry] = Field(default_factory=list)
 
 
 class StatusUpdateRequest(BaseModel):
