@@ -23,6 +23,7 @@ services:
       - ./api:/app
       - ../products_photo:/products_photo
       - ../backups:/backups
+      - /home/ubuntu/.config/rclone:/root/.config/rclone
     env_file: .env
     environment:
       PRODUCTS_BASE: /products_photo
