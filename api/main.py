@@ -434,7 +434,7 @@ async def create_product(
     parsed = parse_description(description)
     overrides = {
         "titleRaw": titleRaw.strip() if titleRaw else parsed.titleRaw,
-        "germanTitleSuggestion": germanTitleSuggestion.strip() if germanTitleSuggestion else parsed.germanTitleSuggestion,
+        "germanTitleSuggestion": "",
         "categorySuggestion": categorySuggestion.strip() if categorySuggestion else parsed.categorySuggestion,
         "productTypeSuggestion": productTypeSuggestion.strip() if productTypeSuggestion else parsed.productTypeSuggestion,
         "priceAmount": priceAmount.strip() if priceAmount else parsed.priceAmount,

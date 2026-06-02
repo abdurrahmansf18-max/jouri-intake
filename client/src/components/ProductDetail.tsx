@@ -121,7 +121,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
         sizeStocks: validSizes.length > 0 ? validSizes : undefined,
         parsed: {
           titleRaw: draft.titleRaw,
-          germanTitleSuggestion: draft.germanTitleSuggestion,
+          germanTitleSuggestion: "",
           categorySuggestion: draft.categorySuggestion,
           productTypeSuggestion: draft.productTypeSuggestion,
           priceAmount: draft.priceAmount,
@@ -261,12 +261,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           {/* ── Başlık ── */}
           <div className={cn("flex items-center gap-3 border-b px-4 py-3 sm:px-5", s.panelBorder)}>
             <div className="min-w-0 flex-1">
-              <h2 className={cn("line-clamp-1 text-sm font-black tracking-tight", s.title)}>
-                {p.germanTitleSuggestion || p.titleRaw || record.folderName}
+              <h2 className={cn("line-clamp-1 text-sm font-black tracking-tight", s.title)} dir="auto">
+                {p.titleRaw || record.folderName}
               </h2>
-              {p.titleRaw && p.germanTitleSuggestion && (
-                <p className={cn("truncate text-xs font-semibold", s.muted)} dir="auto">{p.titleRaw}</p>
-              )}
             </div>
             {/* Masaüstü tab */}
             <div className={cn("hidden sm:inline-flex items-center gap-0.5 rounded-lg border p-0.5", s.controlGroup)}>
@@ -348,10 +345,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <span dir="auto">{p.titleRaw}</span>
                     </InfoRow>}
 
-                    {/* Almanca ad */}
-                    {p.germanTitleSuggestion && <InfoRow label={t.germanTitle} s={s}>
-                      <span>{p.germanTitleSuggestion}</span>
-                    </InfoRow>}
 
                     {/* Renk */}
                     {p.colorRaw && <InfoRow label={t.color} s={s}>
@@ -652,7 +645,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </h3>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <DetailField label={t.rawTitle}            s={s} value={draft.titleRaw}              onChange={(v) => patch("titleRaw", v)} />
-                    <DetailField label={t.germanTitle}         s={s} value={draft.germanTitleSuggestion}  onChange={(v) => patch("germanTitleSuggestion", v)} />
                     <DetailField label={t.price}               s={s} value={draft.priceAmount}            onChange={(v) => patch("priceAmount", v)} />
                     <DetailField label={t.color}               s={s} value={draft.colorRaw}               onChange={(v) => patch("colorRaw", v)} />
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />

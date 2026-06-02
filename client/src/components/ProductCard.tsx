@@ -73,24 +73,12 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
 
       {/* ── İçerik ── */}
       <div className="p-3">
-        {/* Başlık */}
-        {p.germanTitleSuggestion && (
-          <h3 className={cn("line-clamp-2 text-sm font-extrabold leading-5", s.title)}>
-            <Highlight text={p.germanTitleSuggestion} query={searchQuery ?? ""} />
-          </h3>
-        )}
-        {p.titleRaw && (
-          <p
-            className={cn(
-              "line-clamp-1 text-xs font-semibold leading-5",
-              p.germanTitleSuggestion ? s.muted : cn(s.title, "font-extrabold text-sm"),
-            )}
-            dir="auto"
-          >
+        {/* Başlık — her zaman orijinal ad */}
+        {p.titleRaw ? (
+          <h3 className={cn("line-clamp-2 text-sm font-extrabold leading-5", s.title)} dir="auto">
             <Highlight text={p.titleRaw} query={searchQuery ?? ""} />
-          </p>
-        )}
-        {!p.germanTitleSuggestion && !p.titleRaw && (
+          </h3>
+        ) : (
           <h3 className={cn("line-clamp-1 text-sm font-extrabold", s.muted)}>{record.folderName}</h3>
         )}
 
