@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import {
   ClipboardList,
   Edit3,
+  Layers,
   Loader2,
+  Package,
   Ruler,
   Save,
   UploadCloud,
@@ -14,6 +16,7 @@ import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEditor";
+import BulkProductForm from "../components/BulkProductForm";
 
 type Draft = {
   titleRaw: string;
@@ -47,6 +50,7 @@ export default function AddProductPage() {
   const [previews, setPreviews] = useState<{ name: string; url: string }[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [sizeRows, setSizeRows] = useState<SizeStockRow[]>([{ size: "", qty: "1" }]);
+  const [addMode, setAddMode] = useState<"single" | "bulk">("single");
   const [submitting, setSubmitting] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
@@ -130,7 +134,38 @@ export default function AddProductPage() {
 
   return (
     <div className="grid gap-5">
-      <form ref={formRef} onSubmit={handleSubmit} className={cn("rounded-xl border", s.panel)}>
+      {/* Mod seçici */}
+      <div className={cn("grid grid-cols-2 gap-0 rounded-xl border overflow-hidden", s.controlGroup)}>
+        <button
+          type="button"
+          onClick={() => setAddMode("single")}
+          className={cn(
+            "inline-flex min-h-11 items-center justify-center gap-2 px-3 text-sm font-extrabold transition",
+            addMode === "single" ? s.controlActive : s.controlIdle,
+          )}
+        >
+          <Package className="size-4" />
+          {t.addModeSingle}
+        </button>
+        <button
+          type="button"
+          onClick={() => setAddMode("bulk")}
+          className={cn(
+            "inline-flex min-h-11 items-center justify-center gap-2 px-3 text-sm font-extrabold transition border-s",
+            addMode === "bulk" ? s.controlActive : s.controlIdle,
+            s.panelBorder,
+          )}
+        >
+          <Layers className="size-4" />
+          {t.addModeBulk}
+        </button>
+      </div>
+
+      {/* Çoklu ekleme modu */}
+      {addMode === "bulk" && <BulkProductForm />}
+
+      {/* Tekli ekleme modu */}
+      {addMode === "single" && <form ref={formRef} onSubmit={handleSubmit} className={cn("rounded-xl border", s.panel)}>
         <div className={cn("flex items-center justify-between gap-3 border-b px-5 py-4", s.panelBorder)}>
           <div>
             <h1 className={cn("text-lg font-extrabold tracking-tight", s.title)}>{t.addProductTitle}</h1>
@@ -253,7 +288,7 @@ export default function AddProductPage() {
             {submitting ? t.saving : t.saveProduct}
           </button>
         </div>
-      </form>
+      </form>}
     </div>
   );
 }

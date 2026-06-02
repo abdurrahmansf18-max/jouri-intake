@@ -1,0 +1,457 @@
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle, CheckCircle2, Loader2, Package,
+  Plus, Ruler, Save, Trash2, UploadCloud, X,
+} from "lucide-react";
+import { createProduct } from "../api";
+import { useApp } from "../context";
+import { COPY, cn } from "../i18n";
+import { DARK, LIGHT, type ThemeStyles } from "../theme";
+import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
+
+// ── Tipler ───────────────────────────────────────────────────────────────────
+
+type BulkDraft = {
+  id: string;
+  titleRaw: string;
+  priceAmount: string;
+  colorRaw: string;
+  categorySuggestion: string;
+  productTypeSuggestion: string;
+  notes: string;
+  files: File[];
+  previews: { name: string; url: string }[];
+  sizeRows: SizeStockRow[];
+  error?: string;
+  submitted?: boolean;
+};
+
+function makeDraft(): BulkDraft {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    titleRaw: "",
+    priceAmount: "",
+    colorRaw: "",
+    categorySuggestion: "",
+    productTypeSuggestion: "",
+    notes: "",
+    files: [],
+    previews: [],
+    sizeRows: [{ size: "", qty: "1" }],
+  };
+}
+
+// ── Ana bileşen ───────────────────────────────────────────────────────────────
+
+export default function BulkProductForm() {
+  const { locale, theme, showToast } = useApp();
+  const t = COPY[locale];
+  const s = theme === "dark" ? DARK : LIGHT;
+  const navigate = useNavigate();
+
+  const [cards, setCards] = useState<BulkDraft[]>([makeDraft(), makeDraft()]);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+  // Unmount'ta blob URL'leri temizle
+  const cardsRef = useRef<BulkDraft[]>(cards);
+  useEffect(() => { cardsRef.current = cards; }, [cards]);
+  useEffect(() => {
+    return () => { cardsRef.current.forEach((c) => c.previews.forEach((p) => URL.revokeObjectURL(p.url))); };
+  }, []);
+
+  // ── State güncellemeleri ──────────────────────────────────────────────────
+
+  function patch(id: string, update: Partial<BulkDraft>) {
+    setCards((prev) => prev.map((c) => c.id === id ? { ...c, ...update, error: undefined } : c));
+  }
+
+  function addCard() {
+    setCards((prev) => [...prev, makeDraft()]);
+  }
+
+  function removeCard(id: string) {
+    setCards((prev) => {
+      const card = prev.find((c) => c.id === id);
+      if (card) card.previews.forEach((p) => URL.revokeObjectURL(p.url));
+      return prev.filter((c) => c.id !== id);
+    });
+  }
+
+  function handleFiles(id: string, newFiles: File[]) {
+    setCards((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      const combined = [...c.files, ...newFiles].slice(0, 5);
+      c.previews.forEach((p) => URL.revokeObjectURL(p.url));
+      return {
+        ...c,
+        files: combined,
+        previews: combined.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })),
+        error: undefined,
+      };
+    }));
+  }
+
+  function removeFile(id: string, idx: number) {
+    setCards((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      URL.revokeObjectURL(c.previews[idx]?.url ?? "");
+      return {
+        ...c,
+        files: c.files.filter((_, i) => i !== idx),
+        previews: c.previews.filter((_, i) => i !== idx),
+      };
+    }));
+  }
+
+  // ── Doğrulama ─────────────────────────────────────────────────────────────
+
+  function validate(): boolean {
+    let valid = true;
+    setCards((prev) => prev.map((c) => {
+      if (c.submitted) return c; // zaten başarıyla eklenmiş
+      if (!c.files.length) { valid = false; return { ...c, error: t.emptyImg }; }
+      if (!c.titleRaw.trim()) { valid = false; return { ...c, error: t.errTitleRequired }; }
+      if (!c.priceAmount.trim()) { valid = false; return { ...c, error: t.errPriceRequired }; }
+      if (!c.colorRaw.trim()) { valid = false; return { ...c, error: t.errColorRequired }; }
+      const validSizes = c.sizeRows.filter((r) => r.size.trim() && parseInt(r.qty, 10) >= 1);
+      if (!validSizes.length) { valid = false; return { ...c, error: t.errSizeRequired }; }
+      return c;
+    }));
+    return valid;
+  }
+
+  // ── Gönderim ──────────────────────────────────────────────────────────────
+
+  async function handleSubmit() {
+    if (!validate()) return;
+
+    const pending = cards.filter((c) => !c.submitted);
+    setBusy(true);
+    setProgress({ done: 0, total: pending.length });
+
+    const results: { id: string; ok: boolean }[] = [];
+
+    for (const card of pending) {
+      try {
+        const validSizes = card.sizeRows
+          .filter((r) => r.size.trim())
+          .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
+
+        const description = [card.titleRaw, card.colorRaw, card.priceAmount && `${card.priceAmount} EUR`]
+          .filter(Boolean).join(" · ");
+
+        await createProduct(description, card.files, {
+          notes: card.notes,
+          sizeStocks: validSizes,
+          parsed: {
+            titleRaw: card.titleRaw,
+            categorySuggestion: card.categorySuggestion,
+            productTypeSuggestion: card.productTypeSuggestion,
+            priceAmount: card.priceAmount,
+            currency: "EUR",
+            colorRaw: card.colorRaw,
+          },
+        });
+        results.push({ id: card.id, ok: true });
+      } catch {
+        results.push({ id: card.id, ok: false });
+      }
+      setProgress((p) => ({ ...p, done: p.done + 1 }));
+    }
+
+    const ok = results.filter((r) => r.ok).length;
+    const fail = results.filter((r) => !r.ok).length;
+    const failedIds = new Set(results.filter((r) => !r.ok).map((r) => r.id));
+
+    // Başarılıları temizle, başarısızları hata ile bırak
+    setCards((prev) => {
+      prev.forEach((c) => {
+        if (!failedIds.has(c.id) && !c.submitted) {
+          c.previews.forEach((p) => URL.revokeObjectURL(p.url));
+        }
+      });
+      return prev
+        .filter((c) => failedIds.has(c.id) || c.submitted)
+        .map((c) => failedIds.has(c.id) ? { ...c, error: t.errors.ERR_GENERAL } : c);
+    });
+
+    setBusy(false);
+
+    if (fail === 0) {
+      showToast(t.bulkDone(ok), "success");
+      navigate("/products");
+    } else {
+      showToast(t.bulkPartialFail(ok, fail), "error");
+    }
+  }
+
+  const pendingCount = cards.filter((c) => !c.submitted).length;
+
+  return (
+    <div className="grid gap-4">
+      {cards.map((card, idx) => (
+        <BulkCard
+          key={card.id}
+          card={card}
+          index={idx}
+          busy={busy}
+          canRemove={cards.length > 1 && !card.submitted}
+          onPatch={(u) => patch(card.id, u)}
+          onRemove={() => removeCard(card.id)}
+          onFiles={(files) => handleFiles(card.id, files)}
+          onRemoveFile={(i) => removeFile(card.id, i)}
+        />
+      ))}
+
+      {/* Ürün ekle butonu */}
+      {!busy && (
+        <button
+          type="button"
+          onClick={addCard}
+          className={cn(
+            "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed text-sm font-extrabold transition active:scale-95",
+            s.dropzone,
+          )}
+        >
+          <Plus className="size-4" /> {t.bulkAddCard}
+        </button>
+      )}
+
+      {/* Yapışkan gönder çubuğu */}
+      <div className={cn("sticky bottom-20 md:bottom-4 z-10 rounded-xl border p-3 shadow-xl", s.panel)}>
+        {busy ? (
+          <div className="flex items-center justify-center gap-3 py-0.5">
+            <Loader2 className="size-5 animate-spin text-violet-400" />
+            <span className={cn("text-sm font-extrabold", s.title)}>
+              {t.bulkProgress(progress.done, progress.total)}
+            </span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={pendingCount === 0}
+            className={cn(
+              "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition active:scale-95 disabled:opacity-50",
+              s.primary,
+            )}
+          >
+            <Save className="size-4" />
+            {t.bulkSubmit(pendingCount)}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Ürün kartı ────────────────────────────────────────────────────────────────
+
+function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, onRemoveFile }: {
+  card: BulkDraft;
+  index: number;
+  busy: boolean;
+  canRemove: boolean;
+  onPatch: (u: Partial<BulkDraft>) => void;
+  onRemove: () => void;
+  onFiles: (files: File[]) => void;
+  onRemoveFile: (idx: number) => void;
+}) {
+  const { locale, theme } = useApp();
+  const t = COPY[locale];
+  const s = theme === "dark" ? DARK : LIGHT;
+
+  if (card.submitted) {
+    return (
+      <div className={cn("flex items-center gap-3 rounded-xl border px-4 py-3", s.success)}>
+        <CheckCircle2 className="size-4 shrink-0" />
+        <span className="text-sm font-bold">{t.bulkProductNum(index + 1)} — {card.titleRaw}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn(
+      "rounded-xl border",
+      card.error ? "border-red-400/50" : "",
+      s.panel,
+    )}>
+      {/* Kart başlığı */}
+      <div className={cn("flex items-center justify-between gap-2 border-b px-4 py-3", s.panelBorder)}>
+        <div className="flex min-w-0 items-center gap-2">
+          <Package className="size-4 shrink-0 text-violet-400" />
+          <span className={cn("shrink-0 text-sm font-extrabold", s.title)}>
+            {t.bulkProductNum(index + 1)}
+          </span>
+          {card.titleRaw && (
+            <span className={cn("truncate text-xs font-semibold", s.muted)} dir="auto">
+              {card.titleRaw}
+            </span>
+          )}
+        </div>
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className={cn(
+              "inline-flex size-7 shrink-0 items-center justify-center rounded-lg border transition active:scale-95",
+              s.error,
+            )}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        )}
+      </div>
+
+      <div className="grid gap-3 p-4">
+        {/* Hata */}
+        {card.error && (
+          <div className={cn("flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold", s.error)}>
+            <AlertTriangle className="size-3.5 shrink-0" />
+            {card.error}
+          </div>
+        )}
+
+        {/* Görsel yükleme */}
+        <div>
+          <label className={cn(
+            "flex cursor-pointer items-center gap-2 rounded-xl border border-dashed px-3 py-2.5 transition",
+            busy ? "cursor-default opacity-60" : "",
+            s.dropzone,
+          )}>
+            <input
+              className="sr-only"
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={busy}
+              onChange={(e) => {
+                onFiles(Array.from(e.currentTarget.files ?? []));
+                e.currentTarget.value = "";
+              }}
+            />
+            <UploadCloud className="size-4 shrink-0 text-violet-400" />
+            <span className={cn("flex-1 text-xs font-semibold", s.muted)}>
+              {card.files.length > 0 ? t.imageCount(card.files.length) : t.chooseGallery}
+            </span>
+            {card.files.length > 0 && (
+              <span className="text-[10px] font-bold text-violet-400">{card.files.length}/5</span>
+            )}
+          </label>
+
+          {card.previews.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {card.previews.map((p, i) => (
+                <div key={p.name} className="relative">
+                  <img
+                    src={p.url}
+                    alt={p.name}
+                    className="size-14 rounded-lg object-cover ring-1 ring-white/10"
+                  />
+                  {!busy && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveFile(i)}
+                      className="absolute -end-1 -top-1 flex size-5 items-center justify-center rounded-full bg-black/70 text-red-400 transition hover:bg-red-500 hover:text-white"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Alanlar — 2 kolonlu grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <BulkField
+            label={`${t.rawTitle} *`}
+            value={card.titleRaw}
+            onChange={(v) => onPatch({ titleRaw: v })}
+            s={s} disabled={busy}
+          />
+          <BulkField
+            label={`${t.price} *`}
+            value={card.priceAmount}
+            onChange={(v) => onPatch({ priceAmount: v })}
+            s={s} disabled={busy}
+          />
+          <BulkField
+            label={`${t.color} *`}
+            value={card.colorRaw}
+            onChange={(v) => onPatch({ colorRaw: v })}
+            s={s} disabled={busy}
+          />
+          <BulkField
+            label={t.category}
+            value={card.categorySuggestion}
+            onChange={(v) => onPatch({ categorySuggestion: v })}
+            s={s} disabled={busy}
+          />
+          <BulkField
+            label={t.productType}
+            value={card.productTypeSuggestion}
+            onChange={(v) => onPatch({ productTypeSuggestion: v })}
+            s={s} disabled={busy}
+            className="col-span-2"
+          />
+          <BulkField
+            label={t.notes}
+            value={card.notes}
+            onChange={(v) => onPatch({ notes: v })}
+            s={s} disabled={busy}
+            placeholder={t.notesPlaceholder}
+            className="col-span-2"
+          />
+        </div>
+
+        {/* Bedenler */}
+        <div>
+          <span className={cn("mb-1.5 flex items-center gap-1.5 text-xs font-black", s.strong)}>
+            <Ruler className="size-3 text-sky-400" /> {t.sizeStocksLabel} *
+          </span>
+          <SizeStockEditor
+            value={card.sizeRows}
+            onChange={(rows) => onPatch({ sizeRows: rows })}
+            s={s}
+            sizeNamePlaceholder={t.sizeNamePlaceholder}
+            sizeQtyPlaceholder={t.sizeQtyPlaceholder}
+            addRowLabel={t.addSizeRow}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Yardımcı alan bileşeni ────────────────────────────────────────────────────
+
+function BulkField({ label, value, onChange, s, disabled, placeholder, className }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  s: ThemeStyles;
+  disabled: boolean;
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <label className={cn("grid gap-1", className)}>
+      <span className={cn("text-[10px] font-black leading-none", s.strong)}>{label}</span>
+      <input
+        className={cn(
+          "min-h-9 rounded-lg border px-2.5 text-xs font-semibold outline-none focus:ring-2",
+          s.input,
+        )}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder={placeholder}
+        dir="auto"
+      />
+    </label>
+  );
+}

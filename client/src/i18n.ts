@@ -249,6 +249,15 @@ export const COPY = {
     backupHow3: "Görseller: artımlı kopyalama (sadece yeni/değişen dosyalar)",
     backupHow4: "Google Drive'a otomatik yüklenir",
     backupHow5: "30 günden eski yedekler otomatik silinir",
+    // Bulk add
+    addModeSingle: "Tekli Ekle",
+    addModeBulk: "Çoklu Ekle",
+    bulkAddCard: "+ Ürün ekle",
+    bulkSubmit: (n: number) => `${n} ürünü kaydet`,
+    bulkProgress: (done: number, total: number) => `${done}/${total} ekleniyor...`,
+    bulkDone: (n: number) => `${n} ürün eklendi.`,
+    bulkPartialFail: (ok: number, fail: number) => `${ok} eklendi, ${fail} başarısız.`,
+    bulkProductNum: (n: number) => `Ürün ${n}`,
     // Sample
     sampleDesc: "",
   },
@@ -500,6 +509,15 @@ export const COPY = {
     backupHow3: "الصور: نسخ تدريجي (الملفات الجديدة والمتغيرة فقط)",
     backupHow4: "يُرفع إلى Google Drive تلقائياً",
     backupHow5: "يُحذف تلقائياً بعد 30 يوماً",
+    // Bulk add
+    addModeSingle: "إضافة منتج",
+    addModeBulk: "إضافة متعددة",
+    bulkAddCard: "+ إضافة منتج",
+    bulkSubmit: (n: number) => `حفظ ${n} منتجات`,
+    bulkProgress: (done: number, total: number) => `${done}/${total} جارٍ الإضافة...`,
+    bulkDone: (n: number) => `تمت إضافة ${n} منتجات.`,
+    bulkPartialFail: (ok: number, fail: number) => `تمت ${ok}، فشلت ${fail}.`,
+    bulkProductNum: (n: number) => `المنتج ${n}`,
     // Sample
     sampleDesc: "",
   },
