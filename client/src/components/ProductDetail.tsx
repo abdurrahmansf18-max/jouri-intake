@@ -380,24 +380,34 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       </span>
                     </InfoRow>}
 
-                    {/* Beden başına stok */}
+                    {/* Bedenler + Toplam stok — yan yana */}
                     {record.sizeStocks.length > 0 ? (
-                      <InfoRow label={t.sizeStocksLabel} s={s}>
-                        <div className="flex flex-wrap gap-1.5">
-                          {record.sizeStocks.map((ss) => (
-                            <span key={ss.size}
-                              className={cn(
-                                "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-extrabold",
-                                ss.qty > 0
-                                  ? "bg-emerald-400/15 text-emerald-400 ring-1 ring-emerald-400/30"
-                                  : "bg-slate-400/10 text-slate-400 line-through ring-1 ring-slate-400/20",
-                              )}>
-                              <Ruler className="size-2.5" />
-                              {t.sizeStockDisplay(ss.size, ss.qty)}
-                            </span>
-                          ))}
+                      <div className="grid grid-cols-2 gap-0 py-2.5">
+                        <div className={cn("border-e pe-3", s.panelBorder)}>
+                          <span className={cn("block mb-2 text-xs font-black", s.strong)}>{t.sizeStocksLabel}</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {record.sizeStocks.map((ss) => (
+                              <span key={ss.size}
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-extrabold",
+                                  ss.qty > 0
+                                    ? "bg-emerald-400/15 text-emerald-400 ring-1 ring-emerald-400/30"
+                                    : "bg-slate-400/10 text-slate-400 line-through ring-1 ring-slate-400/20",
+                                )}>
+                                <Ruler className="size-2.5" />
+                                {t.sizeStockDisplay(ss.size, ss.qty)}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </InfoRow>
+                        <div className="ps-3 flex flex-col justify-center gap-1">
+                          <span className={cn("text-xs font-black", s.strong)}>{t.stockQuantity}</span>
+                          <span className="inline-flex items-center gap-1">
+                            <Box className="size-3 text-emerald-400" />
+                            <span className="font-black text-emerald-400">{record.stockQuantity}</span>
+                          </span>
+                        </div>
+                      </div>
                     ) : (
                       /* Eski sistem — beden metin + toplam stok */
                       <>
@@ -414,16 +424,6 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           </span>
                         </InfoRow>
                       </>
-                    )}
-
-                    {/* Toplam stok (sizeStocks varsa) */}
-                    {record.sizeStocks.length > 0 && (
-                      <InfoRow label={t.stockQuantity} s={s}>
-                        <span className="inline-flex items-center gap-1">
-                          <Box className="size-3 text-emerald-400" />
-                          <span className="font-black text-emerald-400">{record.stockQuantity}</span>
-                        </span>
-                      </InfoRow>
                     )}
 
                     {/* Satılan */}

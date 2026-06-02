@@ -180,7 +180,7 @@ export const COPY = {
     errSizeSelectRequired: "Hangi bedenden satıldığını seçmelisin.",
     errSaveNeedSize: "En az bir beden girmelisin.",
     // Size stocks UI
-    sizeStocksLabel: "Bedenler ve Stok",
+    sizeStocksLabel: "Bedenler",
     addSizeRow: "+ Beden ekle",
     sizeNamePlaceholder: "S / M / L / XL",
     sizeQtyPlaceholder: "Adet",
@@ -450,7 +450,7 @@ export const COPY = {
     errSizeSelectRequired: "يجب تحديد المقاس المباع.",
     errSaveNeedSize: "يجب إدخال مقاس واحد على الأقل.",
     // Size stocks UI
-    sizeStocksLabel: "المقاسات والمخزون",
+    sizeStocksLabel: "المقاسات",
     addSizeRow: "+ إضافة مقاس",
     sizeNamePlaceholder: "S / M / L / XL",
     sizeQtyPlaceholder: "الكمية",
