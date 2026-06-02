@@ -777,12 +777,12 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
                   <label className="mt-3 grid gap-1.5">
                     <span className={cn("text-xs font-black", s.strong)}>{t.description}</span>
-                    <textarea className={cn("min-h-24 rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
+                    <textarea className={cn("min-h-24 w-full rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
                       value={draft.description} onChange={(e) => patch("description", e.target.value)} dir="auto" />
                   </label>
                   <label className="mt-3 grid gap-1.5">
                     <span className={cn("text-xs font-black", s.strong)}>{t.notes}</span>
-                    <textarea className={cn("min-h-20 rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
+                    <textarea className={cn("min-h-20 w-full rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
                       value={draft.notes} onChange={(e) => patch("notes", e.target.value)}
                       placeholder={t.notesPlaceholder} dir="auto" />
                   </label>

@@ -473,7 +473,7 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             dir="auto"
             rows={3}
             className={cn(
-              "rounded-lg border px-2.5 py-2 text-xs font-semibold leading-5 outline-none focus:ring-2 resize-none",
+              "w-full rounded-lg border px-2.5 py-2 text-xs font-semibold leading-5 outline-none focus:ring-2 resize-none",
               s.input,
             )}
           />

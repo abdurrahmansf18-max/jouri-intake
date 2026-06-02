@@ -278,7 +278,7 @@ export default function AddProductPage() {
             <label className="mt-3 grid gap-1.5">
               <span className={cn("text-xs font-black", s.strong)}>{t.notes}</span>
               <textarea
-                className={cn("min-h-20 rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
+                className={cn("min-h-20 w-full rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
                 value={draft.notes}
                 onChange={(e) => patch("notes", e.target.value)}
                 placeholder={t.notesPlaceholder}
