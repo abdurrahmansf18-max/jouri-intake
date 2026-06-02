@@ -401,7 +401,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                                 </span>
                                 <span className={cn(
                                   "px-2 py-1",
-                                  ss.qty > 0 ? "bg-emerald-400/30 text-emerald-200" : "bg-slate-400/20 text-slate-500",
+                                  ss.qty > 0 ? "bg-emerald-400/25 text-emerald-500" : "bg-slate-400/20 text-slate-500",
                                 )}>
                                   ×{ss.qty}
                                 </span>
