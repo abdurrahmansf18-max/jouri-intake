@@ -115,5 +115,9 @@ class RestoreProductRequest(BaseModel):
     stockQuantity: int = 1
 
 
+class RestoreSizeRequest(BaseModel):
+    size: str
+
+
 class AuthRequest(BaseModel):
     code: str

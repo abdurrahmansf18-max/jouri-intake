@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import {
   addProductImages, deleteProduct, deleteProductImage,
-  productImageUrl, resetSales, restoreProduct,
+  productImageUrl, resetSales, restoreProduct, restoreSize,
   sellProduct, updateProduct, updateStatus, verifyEditLock,
 } from "../api";
 import { useApp } from "../context";
@@ -70,6 +70,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [draft, setDraft] = useState<Draft>(() => recordToDraft(record));
   const [sizeRows, setSizeRows] = useState<SizeStockRow[]>(() => sizeStocksToRows(record.sizeStocks));
   const [busy, setBusy] = useState(false);
+  const [restoringSize, setRestoringSize] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [deletingImage, setDeletingImage] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -177,6 +178,18 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       onReplace(updated);
       showToast(t.toastRestored, "success");
     } finally { setBusy(false); }
+  }
+
+  async function handleRestoreSize(size: string) {
+    setRestoringSize(size);
+    try {
+      const updated = await restoreSize(record.id, size);
+      onReplace(updated);
+      showToast(t.toastSizeRestored, "success");
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
+    } finally { setRestoringSize(null); }
   }
 
   async function handleResetSales() {
@@ -541,34 +554,51 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </section>
                 ) : (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
-                    <label className="grid gap-1.5 mb-2">
-                      <span className={cn("text-xs font-black", s.strong)}>{t.restoreStock}</span>
-                      <input type="number" min={1} value={draft.restoreStock} onChange={(e) => patch("restoreStock", e.target.value)}
-                        className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
-                    </label>
-                    {record.sizeStocks.length > 0 && (
-                      <p className={cn("mb-3 text-xs font-semibold", s.muted)}>{t.restoreStockNote}</p>
+                    {record.soldSizes.length === 0 && (
+                      <label className="grid gap-1.5 mb-3">
+                        <span className={cn("text-xs font-black", s.strong)}>{t.restoreStock}</span>
+                        <input type="number" min={1} value={draft.restoreStock} onChange={(e) => patch("restoreStock", e.target.value)}
+                          className={cn("min-h-11 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
+                      </label>
                     )}
                     <button type="button" onClick={handleRestore} disabled={busy}
                       className={cn("inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border text-sm font-extrabold transition disabled:opacity-60", s.success)}>
-                      <ArchiveRestore className="size-4" /> {t.restoreProduct}
+                      {busy ? <Loader2 className="size-4 animate-spin" /> : <ArchiveRestore className="size-4" />}
+                      {t.restoreProduct}
                     </button>
                   </section>
                 )}
 
-                {/* Satılan bedenler (kısmen satılmış ürün) */}
-                {record.soldSizes.length > 0 && record.status !== "sold_archive" && (
+                {/* Satılan bedenler — geri al butonu ile */}
+                {record.soldSizes.length > 0 && (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
-                    <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold text-amber-400", s.title)}>
-                      <Ruler className="size-4 text-amber-400" /> {t.soldSizesLabel}
+                    <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
+                      <Ruler className="size-4 text-amber-400" />
+                      <span className="text-amber-400">{t.soldSizesLabel}</span>
                     </h3>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid gap-2">
                       {record.soldSizes.map((ss) => (
-                        <div key={ss.size} className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-1.5">
-                          <span className="text-sm font-extrabold text-amber-400">{ss.size}</span>
-                          <span className={cn("ml-2 text-xs", s.muted)}>
-                            {new Date(ss.soldAt).toLocaleDateString(dateLocale)}
-                          </span>
+                        <div key={ss.size} className={cn("flex items-center justify-between gap-3 rounded-xl border px-3 py-2", s.panelBorder)}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-extrabold text-amber-400">{ss.size}</span>
+                            <span className={cn("text-xs", s.muted)}>
+                              {new Date(ss.soldAt).toLocaleDateString(dateLocale)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={restoringSize === ss.size || busy}
+                            onClick={() => handleRestoreSize(ss.size)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-extrabold transition active:scale-95 disabled:opacity-50",
+                              s.success,
+                            )}
+                          >
+                            {restoringSize === ss.size
+                              ? <Loader2 className="size-3 animate-spin" />
+                              : <ArchiveRestore className="size-3" />}
+                            {t.restoreSizeBtn}
+                          </button>
                         </div>
                       ))}
                     </div>

@@ -27,6 +27,7 @@ from models import (
     ProductUpdateRequest,
     ResetSalesRequest,
     RestoreProductRequest,
+    RestoreSizeRequest,
     SaleRecord,
     SavedImage,
     SellProductRequest,
@@ -681,8 +682,18 @@ def reset_sales(
     p.sold_quantity = 0
     p.last_sold_at = None
     p.sale_history = []
+    p.sold_sizes = []
     if body.stockQuantity is not None:
         p.stock_quantity = max(0, int(body.stockQuantity))
+        if p.size_stocks:
+            sizes = [ss["size"] for ss in p.size_stocks]
+            total = p.stock_quantity
+            per_size = total // len(sizes) if sizes else 0
+            remainder = total % len(sizes) if sizes else 0
+            p.size_stocks = [
+                {"size": s, "qty": per_size + (1 if i < remainder else 0)}
+                for i, s in enumerate(sizes)
+            ]
 
     activity_logger.log(db, "reset_sales", product_id=p.id, product_title=p.title_raw)
     db.commit()
@@ -705,6 +716,7 @@ def restore_product(
     p.folder_path = new_path
     p.status = "pending"
     p.stock_quantity = max(1, int(body.stockQuantity))
+    p.sold_sizes = []
 
     # Stoku mevcut bedenler arasında eşit dağıt
     if p.size_stocks:
@@ -722,6 +734,55 @@ def restore_product(
         product_id=p.id,
         product_title=p.title_raw,
         details={"stock": p.stock_quantity},
+    )
+    db.commit()
+    db.refresh(p)
+    record = _to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
+
+
+@app.post("/api/products/{product_id}/restore-size", response_model=ProductRecord)
+def restore_product_size(
+    product_id: str,
+    body: RestoreSizeRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    """Satılan belirli bir bedeni geri alır (iade)."""
+    p = _get_or_404(db, product_id)
+    size_name = body.size.strip()
+
+    sold = list(p.sold_sizes or [])
+    if not any(s["size"] == size_name for s in sold):
+        raise HTTPException(status_code=404, detail={"code": "ERR_SIZE_NOT_FOUND"})
+
+    # sold_sizes'tan kaldır
+    p.sold_sizes = [s for s in sold if s["size"] != size_name]
+
+    # sizeStocks'a 1 adet olarak geri ekle
+    stocks = list(p.size_stocks or [])
+    existing = next((s for s in stocks if s["size"] == size_name), None)
+    if existing:
+        existing["qty"] += 1
+    else:
+        stocks.append({"size": size_name, "qty": 1})
+    p.size_stocks = stocks
+    p.stock_quantity = sum(s["qty"] for s in stocks)
+    p.sizes_raw = ", ".join(s["size"] for s in stocks if s.get("size"))
+
+    # sold_archive ise → stok gelince pending'e döndür
+    if p.status == "sold_archive" and p.stock_quantity > 0:
+        new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, "pending")
+        p.folder_path = new_path
+        p.status = "pending"
+
+    activity_logger.log(
+        db, "restore",
+        product_id=p.id,
+        product_title=p.title_raw,
+        details={"size": size_name},
     )
     db.commit()
     db.refresh(p)

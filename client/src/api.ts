@@ -137,6 +137,15 @@ export async function resetSales(productId: string, stockQuantity?: number): Pro
   return handleResponse<ProductRecord>(res);
 }
 
+export async function restoreSize(productId: string, size: string): Promise<ProductRecord> {
+  const res = await fetch(`/api/products/${productId}/restore-size`, {
+    method: "POST",
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ size }),
+  });
+  return handleResponse<ProductRecord>(res);
+}
+
 export async function restoreProduct(productId: string, stockQuantity = 1): Promise<ProductRecord> {
   const res = await fetch(`/api/products/${productId}/restore`, {
     method: "POST",

@@ -187,6 +187,8 @@ export const COPY = {
     allSizesOutOfStock: "Tüm bedenler tükendi — stok yok.",
     soldSizesLabel: "Satılan bedenler",
     partiallySold: "Kısmen satıldı",
+    restoreSizeBtn: "Geri Al",
+    toastSizeRestored: "Beden tekrar satışa alındı.",
     restoreStockNote: "Stok bedenler arasında eşit dağıtılır, sonra düzenleyebilirsin.",
     // API error codes → messages
     errors: {
@@ -436,6 +438,8 @@ export const COPY = {
     allSizesOutOfStock: "نفدت جميع المقاسات — لا يوجد مخزون.",
     soldSizesLabel: "المقاسات المباعة",
     partiallySold: "مباع جزئياً",
+    restoreSizeBtn: "إرجاع",
+    toastSizeRestored: "تم إرجاع المقاس للبيع.",
     restoreStockNote: "سيتم توزيع المخزون بالتساوي على المقاسات، ويمكنك تعديله لاحقاً.",
     // API error codes → messages
     errors: {
