@@ -7,6 +7,7 @@ import {
   Ruler,
   Save,
   UploadCloud,
+  X,
 } from "lucide-react";
 import { createProduct } from "../api";
 import { useApp } from "../context";
@@ -106,10 +107,24 @@ export default function AddProductPage() {
   }
 
   function handleFiles(selected: File[]) {
-    setFiles(selected);
-    setPreviews((curr) => {
-      curr.forEach((p) => URL.revokeObjectURL(p.url));
-      return selected.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
+    setFiles((prev) => {
+      const combined = [...prev, ...selected].slice(0, 5);
+      setPreviews((curr) => {
+        curr.forEach((p) => URL.revokeObjectURL(p.url));
+        return combined.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
+      });
+      return combined;
+    });
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setPreviews((curr) => {
+        URL.revokeObjectURL(curr[index]?.url ?? "");
+        return curr.filter((_, i) => i !== index);
+      });
+      return next;
     });
   }
 
@@ -131,7 +146,7 @@ export default function AddProductPage() {
               type="file"
               accept="image/*"
               multiple
-              onChange={(e) => handleFiles(Array.from(e.currentTarget.files ?? []).slice(0, 5))}
+              onChange={(e) => { handleFiles(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = ""; }}
             />
             <span className={cn("mb-3 flex size-12 items-center justify-center rounded-xl shadow-sm ring-1", s.dropIcon)}>
               <UploadCloud className="size-6" />
@@ -150,9 +165,16 @@ export default function AddProductPage() {
 
           {previews.length > 0 && (
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-              {previews.map((p) => (
-                <figure key={p.name} className={cn("overflow-hidden rounded-xl border", s.subPanel)}>
+              {previews.map((p, i) => (
+                <figure key={p.name} className={cn("relative overflow-hidden rounded-xl border", s.subPanel)}>
                   <img src={p.url} alt={p.name} className="aspect-square w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeFile(i)}
+                    className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-black/60 text-red-400 hover:bg-red-500/80 hover:text-white transition active:scale-95"
+                  >
+                    <X className="size-3.5" />
+                  </button>
                 </figure>
               ))}
             </div>
