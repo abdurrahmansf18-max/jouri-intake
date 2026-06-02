@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ClipboardList,
@@ -11,12 +11,14 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { createProduct } from "../api";
+import { createProduct, fetchProducts, updateRelatedProducts } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
+import type { ProductRecord } from "../types";
 import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEditor";
 import BulkProductForm from "../components/BulkProductForm";
+import VariantSelector from "../components/VariantSelector";
 
 type Draft = {
   titleRaw: string;
@@ -53,6 +55,12 @@ export default function AddProductPage() {
   const [addMode, setAddMode] = useState<"single" | "bulk">("single");
   const [submitting, setSubmitting] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [allProducts, setAllProducts] = useState<ProductRecord[]>([]);
+  const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchProducts().then(setAllProducts).catch(() => {});
+  }, []);
 
   function patch(key: keyof Draft, value: string) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -81,7 +89,7 @@ export default function AddProductPage() {
         .filter((r) => r.size.trim())
         .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
 
-      await createProduct(description, files, {
+      const newProduct = await createProduct(description, files, {
         notes: draft.notes,
         sizeStocks: validSizes,
         parsed: {
@@ -93,11 +101,17 @@ export default function AddProductPage() {
           colorRaw: draft.colorRaw,
         },
       });
+
+      if (selectedVariantIds.length > 0) {
+        await updateRelatedProducts(newProduct.id, selectedVariantIds);
+      }
+
       showToast(t.toastCreated, "success");
       setDescription("");
       setDraft(emptyDraft());
       setFiles([]);
       setSizeRows([{ size: "", qty: "1" }]);
+      setSelectedVariantIds([]);
       setPreviews((curr) => { curr.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
       formRef.current?.reset();
       navigate("/products");
@@ -272,6 +286,21 @@ export default function AddProductPage() {
               />
             </label>
           </section>
+
+          {/* Renk varyantları */}
+          {allProducts.length > 0 && (
+            <section className={cn("rounded-xl border p-4", s.subPanel)}>
+              <VariantSelector
+                allProducts={allProducts}
+                selectedIds={selectedVariantIds}
+                onChange={setSelectedVariantIds}
+                s={s}
+                label={t.colorVariantsLabel}
+                searchPlaceholder={t.colorVariantsSearch}
+                emptyText={t.colorVariantsEmpty}
+              />
+            </section>
+          )}
 
           {fieldError && (
             <div className={cn("rounded-xl border px-4 py-3 text-sm font-semibold", s.error)}>

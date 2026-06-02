@@ -125,6 +125,8 @@ export default function ArchivePage() {
           onReplace={replaceRecord}
           onDelete={removeRecord}
           showRestoreSizes
+          allProducts={records}
+          onNavigate={(product) => { setSelectedId(product.id); setDetailMode("view"); }}
         />
       )}
     </div>

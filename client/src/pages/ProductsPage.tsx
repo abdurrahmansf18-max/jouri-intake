@@ -164,6 +164,8 @@ export default function ProductsPage() {
           onClose={() => setSelectedId(null)}
           onReplace={replaceRecord}
           onDelete={removeRecord}
+          allProducts={records}
+          onNavigate={(product) => { setSelectedId(product.id); setDetailMode("view"); }}
         />
       )}
     </div>

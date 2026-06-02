@@ -7,7 +7,7 @@ import {
 import {
   addProductImages, deleteProduct, deleteProductImage,
   productImageUrl, resetSales, restoreProduct, restoreSize,
-  sellProduct, updateProduct, updateStatus, verifyEditLock,
+  sellProduct, updateProduct, updateRelatedProducts, updateStatus, verifyEditLock,
 } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -16,6 +16,7 @@ import type { ProductRecord, ProductStatus, SizeStock } from "../types";
 import { statusActiveBadge, statusBadge } from "./ProductCard";
 import ImageLightbox from "./ImageLightbox";
 import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
+import VariantSelector from "./VariantSelector";
 
 const ACTIVE_STATUSES: ProductStatus[] = ["pending", "ai_enhanced", "published"];
 
@@ -60,9 +61,11 @@ interface Props {
   onReplace: (updated: ProductRecord) => void;
   onDelete: (id: string) => void;
   showRestoreSizes?: boolean;
+  allProducts?: ProductRecord[];
+  onNavigate?: (product: ProductRecord) => void;
 }
 
-export default function ProductDetail({ record, initialMode = "view", onClose, onReplace, onDelete, showRestoreSizes = false }: Props) {
+export default function ProductDetail({ record, initialMode = "view", onClose, onReplace, onDelete, showRestoreSizes = false, allProducts, onNavigate }: Props) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
@@ -70,6 +73,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [mode, setMode] = useState<Mode>(initialMode);
   const [draft, setDraft] = useState<Draft>(() => recordToDraft(record));
   const [sizeRows, setSizeRows] = useState<SizeStockRow[]>(() => sizeStocksToRows(record.sizeStocks));
+  const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>(() => record.relatedProducts ?? []);
   const [busy, setBusy] = useState(false);
   const [restoringSize, setRestoringSize] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
@@ -87,6 +91,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   useEffect(() => {
     setDraft(recordToDraft(record));
     setSizeRows(sizeStocksToRows(record.sizeStocks));
+    setSelectedVariantIds(record.relatedProducts ?? []);
     setMode(initialMode);
     setDeleteConfirm(false);
     setImageFiles([]);
@@ -115,8 +120,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
     setBusy(true);
     try {
-
-      const updated = await updateProduct(record.id, {
+      let updated = await updateProduct(record.id, {
         notes: draft.notes,
         description: draft.description,
         sizeStocks: validSizes.length > 0 ? validSizes : undefined,
@@ -130,6 +134,11 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           colorGermanSuggestion: draft.colorGermanSuggestion,
         },
       });
+
+      if (allProducts !== undefined) {
+        updated = await updateRelatedProducts(record.id, selectedVariantIds);
+      }
+
       onReplace(updated);
       showToast(t.toastUpdated, "success");
       setMode("view");
@@ -455,6 +464,51 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </section>
                 )}
 
+                {/* Renk varyantları — görüntüleme modu */}
+                {allProducts && (record.relatedProducts ?? []).length > 0 && (
+                  <section className={cn("rounded-xl border p-4", s.subPanel)}>
+                    <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
+                      <Palette className="size-4 text-fuchsia-400" />
+                      {t.colorVariants}
+                    </h3>
+                    <div className="flex flex-wrap gap-3">
+                      {(record.relatedProducts ?? []).map((relId) => {
+                        const rel = allProducts.find((p) => p.id === relId);
+                        if (!rel) return null;
+                        const img = rel.images[0];
+                        return (
+                          <button
+                            key={relId}
+                            type="button"
+                            onClick={() => onNavigate?.(rel)}
+                            className={cn(
+                              "flex flex-col items-center gap-1.5 rounded-xl border p-2 transition",
+                              "hover:border-fuchsia-400/50 hover:bg-fuchsia-400/5 active:scale-95",
+                              s.panelBorder,
+                            )}
+                          >
+                            {img ? (
+                              <img
+                                src={productImageUrl(rel.id, img.fileName)}
+                                alt={rel.parsed.titleRaw}
+                                className="size-16 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className={cn("size-16 rounded-lg", s.subPanel)} />
+                            )}
+                            <span
+                              className={cn("max-w-[4.5rem] truncate text-xs font-semibold", s.muted)}
+                              dir="auto"
+                            >
+                              {rel.parsed.colorRaw || rel.parsed.titleRaw}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
                 {/* Durum değiştirme */}
                 {!isArchive && (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
@@ -730,6 +784,22 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       placeholder={t.notesPlaceholder} dir="auto" />
                   </label>
                 </section>
+
+                {/* Renk varyantları — düzenleme modu */}
+                {allProducts && (
+                  <section className={cn("rounded-xl border p-4", s.subPanel)}>
+                    <VariantSelector
+                      allProducts={allProducts}
+                      selectedIds={selectedVariantIds}
+                      currentProductId={record.id}
+                      onChange={setSelectedVariantIds}
+                      s={s}
+                      label={t.colorVariantsLabel}
+                      searchPlaceholder={t.colorVariantsSearch}
+                      emptyText={t.colorVariantsEmpty}
+                    />
+                  </section>
+                )}
 
                 {/* Görseller */}
                 <section className={cn("rounded-xl border p-4", s.subPanel)}>

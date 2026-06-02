@@ -34,6 +34,7 @@ from models import (
     SizeStock,
     SoldSizeEntry,
     StatusUpdateRequest,
+    UpdateRelatedRequest,
 )
 from parser import parse_description
 
@@ -187,6 +188,7 @@ def _migrate_size_stocks() -> None:
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS size_stocks JSON"))
         db.execute(text("ALTER TABLE products DROP COLUMN IF EXISTS german_title"))
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_sizes JSON"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS related_products JSON"))
         db.commit()
 
         # size_stocks'u olmayan ürünleri otomatik migrate et
@@ -292,6 +294,7 @@ def _to_record(p: Product) -> ProductRecord:
         saleHistory=[SaleRecord(**s) for s in (p.sale_history or [])],
         sizeStocks=[SizeStock(**ss) for ss in (p.size_stocks or [])],
         soldSizes=[SoldSizeEntry(**ss) for ss in (p.sold_sizes or [])],
+        relatedProducts=list(p.related_products or []),
     )
 
 
@@ -792,6 +795,64 @@ def restore_product_size(
     db.refresh(p)
     record = _to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
+
+
+@app.patch("/api/products/{product_id}/related", response_model=ProductRecord)
+def update_related_products(
+    product_id: str,
+    body: UpdateRelatedRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    """Renk varyantlarını çift yönlü günceller."""
+    p = _get_or_404(db, product_id)
+
+    new_ids = [rid for rid in body.relatedIds if rid != product_id]  # kendini ekleme
+
+    # Var olmayan ID'leri reddet
+    for rid in new_ids:
+        if not db.query(Product).filter(Product.id == rid).first():
+            raise HTTPException(status_code=404, detail={"code": "ERR_PRODUCT_NOT_FOUND"})
+
+    old_ids = set(p.related_products or [])
+    next_ids = set(new_ids)
+
+    added = next_ids - old_ids
+    removed = old_ids - next_ids
+
+    affected: list[Product] = []
+
+    for rid in added:
+        rel = db.query(Product).filter(Product.id == rid).first()
+        if rel:
+            rp = list(rel.related_products or [])
+            if product_id not in rp:
+                rel.related_products = rp + [product_id]
+                affected.append(rel)
+
+    for rid in removed:
+        rel = db.query(Product).filter(Product.id == rid).first()
+        if rel:
+            rp = list(rel.related_products or [])
+            if product_id in rp:
+                rel.related_products = [x for x in rp if x != product_id]
+                affected.append(rel)
+
+    p.related_products = list(next_ids)
+
+    db.commit()
+    db.refresh(p)
+    for aff in affected:
+        db.refresh(aff)
+
+    record = _to_record(p)
+    for aff in affected:
+        aff_rec = _to_record(aff)
+        background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": aff_rec.model_dump(mode="json")})
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+
     return record
 
 

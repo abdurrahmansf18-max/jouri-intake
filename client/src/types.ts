@@ -58,6 +58,7 @@ export interface ProductRecord {
   saleHistory: SaleRecord[];
   sizeStocks: SizeStock[];
   soldSizes: SoldSizeEntry[];
+  relatedProducts: string[];
 }
 
 export interface ActivityLog {

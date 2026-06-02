@@ -75,6 +75,7 @@ class ProductRecord(BaseModel):
     saleHistory: list[SaleRecord] = Field(default_factory=list)
     sizeStocks: list[SizeStock] = Field(default_factory=list)
     soldSizes: list[SoldSizeEntry] = Field(default_factory=list)
+    relatedProducts: list[str] = Field(default_factory=list)
 
 
 class StatusUpdateRequest(BaseModel):
@@ -117,6 +118,10 @@ class RestoreProductRequest(BaseModel):
 
 class RestoreSizeRequest(BaseModel):
     size: str
+
+
+class UpdateRelatedRequest(BaseModel):
+    relatedIds: list[str]
 
 
 class AuthRequest(BaseModel):

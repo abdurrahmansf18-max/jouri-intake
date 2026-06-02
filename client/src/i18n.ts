@@ -261,6 +261,12 @@ export const COPY = {
     bulkDone: (n: number) => `${n} ürün eklendi.`,
     bulkPartialFail: (ok: number, fail: number) => `${ok} eklendi, ${fail} başarısız.`,
     bulkProductNum: (n: number) => `Ürün ${n}`,
+    // Color variants
+    colorVariants: "Diğer Renkler",
+    colorVariantsLabel: "Renk Varyantları",
+    colorVariantsSearch: "Ürün adı veya renk ara...",
+    colorVariantsEmpty: "Eşleşen ürün bulunamadı.",
+    toastVariantsUpdated: "Renk varyantları güncellendi.",
     // Sample
     sampleDesc: "",
   },
@@ -524,6 +530,12 @@ export const COPY = {
     bulkDone: (n: number) => `تمت إضافة ${n} منتجات.`,
     bulkPartialFail: (ok: number, fail: number) => `تمت ${ok}، فشلت ${fail}.`,
     bulkProductNum: (n: number) => `المنتج ${n}`,
+    // Color variants
+    colorVariants: "ألوان أخرى",
+    colorVariantsLabel: "متغيرات اللون",
+    colorVariantsSearch: "ابحث باسم المنتج أو اللون...",
+    colorVariantsEmpty: "لا توجد منتجات مطابقة.",
+    toastVariantsUpdated: "تم تحديث متغيرات اللون.",
     // Sample
     sampleDesc: "",
   },
