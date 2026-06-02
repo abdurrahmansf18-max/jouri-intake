@@ -38,7 +38,7 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    Promise.all([fetchProducts(), fetchLogs(30)])
+    Promise.all([fetchProducts(), fetchLogs(50)])
       .then(([prods, activity]) => { setProducts(prods); setLogs(activity); })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -302,7 +302,7 @@ export default function DashboardPage() {
             <p className={cn("text-sm font-semibold", s.muted)}>{t.dashNoActivity}</p>
           </div>
         ) : (
-          <div>
+          <div className="max-h-[28rem] overflow-y-auto">
             {logs.map((log) => {
               const changed = log.action === "update" && log.details?.changed
                 ? log.details.changed as Record<string, { from: string; to: string }>
