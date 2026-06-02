@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  AlertTriangle, CheckCircle2, Loader2, Package,
+  AlertTriangle, CheckCircle2, ClipboardList, Loader2, Package,
   Plus, Ruler, Save, Trash2, UploadCloud, X,
 } from "lucide-react";
 import { createProduct } from "../api";
@@ -19,6 +19,7 @@ type BulkDraft = {
   colorRaw: string;
   categorySuggestion: string;
   productTypeSuggestion: string;
+  description: string;
   notes: string;
   files: File[];
   previews: { name: string; url: string }[];
@@ -35,6 +36,7 @@ function makeDraft(): BulkDraft {
     colorRaw: "",
     categorySuggestion: "",
     productTypeSuggestion: "",
+    description: "",
     notes: "",
     files: [],
     previews: [],
@@ -53,6 +55,7 @@ export default function BulkProductForm() {
   const [cards, setCards] = useState<BulkDraft[]>([makeDraft(), makeDraft()]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [quickCount, setQuickCount] = useState(5);
 
   // Unmount'ta blob URL'leri temizle
   const cardsRef = useRef<BulkDraft[]>(cards);
@@ -69,6 +72,10 @@ export default function BulkProductForm() {
 
   function addCard() {
     setCards((prev) => [...prev, makeDraft()]);
+  }
+
+  function addCards(n: number) {
+    setCards((prev) => [...prev, ...Array.from({ length: n }, makeDraft)]);
   }
 
   function removeCard(id: string) {
@@ -142,8 +149,9 @@ export default function BulkProductForm() {
           .filter((r) => r.size.trim())
           .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
 
-        const description = [card.titleRaw, card.colorRaw, card.priceAmount && `${card.priceAmount} EUR`]
-          .filter(Boolean).join(" · ");
+        const description = card.description.trim() ||
+          [card.titleRaw, card.colorRaw, card.priceAmount && `${card.priceAmount} EUR`]
+            .filter(Boolean).join(" · ");
 
         await createProduct(description, card.files, {
           notes: card.notes,
@@ -194,6 +202,46 @@ export default function BulkProductForm() {
 
   return (
     <div className="grid gap-4">
+
+      {/* ── Kontrol çubuğu ── */}
+      <div className={cn("flex items-center gap-3 rounded-xl border px-4 py-3", s.subPanel)}>
+        {/* Kart sayacı */}
+        <div className="flex items-center gap-2">
+          <Package className="size-4 text-violet-400 shrink-0" />
+          <span className={cn("text-sm font-extrabold", s.title)}>
+            {t.bulkCardCount(cards.length)}
+          </span>
+        </div>
+
+        {/* Hızlı ekle */}
+        {!busy && (
+          <div className="flex items-center gap-2 ms-auto">
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={quickCount}
+              onChange={(e) => setQuickCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+              className={cn(
+                "w-14 rounded-lg border px-2 py-1.5 text-center text-sm font-extrabold outline-none focus:ring-2",
+                s.input,
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => addCards(quickCount)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-extrabold transition active:scale-95",
+                s.controlGroup, s.controlIdle,
+              )}
+            >
+              <Plus className="size-3.5" />
+              {t.bulkQuickAdd(quickCount)}
+            </button>
+          </div>
+        )}
+      </div>
+
       {cards.map((card, idx) => (
         <BulkCard
           key={card.id}
@@ -208,7 +256,7 @@ export default function BulkProductForm() {
         />
       ))}
 
-      {/* Ürün ekle butonu */}
+      {/* Tekli ekle butonu */}
       {!busy && (
         <button
           type="button"
@@ -410,6 +458,26 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             className="col-span-2"
           />
         </div>
+
+        {/* Açıklama */}
+        <label className="grid gap-1">
+          <span className={cn("flex items-center gap-1.5 text-[10px] font-black", s.strong)}>
+            <ClipboardList className="size-3 text-violet-400" />
+            {t.description}
+          </span>
+          <textarea
+            value={card.description}
+            onChange={(e) => onPatch({ description: e.target.value })}
+            disabled={busy}
+            placeholder={t.sampleDesc || t.descriptionHelp(0).split("·")[0].trim()}
+            dir="auto"
+            rows={3}
+            className={cn(
+              "rounded-lg border px-2.5 py-2 text-xs font-semibold leading-5 outline-none focus:ring-2 resize-none",
+              s.input,
+            )}
+          />
+        </label>
 
         {/* Bedenler */}
         <div>
