@@ -645,7 +645,7 @@ def sell_product(
         sold_amount = min(quantity, current_stock)
         next_stock = current_stock - sold_amount
 
-    p.sale_history = list(p.sale_history or []) + [
+    new_history = list(p.sale_history or []) + [
         {
             "soldAt": now.isoformat(),
             "quantity": sold_amount,
@@ -653,6 +653,7 @@ def sell_product(
             "note": (body.note or "").strip(),
         }
     ]
+    p.sale_history = new_history[-200:]  # son 200 satış kaydını tut
     p.sold_quantity = (p.sold_quantity or 0) + sold_amount
     p.last_sold_at = now
     p.stock_quantity = next_stock
@@ -901,6 +902,14 @@ def delete_product(
     p = _get_or_404(db, product_id)
     title = p.title_raw or product_id
     folder_path = p.folder_path
+
+    # Silinecek ürünün ID'sini diğer ürünlerin related_products listesinden temizle
+    if p.related_products:
+        linked = db.query(Product).filter(Product.id.in_(p.related_products)).all()
+        for lp in linked:
+            rp = list(lp.related_products or [])
+            if product_id in rp:
+                lp.related_products = [x for x in rp if x != product_id]
 
     activity_logger.log(db, "delete", product_id=p.id, product_title=title)
     db.delete(p)

@@ -166,6 +166,7 @@ export default function VariantSelector({
                         src={productImageUrl(p.id, img.fileName)}
                         alt=""
                         className="size-10 shrink-0 rounded-lg object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <div className={cn("size-10 shrink-0 rounded-lg", s.subPanel)} />

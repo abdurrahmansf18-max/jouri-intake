@@ -494,6 +494,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                                 src={productImageUrl(rel.id, img.fileName)}
                                 alt={rel.parsed.titleRaw}
                                 className="size-16 rounded-lg object-cover"
+                                loading="lazy"
                               />
                             ) : (
                               <div className={cn("size-16 rounded-lg", s.subPanel)} />
