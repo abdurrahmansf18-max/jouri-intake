@@ -222,7 +222,7 @@ export interface BackupStatus {
   backups?: BackupEntry[];
 }
 
-export async function fetchBackups(): Promise<{ status: BackupStatus; backups: BackupEntry[] }> {
+export async function fetchBackups(): Promise<{ status: BackupStatus; backups: BackupEntry[]; drive_backups: string[] }> {
   const res = await fetch("/api/backups", { headers: headers() });
   return handleResponse(res);
 }
@@ -232,7 +232,12 @@ export async function deleteBackup(date: string): Promise<void> {
   await handleResponse(res);
 }
 
-export async function runBackup(): Promise<{ status: BackupStatus; backups: BackupEntry[] }> {
+export async function deleteDriveBackup(date: string): Promise<void> {
+  const res = await fetch(`/api/backups/drive/${date}`, { method: "DELETE", headers: headers() });
+  await handleResponse(res);
+}
+
+export async function runBackup(): Promise<{ status: BackupStatus; backups: BackupEntry[]; drive_backups: string[] }> {
   const res = await fetch("/api/backups/run", { method: "POST", headers: headers() });
   return handleResponse(res);
 }

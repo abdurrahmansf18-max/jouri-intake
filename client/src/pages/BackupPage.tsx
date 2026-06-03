@@ -12,7 +12,7 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
-import { deleteBackup, fetchBackups, runBackup, type BackupEntry, type BackupStatus } from "../api";
+import { deleteBackup, deleteDriveBackup, fetchBackups, runBackup, type BackupEntry, type BackupStatus } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -24,8 +24,10 @@ export default function BackupPage() {
 
   const [status, setStatus] = useState<BackupStatus>({});
   const [backups, setBackups] = useState<BackupEntry[]>([]);
+  const [driveBackups, setDriveBackups] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deletingDrive, setDeletingDrive] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
@@ -36,6 +38,7 @@ export default function BackupPage() {
       const data = await fetchBackups();
       setStatus(data.status);
       setBackups(data.backups);
+      setDriveBackups(data.drive_backups ?? []);
     } catch {
       showToast(t.errors.ERR_GENERAL, "error");
     } finally {
@@ -51,6 +54,7 @@ export default function BackupPage() {
       const data = await runBackup();
       setStatus(data.status);
       setBackups(data.backups);
+      setDriveBackups(data.drive_backups ?? []);
       showToast(t.backupManualDone, "success");
     } catch {
       showToast(t.backupManualFail, "error");
@@ -70,6 +74,20 @@ export default function BackupPage() {
       showToast(t.errors.ERR_GENERAL, "error");
     } finally {
       setDeleting(null);
+    }
+  }
+
+  async function handleDeleteDrive(date: string) {
+    if (!window.confirm(t.backupDriveDeleteConfirm)) return;
+    setDeletingDrive(date);
+    try {
+      await deleteDriveBackup(date);
+      setDriveBackups(prev => prev.filter(d => d !== date));
+      showToast(t.backupDriveDeleted, "success");
+    } catch {
+      showToast(t.errors.ERR_GENERAL, "error");
+    } finally {
+      setDeletingDrive(null);
     }
   }
 
@@ -176,10 +194,13 @@ export default function BackupPage() {
 
       </div>
 
-      {/* Backup list */}
+      {/* VPS Backup list */}
       <div className={cn("rounded-xl border", s.panel)}>
         <div className={cn("flex items-center justify-between px-4 py-4 border-b sm:px-5", s.panelBorder)}>
-          <h2 className={cn("text-base font-extrabold", s.title)}>{t.backupAvailable}</h2>
+          <h2 className={cn("text-base font-extrabold flex items-center gap-2", s.title)}>
+            <HardDrive className="size-4 text-violet-400" />
+            {t.backupAvailable}
+          </h2>
           <span className={cn("text-sm font-black", s.muted)}>{backups.length}</span>
         </div>
 
@@ -202,12 +223,10 @@ export default function BackupPage() {
                   s.panelBorder
                 )}
               >
-                {/* Date — full width on mobile */}
                 <div className="flex-1 min-w-0">
                   <div className={cn("text-sm font-extrabold", s.title)}>{b.date}</div>
                 </div>
 
-                {/* Sizes — side by side */}
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="flex items-center gap-1.5">
                     <Database className={cn("size-3.5", s.muted)} />
@@ -219,7 +238,6 @@ export default function BackupPage() {
                   </div>
                 </div>
 
-                {/* Delete button */}
                 <button
                   type="button"
                   onClick={() => handleDelete(b.date)}
@@ -231,6 +249,62 @@ export default function BackupPage() {
                   )}
                 >
                   {deleting === b.date
+                    ? <Loader2 className="size-3.5 animate-spin" />
+                    : <Trash2 className="size-3.5" />
+                  }
+                  <span className="hidden sm:inline">{t.backupDelete}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Drive Backup list */}
+      <div className={cn("rounded-xl border", s.panel)}>
+        <div className={cn("flex items-center justify-between px-4 py-4 border-b sm:px-5", s.panelBorder)}>
+          <h2 className={cn("text-base font-extrabold flex items-center gap-2", s.title)}>
+            <CloudUpload className="size-4 text-sky-400" />
+            {t.backupDriveAvailable}
+          </h2>
+          <span className={cn("text-sm font-black", s.muted)}>{driveBackups.length}</span>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="size-8 animate-spin text-sky-400" />
+          </div>
+        ) : driveBackups.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-12">
+            <CloudUpload className={cn("size-10", s.emptyIcon)} />
+            <p className={cn("text-sm font-semibold", s.muted)}>{t.backupDriveEmpty}</p>
+          </div>
+        ) : (
+          <div>
+            {driveBackups.map((date) => (
+              <div
+                key={date}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-4 border-b last:border-b-0 sm:px-5",
+                  s.panelBorder
+                )}
+              >
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <CloudUpload className="size-3.5 shrink-0 text-sky-400" />
+                  <span className={cn("text-sm font-extrabold", s.title)}>{date}</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteDrive(date)}
+                  disabled={deletingDrive === date}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5",
+                    "text-xs font-extrabold transition shrink-0",
+                    s.error, "opacity-70 hover:opacity-100 disabled:opacity-40"
+                  )}
+                >
+                  {deletingDrive === date
                     ? <Loader2 className="size-3.5 animate-spin" />
                     : <Trash2 className="size-3.5" />
                   }

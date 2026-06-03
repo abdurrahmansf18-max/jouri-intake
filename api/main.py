@@ -992,8 +992,8 @@ BACKUP_ROOT = Path("/backups")
 
 @app.get("/api/backups")
 def get_backups(_: Annotated[None, Depends(verify_access)]):
-    from pathlib import Path as P
     import json as _json
+    import subprocess as _sp
 
     status_file = BACKUP_ROOT / "status.json"
     status = {}
@@ -1009,6 +1009,8 @@ def get_backups(_: Annotated[None, Depends(verify_access)]):
             if not entry.is_dir() or not entry.name.startswith("20"):
                 continue
             db_file = entry / "db.sql"
+            if not db_file.exists():
+                db_file = entry / "db.json"
             img_dir = entry / "products_photo"
             backups.append({
                 "date": entry.name,
@@ -1016,7 +1018,21 @@ def get_backups(_: Annotated[None, Depends(verify_access)]):
                 "img_size": _dir_size(img_dir),
             })
 
-    return {"status": status, "backups": backups}
+    drive_backups: list[str] = []
+    try:
+        r = _sp.run(
+            ["rclone", "lsf", "gdrive:jouri-backups/", "--dirs-only"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if r.returncode == 0:
+            drive_backups = sorted(
+                [d.rstrip("/") for d in r.stdout.strip().split("\n") if d.strip()],
+                reverse=True,
+            )
+    except Exception:
+        pass
+
+    return {"status": status, "backups": backups, "drive_backups": drive_backups}
 
 
 @app.post("/api/backups/run")
@@ -1141,7 +1157,22 @@ def run_backup(
         (BACKUP_ROOT / "status.json").write_text(
             _json.dumps(status_data, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        return {"status": status_data, "backups": backups_list}
+
+        drive_backups: list[str] = []
+        try:
+            dr = _subprocess.run(
+                ["rclone", "lsf", "gdrive:jouri-backups/", "--dirs-only"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if dr.returncode == 0:
+                drive_backups = sorted(
+                    [d.rstrip("/") for d in dr.stdout.strip().split("\n") if d.strip()],
+                    reverse=True,
+                )
+        except Exception:
+            pass
+
+        return {"status": status_data, "backups": backups_list, "drive_backups": drive_backups}
 
     except Exception as exc:
         print(f"[backup] Manuel yedekleme hatası: {exc}")
@@ -1175,6 +1206,28 @@ def delete_backup(
         )
     except Exception:
         pass
+
+    return {"ok": True}
+
+
+@app.delete("/api/backups/drive/{date}")
+def delete_drive_backup(
+    date: str,
+    _: Annotated[None, Depends(verify_access)],
+):
+    import re as _re
+    import subprocess as _sp
+
+    if not _re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        raise HTTPException(status_code=400, detail={"code": "ERR_GENERAL"})
+
+    try:
+        _sp.run(
+            ["rclone", "purge", f"gdrive:jouri-backups/{date}", "--quiet"],
+            capture_output=True, timeout=30,
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail={"code": "ERR_GENERAL"})
 
     return {"ok": True}
 
