@@ -1186,7 +1186,6 @@ def delete_backup(
 ):
     import re as _re
     import shutil as _shutil
-    import subprocess as _subprocess
 
     if not _re.match(r"^\d{4}-\d{2}-\d{2}$", date):
         raise HTTPException(status_code=400, detail={"code": "ERR_GENERAL"})
@@ -1195,17 +1194,8 @@ def delete_backup(
     if not backup_dir.exists():
         raise HTTPException(status_code=404, detail={"code": "ERR_PRODUCT_NOT_FOUND"})
 
-    # Local sil
+    # Local sil (Drive'a dokunma — Drive'da tüm yedekler korunur)
     _shutil.rmtree(str(backup_dir))
-
-    # Drive'dan da sil (hata olursa sessizce geç — local zaten silindi)
-    try:
-        _subprocess.run(
-            ["rclone", "purge", f"gdrive:jouri-backups/{date}", "--quiet"],
-            capture_output=True, timeout=30,
-        )
-    except Exception:
-        pass
 
     return {"ok": True}
 

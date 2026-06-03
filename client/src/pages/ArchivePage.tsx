@@ -22,6 +22,7 @@ export default function ArchivePage() {
   const s = theme === "dark" ? DARK : LIGHT;
 
   const [records, setRecords] = useState<ProductRecord[]>([]);
+  const [allProducts, setAllProducts] = useState<ProductRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -30,13 +31,17 @@ export default function ArchivePage() {
 
   useEffect(() => {
     fetchProducts()
-      .then((all) => setRecords(all.filter(isArchived)))
+      .then((all) => { setAllProducts(all); setRecords(all.filter(isArchived)); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   useProductSync({
     onProductUpdated: (updated) => {
+      setAllProducts((prev) => {
+        const exists = prev.find((p) => p.id === updated.id);
+        return exists ? prev.map((p) => p.id === updated.id ? updated : p) : [updated, ...prev];
+      });
       if (isArchived(updated)) {
         setRecords((prev) => {
           const exists = prev.find((r) => r.id === updated.id);
@@ -47,6 +52,7 @@ export default function ArchivePage() {
       }
     },
     onProductDeleted: (id) => {
+      setAllProducts((prev) => prev.filter((p) => p.id !== id));
       setRecords((prev) => prev.filter((r) => r.id !== id));
       setSelectedId((cur) => cur === id ? null : cur);
     },
@@ -148,7 +154,7 @@ export default function ArchivePage() {
           onReplace={replaceRecord}
           onDelete={removeRecord}
           showRestoreSizes
-          allProducts={records}
+          allProducts={allProducts}
           onNavigate={(product) => { setSelectedId(product.id); setDetailMode("view"); }}
         />
       )}

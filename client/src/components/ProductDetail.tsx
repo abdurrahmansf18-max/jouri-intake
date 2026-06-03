@@ -214,6 +214,8 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       const updated = await resetSales(record.id);
       onReplace(updated);
       showToast(t.toastSalesReset, "success");
+    } catch {
+      showToast(t.errors.ERR_GENERAL, "error");
     } finally { setBusy(false); }
   }
 

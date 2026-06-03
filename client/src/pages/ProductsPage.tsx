@@ -21,6 +21,7 @@ export default function ProductsPage() {
   const s = theme === "dark" ? DARK : LIGHT;
 
   const [records, setRecords] = useState<ProductRecord[]>([]);
+  const [allProducts, setAllProducts] = useState<ProductRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
@@ -30,13 +31,17 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts()
-      .then((all) => setRecords(all.filter((p) => p.status !== "sold_archive")))
+      .then((all) => { setAllProducts(all); setRecords(all.filter((p) => p.status !== "sold_archive")); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   useProductSync({
     onProductUpdated: (updated) => {
+      setAllProducts((prev) => {
+        const exists = prev.find((p) => p.id === updated.id);
+        return exists ? prev.map((p) => p.id === updated.id ? updated : p) : [updated, ...prev];
+      });
       if (updated.status === "sold_archive") {
         setRecords((prev) => prev.filter((r) => r.id !== updated.id));
       } else {
@@ -49,11 +54,13 @@ export default function ProductsPage() {
       }
     },
     onProductCreated: (created) => {
+      setAllProducts((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
       if (created.status !== "sold_archive") {
         setRecords((prev) => [created, ...prev.filter((r) => r.id !== created.id)]);
       }
     },
     onProductDeleted: (id) => {
+      setAllProducts((prev) => prev.filter((p) => p.id !== id));
       setRecords((prev) => prev.filter((r) => r.id !== id));
       setSelectedId((cur) => cur === id ? null : cur);
     },
@@ -187,7 +194,7 @@ export default function ProductsPage() {
           onClose={() => setSelectedId(null)}
           onReplace={replaceRecord}
           onDelete={removeRecord}
-          allProducts={records}
+          allProducts={allProducts}
           onNavigate={(product) => { setSelectedId(product.id); setDetailMode("view"); }}
         />
       )}
