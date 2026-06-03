@@ -23,7 +23,7 @@ services:
       - ./api:/app
       - ../products_photo:/products_photo
       - ../backups:/backups
-      - /home/ubuntu/.config/rclone/rclone-docker.conf:/root/.config/rclone/rclone.conf
+      - /home/ubuntu/.config/rclone-docker:/root/.config/rclone
     env_file: .env
     environment:
       PRODUCTS_BASE: /products_photo
