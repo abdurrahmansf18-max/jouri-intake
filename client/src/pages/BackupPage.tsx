@@ -214,7 +214,7 @@ export default function BackupPage() {
             <p className={cn("text-sm font-semibold", s.muted)}>{t.backupEmpty}</p>
           </div>
         ) : (
-          <div>
+          <div className="max-h-72 overflow-y-auto">
             {backups.map((b) => (
               <div
                 key={b.date}
@@ -280,7 +280,7 @@ export default function BackupPage() {
             <p className={cn("text-sm font-semibold", s.muted)}>{t.backupDriveEmpty}</p>
           </div>
         ) : (
-          <div>
+          <div className="max-h-72 overflow-y-auto">
             {driveBackups.map((date) => (
               <div
                 key={date}
