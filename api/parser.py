@@ -112,6 +112,7 @@ async def _request_ai_content(client: AsyncOpenAI, model_name: str, description:
 
 def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
     structured = parse_description_structured(description)
+    structured_parsed = structured["parsed"]
     structured_variants = structured.get("variants", [])
     variants = _normalize_variants(data.get("variants", []))
     if not variants and structured_variants:
@@ -131,12 +132,20 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
                     all_sizes.append(s)
         sizes_raw = ", ".join(all_sizes)
 
+    title_raw = _field(data.get("titleRaw", ""))
+    if _contains_arabic(title_raw):
+        title_raw = ""
+
+    category = _field(data.get("categorySuggestion", ""))
+    if _looks_like_kids_sizes(sizes_raw or structured_parsed.get("sizesRaw", "")) and category.lower() not in {"boys", "girls", "kids"}:
+        category = ""
+
     return {
         "parsed": ParsedProduct(
-            titleRaw=_field(data.get("titleRaw", "")) or structured["parsed"].get("titleRaw", ""),
-            categorySuggestion=_field(data.get("categorySuggestion", "")) or structured["parsed"].get("categorySuggestion", ""),
-            productTypeSuggestion=_field(data.get("productTypeSuggestion", "")) or structured["parsed"].get("productTypeSuggestion", ""),
-            priceAmount=_field(data.get("priceAmount", "")) or structured["parsed"].get("priceAmount", ""),
+            titleRaw=title_raw or structured_parsed.get("titleRaw", ""),
+            categorySuggestion=category or structured_parsed.get("categorySuggestion", ""),
+            productTypeSuggestion=_field(data.get("productTypeSuggestion", "")) or structured_parsed.get("productTypeSuggestion", ""),
+            priceAmount=_field(data.get("priceAmount", "")) or structured_parsed.get("priceAmount", ""),
             currency=_field(data.get("currency", "")) or "EUR",
             colorRaw=color_raw,
             colorGermanSuggestion="",
@@ -241,6 +250,14 @@ def _field(value) -> str:
 def _brief_error(error: Exception) -> str:
     text = str(error).replace("\n", " ")
     return text[:500]
+
+
+def _contains_arabic(value: str) -> bool:
+    return bool(re.search(r"[\u0600-\u06ff]", value))
+
+
+def _looks_like_kids_sizes(value: str) -> bool:
+    return bool(re.search(r"\b\d+\s*y\b", value, re.IGNORECASE))
 
 
 def _extract_variants(description: str) -> list[dict[str, str]]:
