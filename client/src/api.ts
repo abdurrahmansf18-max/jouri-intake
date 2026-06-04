@@ -60,7 +60,7 @@ export async function fetchProducts(): Promise<ProductRecord[]> {
   return handleResponse<ProductRecord[]>(res);
 }
 
-export async function parseProductText(text: string): Promise<{ parsed: ParsedProduct, description: string }> {
+export async function parseProductText(text: string): Promise<{ parsed: ParsedProduct, description: string, variants?: any[] }> {
   const res = await fetch("/api/parse-product", {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),

@@ -106,8 +106,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setUnlockError(false);
     setSellError("");
     setShowShopifyPreview(false);
-    setAiPromptModalFile(null);
-    setAiPromptValue("");
+
     setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
   }, [record.id, initialMode]);
 
