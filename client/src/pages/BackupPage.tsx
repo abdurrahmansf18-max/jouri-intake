@@ -55,7 +55,13 @@ export default function BackupPage() {
       setStatus(data.status);
       setBackups(data.backups);
       setDriveBackups(data.drive_backups ?? []);
-      showToast(t.backupManualDone, "success");
+      if (data.status.last_db_sql_error) {
+        showToast(t.backupManualSqlFail, "error");
+      } else if (data.status.drive_ok === false) {
+        showToast(t.backupManualPartialFail, "error");
+      } else {
+        showToast(t.backupManualDone, "success");
+      }
     } catch {
       showToast(t.backupManualFail, "error");
     } finally {
@@ -92,6 +98,18 @@ export default function BackupPage() {
   }
 
   const hasStatus = !!status.last_run;
+  const driveState = !hasStatus || status.drive_ok == null
+    ? "unknown"
+    : status.drive_ok
+      ? "ok"
+      : "fail";
+  const driveStorageText = driveState === "ok"
+    ? t.backupDriveStorage
+    : driveState === "fail"
+      ? t.backupDriveStorageFail
+      : t.backupDriveStorageUnknown;
+  const dbSqlSize = status.last_db_sql_size ?? status.last_db_size ?? "-";
+  const dbJsonSize = status.last_db_json_size ?? "-";
 
   return (
     <div className="grid gap-5">
@@ -134,8 +152,8 @@ export default function BackupPage() {
         <span className={cn(s.muted)}>{t.backupManualInfo}</span>
       </div>
 
-      {/* Status cards — 2 col on mobile, 4 on large */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Status cards */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
 
         {/* Last backup */}
         <div className={cn("col-span-2 rounded-xl border p-4 sm:col-span-1", s.panel)}>
@@ -151,13 +169,29 @@ export default function BackupPage() {
           <div className={cn("mt-1.5 text-xs leading-4", s.muted)}>{t.backupSchedule}</div>
         </div>
 
-        {/* DB size */}
+        {/* Primary DB dump size */}
         <div className={cn("rounded-xl border p-4", s.panel)}>
           <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
             <Database className="size-3.5 shrink-0" />
-            {t.backupDb}
+            {t.backupDbSql}
           </div>
-          <div className="text-xl font-black text-violet-400">{status.last_db_size ?? "-"}</div>
+          <div className="text-xl font-black text-violet-400">{dbSqlSize}</div>
+          {status.last_db_sql_error ? (
+            <div className="mt-1 break-words text-[11px] font-semibold leading-4 text-red-400/80">
+              {t.backupDbSqlErrorPrefix} {status.last_db_sql_error}
+            </div>
+          ) : (
+            <div className={cn("mt-1 text-xs", s.muted)}>{t.backupDbPrimary}</div>
+          )}
+        </div>
+
+        {/* JSON export size */}
+        <div className={cn("rounded-xl border p-4", s.panel)}>
+          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
+            <Database className="size-3.5 shrink-0" />
+            {t.backupJsonExport}
+          </div>
+          <div className="text-xl font-black text-violet-300">{dbJsonSize}</div>
           <div className={cn("mt-1 text-xs", s.muted)}>{t.backupLocalStorage}</div>
         </div>
 
@@ -178,18 +212,25 @@ export default function BackupPage() {
             {t.backupDrive}
           </div>
           <div className="flex items-center gap-2">
-            {!hasStatus ? (
+            {driveState === "unknown" ? (
               <HardDrive className={cn("size-5", s.muted)} />
-            ) : status.drive_ok ? (
+            ) : driveState === "ok" ? (
               <CheckCircle2 className="size-5 text-emerald-400" />
             ) : (
               <AlertCircle className="size-5 text-red-400" />
             )}
             <span className={cn("text-sm font-extrabold", s.title)}>
-              {!hasStatus ? "-" : status.drive_ok ? t.backupOk : t.backupFail}
+              {driveState === "unknown" ? "-" : driveState === "ok" ? t.backupOk : t.backupFail}
             </span>
           </div>
-          <div className={cn("mt-1 text-xs", s.muted)}>{t.backupDriveStorage}</div>
+          <div className={cn("mt-1 text-xs", driveState === "fail" ? "text-red-400" : s.muted)}>
+            {driveStorageText}
+          </div>
+          {driveState === "fail" && status.drive_error ? (
+            <div className="mt-1 break-words text-[11px] font-semibold leading-4 text-red-400/80">
+              {t.backupDriveErrorPrefix} {status.drive_error}
+            </div>
+          ) : null}
         </div>
 
       </div>
@@ -227,10 +268,14 @@ export default function BackupPage() {
                   <div className={cn("text-sm font-extrabold", s.title)}>{b.date}</div>
                 </div>
 
-                <div className="flex items-center gap-4 shrink-0">
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
                   <div className="flex items-center gap-1.5">
                     <Database className={cn("size-3.5", s.muted)} />
-                    <span className={cn("text-xs font-bold", s.muted)}>{b.db_size}</span>
+                    <span className={cn("text-xs font-bold", s.muted)}>db.sql {b.db_sql_size ?? b.db_size}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Database className={cn("size-3.5", s.muted)} />
+                    <span className={cn("text-xs font-bold", s.muted)}>db.json {b.db_json_size ?? "-"}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Images className={cn("size-3.5", s.muted)} />

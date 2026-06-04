@@ -237,6 +237,9 @@ export async function deleteLog(logId: number): Promise<void> {
 export interface BackupEntry {
   date: string;
   db_size: string;
+  db_sql_size?: string;
+  db_json_size?: string;
+  db_primary?: "db.sql" | "db.json";
   img_size: string;
 }
 
@@ -244,8 +247,12 @@ export interface BackupStatus {
   last_run?: string;
   last_date?: string;
   last_db_size?: string;
+  last_db_sql_size?: string;
+  last_db_json_size?: string;
+  last_db_sql_error?: string | null;
   last_img_size?: string;
   drive_ok?: boolean;
+  drive_error?: string | null;
   backups?: BackupEntry[];
 }
 

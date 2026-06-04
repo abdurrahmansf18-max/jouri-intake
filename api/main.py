@@ -1051,15 +1051,7 @@ def get_backups(_: Annotated[None, Depends(verify_access)]):
         for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
             if not entry.is_dir() or not entry.name.startswith("20"):
                 continue
-            db_file = entry / "db.sql"
-            if not db_file.exists():
-                db_file = entry / "db.json"
-            img_dir = entry / "products_photo"
-            backups.append({
-                "date": entry.name,
-                "db_size": _dir_size(db_file),
-                "img_size": _dir_size(img_dir),
-            })
+            backups.append(_backup_entry(entry))
 
     drive_backups: list[str] = []
     try:
@@ -1083,7 +1075,7 @@ def run_backup(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    """Manuel yedekleme: DB JSON export + artımlı fotoğraf kopyalama."""
+    """Manuel yedekleme: pg_dump db.sql + JSON export + artımlı fotoğraf kopyalama."""
     import json as _json
     import shutil as _shutil
 
@@ -1098,7 +1090,11 @@ def run_backup(
     today_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # 1. DB — JSON formatında export
+        # 1. DB — kritik yedek: PostgreSQL dump (db.sql)
+        db_sql_file = today_dir / "db.sql"
+        db_sql_error = _write_pg_dump(db_sql_file)
+
+        # 2. DB — okunabilir yardımcı export (db.json)
         products = db.query(Product).all()
         logs = db.query(ActivityLog).all()
         db_data = {
@@ -1128,6 +1124,7 @@ def run_backup(
                     "sale_history": p.sale_history,
                     "size_stocks": p.size_stocks,
                     "sold_sizes": p.sold_sizes,
+                    "related_products": p.related_products,
                 }
                 for p in products
             ],
@@ -1143,10 +1140,12 @@ def run_backup(
                 for log in logs
             ],
         }
-        db_file = today_dir / "db.json"
-        db_file.write_text(_json.dumps(db_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        db_json_file = today_dir / "db.json"
+        db_json_tmp = today_dir / "db.json.tmp"
+        db_json_tmp.write_text(_json.dumps(db_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        db_json_tmp.replace(db_json_file)
 
-        # 2. Fotoğraflar — artımlı kopyalama (sadece yeni/değişen dosyalar)
+        # 3. Fotoğraflar — artımlı kopyalama (sadece yeni/değişen dosyalar)
         photos_src = Path("/products_photo")
         photos_dst = today_dir / "products_photo"
         if photos_src.exists():
@@ -1160,41 +1159,54 @@ def run_backup(
                 if not dst_file.exists() or item.stat().st_mtime > dst_file.stat().st_mtime:
                     _shutil.copy2(item, dst_file)
 
-        # 3. Google Drive sync (rclone)
+        # 4. Google Drive sync (rclone)
         import subprocess as _subprocess
         drive_ok: bool | None = None
+        drive_error: str | None = None
         try:
             result = _subprocess.run(
                 ["rclone", "sync", str(today_dir), f"gdrive:jouri-backups/{date_str}", "--quiet"],
-                capture_output=True, timeout=120,
+                capture_output=True, text=True, timeout=120,
             )
             drive_ok = result.returncode == 0
-        except (FileNotFoundError, _subprocess.TimeoutExpired):
+            if not drive_ok:
+                drive_error = _summarize_rclone_error(
+                    result.stderr or result.stdout or f"rclone sync exit code {result.returncode}"
+                )
+        except FileNotFoundError:
             drive_ok = False
+            drive_error = "rclone komutu bulunamadı."
+        except _subprocess.TimeoutExpired as exc:
+            drive_ok = False
+            output = ""
+            for part in (exc.stderr, exc.stdout):
+                if isinstance(part, bytes):
+                    output += part.decode("utf-8", errors="ignore")
+                elif isinstance(part, str):
+                    output += part
+            drive_error = _summarize_rclone_error(output or "rclone sync zaman aşımına uğradı.")
 
-        # 4. status.json güncelle
-        db_size = _dir_size(db_file)
+        # 5. status.json güncelle
+        db_sql_size = _dir_size(db_sql_file)
+        db_json_size = _dir_size(db_json_file)
         img_size = _dir_size(photos_dst) if photos_dst.exists() else "-"
 
         backups_list = []
         for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
             if not entry.is_dir() or not entry.name.startswith("20"):
                 continue
-            db_f = entry / "db.sql"
-            if not db_f.exists():
-                db_f = entry / "db.json"
-            backups_list.append({
-                "date": entry.name,
-                "db_size": _dir_size(db_f),
-                "img_size": _dir_size(entry / "products_photo"),
-            })
+            backups_list.append(_backup_entry(entry))
 
         status_data: dict = {
             "last_run": started_str,
             "last_date": date_str,
-            "last_db_size": db_size,
+            "last_db_size": db_sql_size,
+            "last_db_sql_size": db_sql_size,
+            "last_db_json_size": db_json_size,
+            "last_db_sql_error": db_sql_error,
             "last_img_size": img_size,
             "drive_ok": drive_ok,
+            "drive_error": drive_error,
             "backups": backups_list,
         }
         (BACKUP_ROOT / "status.json").write_text(
@@ -1279,6 +1291,91 @@ def _dir_size(path) -> str:
             return f"{size:.1f} {unit}"
         size /= 1024
     return f"{size:.1f} TB"
+
+
+def _backup_entry(entry: Path) -> dict:
+    db_sql = entry / "db.sql"
+    db_json = entry / "db.json"
+    primary = db_sql if db_sql.exists() else db_json
+    return {
+        "date": entry.name,
+        "db_size": _dir_size(primary),
+        "db_sql_size": _dir_size(db_sql),
+        "db_json_size": _dir_size(db_json),
+        "img_size": _dir_size(entry / "products_photo"),
+        "db_primary": "db.sql" if db_sql.exists() else "db.json",
+    }
+
+
+def _write_pg_dump(target: Path) -> str | None:
+    import subprocess as _sp
+    from urllib.parse import unquote, urlparse
+
+    database_url = os.environ.get(
+        "DATABASE_URL",
+        "postgresql://jouri:jouri@db:5432/jouri",
+    )
+    parsed = urlparse(database_url)
+    db_name = unquote((parsed.path or "").lstrip("/") or "jouri")
+    db_user = unquote(parsed.username or "jouri")
+    db_password = unquote(parsed.password or "")
+    db_host = parsed.hostname or "db"
+    db_port = str(parsed.port or 5432)
+
+    tmp_target = target.with_suffix(target.suffix + ".tmp")
+    tmp_target.unlink(missing_ok=True)
+    env = os.environ.copy()
+    if db_password:
+        env["PGPASSWORD"] = db_password
+
+    try:
+        result = _sp.run(
+            [
+                "pg_dump",
+                "-h", db_host,
+                "-p", db_port,
+                "-U", db_user,
+                "-d", db_name,
+                "-f", str(tmp_target),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=env,
+        )
+    except FileNotFoundError:
+        tmp_target.unlink(missing_ok=True)
+        return "pg_dump komutu bulunamadı; SQL yedeği üretilemedi."
+    except _sp.TimeoutExpired:
+        tmp_target.unlink(missing_ok=True)
+        return "pg_dump zaman aşımına uğradı; SQL yedeği üretilemedi."
+
+    if result.returncode != 0:
+        tmp_target.unlink(missing_ok=True)
+        compact = " ".join((result.stderr or result.stdout or "").split())
+        return (compact[:240] if compact else f"pg_dump çıkış kodu {result.returncode}; SQL yedeği üretilemedi.")
+
+    tmp_target.replace(target)
+    return None
+
+
+def _summarize_rclone_error(output: str) -> str:
+    text = (output or "").strip()
+    compact = " ".join(text.split())
+    lower = compact.lower()
+
+    if "rate_limit_exceeded" in lower or "ratelimitexceeded" in lower or "quota exceeded" in lower:
+        return "Google Drive API kota limiti aşıldı (RATE_LIMIT_EXCEEDED)."
+    if "invalid_grant" in lower or "token" in lower and "expired" in lower:
+        return "Google Drive yetki anahtarı yenilenmeli."
+    if "couldn't find root directory" in lower or "directory not found" in lower:
+        return "Google Drive hedef klasörü bulunamadı."
+    if "config file" in lower or "failed to create file system" in lower:
+        return "rclone yapılandırması okunamadı."
+    if "zaman aşımına" in lower or "timeout" in lower or "timed out" in lower:
+        return "Google Drive senkronu zaman aşımına uğradı."
+
+    return compact[:240] if compact else "Google Drive senkronu başarısız oldu."
 
 
 # ── Activity logs ─────────────────────────────────────────────────────────────
