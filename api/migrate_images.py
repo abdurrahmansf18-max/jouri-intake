@@ -3,7 +3,7 @@ from pathlib import Path
 from file_manager import _process_image, _STATUS_DIRS
 from sqlalchemy.orm import Session
 from database import SessionLocal
-from models import Product
+from db_models import Product
 
 def migrate_existing_images():
     db: Session = SessionLocal()
