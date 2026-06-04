@@ -60,7 +60,9 @@ export async function fetchProducts(): Promise<ProductRecord[]> {
   return handleResponse<ProductRecord[]>(res);
 }
 
-export async function parseProductText(text: string): Promise<{ parsed: ParsedProduct, description: string, variants?: any[] }> {
+export type AiParseProvider = "gemini" | "gemma" | "parser";
+
+export async function parseProductText(text: string): Promise<{ parsed: ParsedProduct, description: string, variants?: any[], provider?: AiParseProvider }> {
   const res = await fetch("/api/parse-product", {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),

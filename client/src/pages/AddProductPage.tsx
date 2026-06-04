@@ -29,6 +29,11 @@ type Draft = {
   notes: string;
 };
 
+type AiVariant = {
+  color?: string;
+  sizes?: string | string[];
+};
+
 function emptyDraft(): Draft {
   return {
     titleRaw: "",
@@ -137,12 +142,13 @@ export default function AddProductPage() {
     try {
       const result = await parseProductText(aiText);
       const parsed = result.parsed;
+      const providerNote = getProviderNote(result.provider, t);
       
-      const variants = result.variants || [];
-      if (variants.length > 1) {
+      const variants: AiVariant[] = result.variants || [];
+      if (variants.length > 1 || (addMode === "bulk" && variants.length > 0)) {
          // Create bulk cards
-         const newCards = variants.map((v: any, idx: number) => {
-             const sizes = v.sizes ? v.sizes.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+         const newCards = variants.map((v: AiVariant, idx: number) => {
+             const sizes = splitAiSizes(v.sizes);
              return {
                  id: `ai-${Date.now()}-${idx}`,
                  titleRaw: parsed.titleRaw || "",
@@ -159,7 +165,7 @@ export default function AddProductPage() {
          });
          setBulkCards(newCards);
          setAddMode("bulk");
-         showToast(t.aiBulkSwitched, "success");
+         showToast(`${t.aiBulkSwitched} ${providerNote}`, "success");
       } else {
          if (result.description) setDescription(result.description);
          if (parsed.titleRaw) patch("titleRaw", parsed.titleRaw);
@@ -169,12 +175,12 @@ export default function AddProductPage() {
          if (parsed.productTypeSuggestion) patch("productTypeSuggestion", parsed.productTypeSuggestion);
          
          if (parsed.sizesRaw) {
-           const sizes = parsed.sizesRaw.split(",").map((s: string) => s.trim()).filter(Boolean);
+           const sizes = splitAiSizes(parsed.sizesRaw);
            if (sizes.length > 0) {
              setSizeRows(sizes.map((s: string) => ({ size: s, qty: "1" })));
            }
          }
-         showToast(t.aiSuccess, "success");
+         showToast(`${t.aiSuccess} ${providerNote}`, "success");
       }
     } catch (err) {
       showToast(t.aiFailed, "error");
@@ -405,6 +411,33 @@ export default function AddProductPage() {
       </form>}
     </div>
   );
+}
+
+function splitAiSizes(value: string | string[] | undefined): string[] {
+  const raw = Array.isArray(value) ? value.join(",") : (value || "");
+  const suffix = raw.match(/\b([A-Za-z]+)\b\s*$/)?.[1]?.toUpperCase() || "";
+  const sizes: string[] = [];
+  raw
+    .replace(/،/g, ",")
+    .split(/[,/]+/)
+    .map((item) => item.trim().replace(/\s+/g, ""))
+    .filter(Boolean)
+    .forEach((item) => {
+      const normalized = suffix && /^\d+(?:[.,]\d+)?$/.test(item) ? `${item}${suffix}` : item.toUpperCase();
+      if (!sizes.includes(normalized)) sizes.push(normalized);
+    });
+  return sizes;
+}
+
+function getProviderNote(
+  provider: "gemini" | "gemma" | "parser" | undefined,
+  t: typeof COPY["tr"] | typeof COPY["ar"],
+): string {
+  const label =
+    provider === "gemini" ? t.aiProviderGemini :
+    provider === "gemma" ? t.aiProviderGemma :
+    t.aiProviderParser;
+  return t.aiProviderUsed(label);
 }
 
 function Field({
