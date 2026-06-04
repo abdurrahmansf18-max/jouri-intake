@@ -2,8 +2,10 @@ import os
 import re
 import hashlib
 import shutil
+import io
 from datetime import datetime, timezone
 from pathlib import Path
+from PIL import Image, ImageOps
 
 from models import SavedImage, ImageFolder, ImageFolders
 
@@ -43,9 +45,23 @@ def create_product_folder(title_raw: str, description: str) -> tuple[str, Path]:
     folder_name = f"{stamp}-{slug}-{hash_val}"
     folder_path = DRAFT_ROOT / folder_name
     (folder_path / "originals").mkdir(parents=True, exist_ok=True)
+    (folder_path / "thumbnails").mkdir(parents=True, exist_ok=True)
     (folder_path / "enhanced").mkdir(parents=True, exist_ok=True)
     return folder_name, folder_path
 
+def _process_image(content: bytes, max_size: tuple[int, int], quality: int = 85) -> bytes:
+    try:
+        with Image.open(io.BytesIO(content)) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            img.save(out, format="JPEG", quality=quality, optimize=True)
+            return out.getvalue()
+    except Exception as e:
+        print(f"[file_manager] Image processing failed: {e}")
+        return content  # Fallback to original
 
 def save_images(
     folder_path: Path,
@@ -53,18 +69,29 @@ def save_images(
     start_index: int = 1,
 ) -> list[SavedImage]:
     originals_path = folder_path / "originals"
+    thumbnails_path = folder_path / "thumbnails"
     originals_path.mkdir(parents=True, exist_ok=True)
+    thumbnails_path.mkdir(parents=True, exist_ok=True)
+    
     status_dir = _detect_status_dir(folder_path)
     saved: list[SavedImage] = []
+    
     for offset, (original_name, content, mime_type) in enumerate(images):
-        ext = _get_extension(original_name, mime_type)
-        file_name = f"image-{str(start_index + offset).zfill(2)}{ext}"
-        (originals_path / file_name).write_bytes(content)
+        file_name = f"image-{str(start_index + offset).zfill(2)}.jpg"
+        
+        # Sıkıştırılmış orijinal kaydet
+        compressed = _process_image(content, max_size=(1920, 1920), quality=85)
+        (originals_path / file_name).write_bytes(compressed)
+        
+        # Küçük resim (thumbnail) kaydet
+        thumbnail = _process_image(content, max_size=(400, 400), quality=80)
+        (thumbnails_path / file_name).write_bytes(thumbnail)
+
         saved.append(SavedImage(
             fileName=file_name,
             originalName=original_name,
-            mimeType=mime_type,
-            size=len(content),
+            mimeType="image/jpeg",
+            size=len(compressed),
             relativePath=f"products_photo/{status_dir}/{folder_path.name}/originals/{file_name}",
         ))
     return saved
@@ -87,12 +114,17 @@ def delete_product_folder(folder_path: str) -> None:
 
 
 def resolve_image_path(folder_path: str, kind: str, file_name: str) -> Path:
-    if kind not in {"originals", "enhanced"}:
+    if kind not in {"originals", "enhanced", "thumbnails"}:
         raise FileNotFoundError("Invalid image kind")
     safe_name = Path(file_name).name
     if safe_name != file_name:
         raise FileNotFoundError("Invalid image name")
     image_path = Path(folder_path) / kind / safe_name
+    
+    # Geriye dönük uyumluluk: Eğer thumbnail istendiyse ve yoksa orijinali ver
+    if not image_path.exists() and kind == "thumbnails":
+        image_path = Path(folder_path) / "originals" / safe_name
+        
     if not image_path.exists() or not image_path.is_file():
         raise FileNotFoundError("Image not found")
     return image_path

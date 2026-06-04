@@ -11,3 +11,4 @@ openai
 aiohttp
 python-dotenv
 google-genai
+Pillow

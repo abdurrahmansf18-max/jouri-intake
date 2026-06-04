@@ -1007,6 +1007,15 @@ def delete_product_image(
     try:
         path = file_manager.resolve_image_path(p.folder_path, kind, file_name)
         path.unlink()
+        
+        # Eğer orijinal siliniyorsa, thumbnail'i de sil
+        if kind == "originals":
+            try:
+                thumb_path = file_manager.resolve_image_path(p.folder_path, "thumbnails", file_name)
+                thumb_path.unlink()
+            except FileNotFoundError:
+                pass
+                
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail={"code": "ERR_IMAGE_NOT_FOUND"})
     p.images = [img for img in (p.images or []) if img.get("fileName") != file_name]

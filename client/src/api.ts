@@ -272,10 +272,10 @@ export async function runBackup(): Promise<{ status: BackupStatus; backups: Back
 export function productImageUrl(
   productId: string,
   fileName: string,
-  kind?: "originals" | "enhanced",
-  folder?: "originals" | "enhanced"
+  kind?: "originals" | "enhanced" | "thumbnails",
+  folder?: "originals" | "enhanced" | "thumbnails"
 ): string {
-  // Öncelik sırası: açık kind parametresi > folder alanı > ai_ prefix tespiti > varsayılan originals
-  const resolvedKind = kind ?? folder ?? (fileName.startsWith("ai_") ? "enhanced" : "originals");
+  // Öncelik sırası: açık kind parametresi > folder alanı > ai_ prefix tespiti > varsayılan thumbnails
+  const resolvedKind = kind ?? folder ?? (fileName.startsWith("ai_") ? "enhanced" : "thumbnails");
   return `/api/products/${encodeURIComponent(productId)}/images/${resolvedKind}/${encodeURIComponent(fileName)}`;
 }
