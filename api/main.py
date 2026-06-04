@@ -1366,6 +1366,8 @@ def _summarize_rclone_error(output: str) -> str:
 
     if "rate_limit_exceeded" in lower or "ratelimitexceeded" in lower or "quota exceeded" in lower:
         return "Google Drive API kota limiti aşıldı (RATE_LIMIT_EXCEEDED)."
+    if "read-only file system" in lower or "failed to save config" in lower:
+        return "rclone yapılandırma klasörü yazılabilir değil."
     if "invalid_grant" in lower or "token" in lower and "expired" in lower:
         return "Google Drive yetki anahtarı yenilenmeli."
     if "couldn't find root directory" in lower or "directory not found" in lower:

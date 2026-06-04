@@ -110,6 +110,9 @@ export default function BackupPage() {
       : t.backupDriveStorageUnknown;
   const dbSqlSize = status.last_db_sql_size ?? status.last_db_size ?? "-";
   const dbJsonSize = status.last_db_json_size ?? "-";
+  const driveErrorText = status.drive_error && status.drive_error.length > 110
+    ? `${status.drive_error.slice(0, 110)}...`
+    : status.drive_error;
 
   return (
     <div className="grid gap-5">
@@ -226,9 +229,9 @@ export default function BackupPage() {
           <div className={cn("mt-1 text-xs", driveState === "fail" ? "text-red-400" : s.muted)}>
             {driveStorageText}
           </div>
-          {driveState === "fail" && status.drive_error ? (
-            <div className="mt-1 break-words text-[11px] font-semibold leading-4 text-red-400/80">
-              {t.backupDriveErrorPrefix} {status.drive_error}
+          {driveState === "fail" && driveErrorText ? (
+            <div className="mt-1 text-[11px] font-semibold leading-4 text-red-400/80">
+              {t.backupDriveErrorPrefix} {driveErrorText}
             </div>
           ) : null}
         </div>
@@ -260,26 +263,26 @@ export default function BackupPage() {
               <div
                 key={b.date}
                 className={cn(
-                  "flex flex-wrap items-center gap-3 px-4 py-4 border-b last:border-b-0 sm:px-5 sm:flex-nowrap",
+                  "grid gap-3 px-4 py-4 border-b last:border-b-0 sm:grid-cols-[minmax(8rem,1fr)_auto_auto] sm:items-center sm:px-5",
                   s.panelBorder
                 )}
               >
-                <div className="flex-1 min-w-0">
-                  <div className={cn("text-sm font-extrabold", s.title)}>{b.date}</div>
+                <div className="min-w-0">
+                  <div className={cn("whitespace-nowrap text-sm font-extrabold", s.title)}>{b.date}</div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 shrink-0">
-                  <div className="flex items-center gap-1.5">
+                <div className="grid gap-2 text-xs sm:flex sm:items-center sm:gap-4">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <Database className={cn("size-3.5", s.muted)} />
-                    <span className={cn("text-xs font-bold", s.muted)}>db.sql {b.db_sql_size ?? b.db_size}</span>
+                    <span className={cn("font-bold", s.muted)}>db.sql {b.db_sql_size ?? b.db_size}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <Database className={cn("size-3.5", s.muted)} />
-                    <span className={cn("text-xs font-bold", s.muted)}>db.json {b.db_json_size ?? "-"}</span>
+                    <span className={cn("font-bold", s.muted)}>db.json {b.db_json_size ?? "-"}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <Images className={cn("size-3.5", s.muted)} />
-                    <span className={cn("text-xs font-bold", s.muted)}>{b.img_size}</span>
+                    <span className={cn("font-bold", s.muted)}>{b.img_size}</span>
                   </div>
                 </div>
 
@@ -288,8 +291,8 @@ export default function BackupPage() {
                   onClick={() => handleDelete(b.date)}
                   disabled={deleting === b.date}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5",
-                    "text-xs font-extrabold transition shrink-0",
+                    "inline-flex w-fit items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5",
+                    "text-xs font-extrabold transition sm:justify-self-end",
                     s.error, "opacity-70 hover:opacity-100 disabled:opacity-40"
                   )}
                 >
