@@ -1159,32 +1159,9 @@ def run_backup(
                 if not dst_file.exists() or item.stat().st_mtime > dst_file.stat().st_mtime:
                     _shutil.copy2(item, dst_file)
 
-        # 4. Google Drive sync (rclone)
+        # 4. Google Drive upload + verification (rclone)
         import subprocess as _subprocess
-        drive_ok: bool | None = None
-        drive_error: str | None = None
-        try:
-            result = _subprocess.run(
-                ["rclone", "sync", str(today_dir), f"gdrive:jouri-backups/{date_str}", "--quiet"],
-                capture_output=True, text=True, timeout=120,
-            )
-            drive_ok = result.returncode == 0
-            if not drive_ok:
-                drive_error = _summarize_rclone_error(
-                    result.stderr or result.stdout or f"rclone sync exit code {result.returncode}"
-                )
-        except FileNotFoundError:
-            drive_ok = False
-            drive_error = "rclone komutu bulunamadı."
-        except _subprocess.TimeoutExpired as exc:
-            drive_ok = False
-            output = ""
-            for part in (exc.stderr, exc.stdout):
-                if isinstance(part, bytes):
-                    output += part.decode("utf-8", errors="ignore")
-                elif isinstance(part, str):
-                    output += part
-            drive_error = _summarize_rclone_error(output or "rclone sync zaman aşımına uğradı.")
+        drive_ok, drive_error = _copy_backup_to_drive(today_dir, date_str)
 
         # 5. status.json güncelle
         db_sql_size = _dir_size(db_sql_file)
@@ -1357,6 +1334,76 @@ def _write_pg_dump(target: Path) -> str | None:
 
     tmp_target.replace(target)
     return None
+
+
+def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | None]:
+    import subprocess as _sp
+
+    remote = f"gdrive:jouri-backups/{date_str}"
+    common_flags = [
+        "--timeout", "5m",
+        "--contimeout", "30s",
+        "--retries", "3",
+        "--low-level-retries", "10",
+    ]
+
+    try:
+        copy_result = _sp.run(
+            [
+                "rclone", "copy", str(source_dir), remote,
+                "--create-empty-src-dirs",
+                "--fast-list",
+                "--transfers", "4",
+                "--checkers", "8",
+                "--stats", "30s",
+                *common_flags,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=900,
+        )
+    except FileNotFoundError:
+        return False, "rclone komutu bulunamadı."
+    except _sp.TimeoutExpired as exc:
+        return False, _summarize_rclone_error(_timeout_output(exc) or "rclone copy zaman aşımına uğradı.")
+
+    if copy_result.returncode != 0:
+        return False, _summarize_rclone_error(
+            copy_result.stderr or copy_result.stdout or f"rclone copy exit code {copy_result.returncode}"
+        )
+
+    try:
+        check_result = _sp.run(
+            [
+                "rclone", "check", str(source_dir), remote,
+                "--one-way",
+                "--size-only",
+                *common_flags,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+    except _sp.TimeoutExpired as exc:
+        return False, _summarize_rclone_error(_timeout_output(exc) or "rclone check zaman aşımına uğradı.")
+
+    if check_result.returncode != 0:
+        message = _summarize_rclone_error(
+            check_result.stderr or check_result.stdout or f"rclone check exit code {check_result.returncode}"
+        )
+        return False, f"Drive doğrulaması başarısız: {message}"
+
+    return True, None
+
+
+def _timeout_output(exc) -> str:
+    output = ""
+    for part in (getattr(exc, "stderr", None), getattr(exc, "stdout", None)):
+        if isinstance(part, bytes):
+            output += part.decode("utf-8", errors="ignore")
+        elif isinstance(part, str):
+            output += part
+    return output
 
 
 def _summarize_rclone_error(output: str) -> str:
