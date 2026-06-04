@@ -1344,7 +1344,10 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
         "--timeout", "5m",
         "--contimeout", "30s",
         "--retries", "3",
+        "--retries-sleep", "20s",
         "--low-level-retries", "10",
+        "--tpslimit", "4",
+        "--tpslimit-burst", "4",
     ]
 
     try:
@@ -1353,8 +1356,8 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
                 "rclone", "copy", str(source_dir), remote,
                 "--create-empty-src-dirs",
                 "--fast-list",
-                "--transfers", "4",
-                "--checkers", "8",
+                "--transfers", "2",
+                "--checkers", "2",
                 "--stats", "30s",
                 *common_flags,
             ],
