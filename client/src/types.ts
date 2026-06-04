@@ -18,6 +18,7 @@ export interface SavedImage {
   mimeType: string;
   size: number;
   relativePath: string;
+  folder?: "originals" | "enhanced";  // Hangi klasörde olduğunu belirtir
 }
 
 export interface ImageFolder { path: string; relativePath: string; }

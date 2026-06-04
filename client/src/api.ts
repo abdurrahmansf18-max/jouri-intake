@@ -60,6 +60,15 @@ export async function fetchProducts(): Promise<ProductRecord[]> {
   return handleResponse<ProductRecord[]>(res);
 }
 
+export async function parseProductText(text: string): Promise<{ parsed: ParsedProduct, description: string }> {
+  const res = await fetch("/api/parse-product", {
+    method: "POST",
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ text }),
+  });
+  return handleResponse(res);
+}
+
 export interface ProductUpdate {
   notes?: string;
   stockQuantity?: number;
@@ -166,13 +175,31 @@ export async function restoreProduct(productId: string, stockQuantity = 1): Prom
   return handleResponse<ProductRecord>(res);
 }
 
-export async function addProductImages(productId: string, images: File[]): Promise<ProductRecord> {
+export async function addProductImages(productId: string, files: File[]): Promise<ProductRecord> {
   const form = new FormData();
-  for (const img of images) form.append("images", img);
-  const res = await fetch(`/api/products/${productId}/images`, {
+  files.forEach((f) => form.append("images", f));
+  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/images`, {
     method: "POST",
     headers: headers(),
     body: form,
+  });
+  return handleResponse<ProductRecord>(res);
+}
+
+export async function enhanceProductImage(productId: string, fileName: string, prompt?: string): Promise<ProductRecord> {
+  let url = `/api/products/${encodeURIComponent(productId)}/images/enhance?file_name=${encodeURIComponent(fileName)}`;
+  if (prompt) url += `&prompt=${encodeURIComponent(prompt)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: headers(),
+  });
+  return handleResponse<ProductRecord>(res);
+}
+
+export async function pushToShopify(productId: string): Promise<ProductRecord> {
+  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/shopify-push`, {
+    method: "POST",
+    headers: headers(),
   });
   return handleResponse<ProductRecord>(res);
 }
@@ -245,7 +272,10 @@ export async function runBackup(): Promise<{ status: BackupStatus; backups: Back
 export function productImageUrl(
   productId: string,
   fileName: string,
-  kind: "originals" | "enhanced" = "originals"
+  kind?: "originals" | "enhanced",
+  folder?: "originals" | "enhanced"
 ): string {
-  return `/api/products/${encodeURIComponent(productId)}/images/${kind}/${encodeURIComponent(fileName)}`;
+  // Öncelik sırası: açık kind parametresi > folder alanı > ai_ prefix tespiti > varsayılan originals
+  const resolvedKind = kind ?? folder ?? (fileName.startsWith("ai_") ? "enhanced" : "originals");
+  return `/api/products/${encodeURIComponent(productId)}/images/${resolvedKind}/${encodeURIComponent(fileName)}`;
 }

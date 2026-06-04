@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
-  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X,
+  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles
 } from "lucide-react";
 import {
   addProductImages, deleteProduct, deleteProductImage,
   productImageUrl, resetSales, restoreProduct, restoreSize,
   sellProduct, updateProduct, updateRelatedProducts, updateStatus, verifyEditLock,
+  enhanceProductImage, pushToShopify
 } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -88,6 +89,8 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [unlockError, setUnlockError] = useState(false);
   const [unlockBusy, setUnlockBusy] = useState(false);
   const [sellError, setSellError] = useState("");
+  const [showShopifyPreview, setShowShopifyPreview] = useState(false);
+  
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -102,6 +105,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setUnlockCode("");
     setUnlockError(false);
     setSellError("");
+    setShowShopifyPreview(false);
+    setAiPromptModalFile(null);
+    setAiPromptValue("");
     setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
   }, [record.id, initialMode]);
 
@@ -139,6 +145,12 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
       if (allProducts !== undefined) {
         updated = await updateRelatedProducts(record.id, selectedVariantIds);
+      }
+
+      if (imageFiles.length > 0) {
+        updated = await addProductImages(record.id, imageFiles);
+        setImageFiles([]);
+        setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
       }
 
       onReplace(updated);
@@ -246,6 +258,20 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     finally { setDeletingImage(null); }
   }
 
+  async function handlePushToShopify() {
+    setBusy(true);
+    try {
+      const updated = await pushToShopify(record.id);
+      onReplace(updated);
+      showToast("Shopify'a başarıyla gönderildi!", "success");
+    } catch (err) {
+      showToast("Shopify'a gönderim başarısız", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+
   async function handleDelete() {
     setBusy(true);
     try {
@@ -262,7 +288,8 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const p = record.parsed;
   const isArchive = record.status === "sold_archive";
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
-  const isPublishedLocked = record.status === "published" && !editUnlocked;
+  const isPublishedLocked = (record.status === "published" || record.status === "sold_archive") && !editUnlocked;
+  const isImageLocked = (record.status === "ai_enhanced" || record.status === "published" || record.status === "sold_archive") && !editUnlocked;
 
   // Satış için geçerli bedenler (stok > 0)
   const availableSizes = record.sizeStocks.filter((ss) => ss.qty > 0);
@@ -338,11 +365,13 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {record.images.length > 0 && (
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {record.images.map((img, i) => (
-                      <button key={img.fileName} type="button" onClick={() => setLightboxIdx(i)}
-                        className="overflow-hidden rounded-xl ring-1 ring-white/10 active:scale-95 transition-transform">
-                        <img src={productImageUrl(record.id, img.fileName)} alt={img.originalName}
-                          className="aspect-square w-full object-cover" loading="lazy" />
-                      </button>
+                      <div key={img.fileName} className="relative group">
+                        <button type="button" onClick={() => setLightboxIdx(i)}
+                          className="overflow-hidden rounded-xl ring-1 ring-white/10 active:scale-95 transition-transform w-full block">
+                          <img src={productImageUrl(record.id, img.fileName, undefined, img.folder)} alt={img.originalName}
+                            className="aspect-square w-full object-cover" loading="lazy" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -501,7 +530,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           >
                             {img ? (
                               <img
-                                src={productImageUrl(rel.id, img.fileName)}
+                                src={productImageUrl(rel.id, img.fileName, undefined, img.folder)}
                                 alt={rel.parsed.titleRaw}
                                 className="size-16 rounded-lg object-cover"
                                 loading="lazy"
@@ -525,7 +554,14 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {/* Durum değiştirme */}
                 {!isArchive && (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
-                    <h3 className={cn("mb-3 text-xs font-black uppercase tracking-wide", s.muted)}>{t.changeStatus}</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className={cn("text-xs font-black uppercase tracking-wide", s.muted)}>{t.changeStatus}</h3>
+                      {record.status === "published" && (
+                        <button type="button" onClick={() => setShowShopifyPreview(true)} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-md transition disabled:opacity-50 shadow-sm">
+                          <ShoppingBag className="size-3" /> {t.shopifyBtn}
+                        </button>
+                      )}
+                    </div>
                     {isPublishedLocked ? (
                       <div className={cn("flex items-center gap-2 text-xs font-semibold", s.muted)}>
                         <Lock className="size-3.5 text-emerald-400 shrink-0" />
@@ -533,13 +569,19 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {ACTIVE_STATUSES.map((st) => (
-                          <button key={st} type="button" disabled={busy} onClick={() => handleStatusChange(st)}
-                            className={cn("rounded-lg border px-3 py-1.5 text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50",
-                              record.status === st ? statusActiveBadge(st, s) : cn(statusBadge(st, s), "opacity-60 hover:opacity-100"))}>
-                            {statusLabel(st, locale)}
-                          </button>
-                        ))}
+                        {ACTIVE_STATUSES.map((st) => {
+                          const isTransitionAllowed = editUnlocked || record.status === st || 
+                            (record.status === "pending" && st === "ai_enhanced") || 
+                            (record.status === "ai_enhanced" && st === "published");
+                          
+                          return (
+                            <button key={st} type="button" disabled={busy || !isTransitionAllowed} onClick={() => handleStatusChange(st)}
+                              className={cn("rounded-lg border px-3 py-1.5 text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50",
+                                record.status === st ? statusActiveBadge(st, s) : cn(statusBadge(st, s), isTransitionAllowed ? "opacity-60 hover:opacity-100" : "opacity-30 cursor-not-allowed"))}>
+                              {statusLabel(st, locale)}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </section>
@@ -834,37 +876,43 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       {record.images.map((img, i) => (
                         <div key={img.fileName} className="relative overflow-hidden rounded-xl">
                           <button type="button" onClick={() => setLightboxIdx(i)} className="block w-full">
-                            <img src={productImageUrl(record.id, img.fileName)} alt={img.originalName}
+                            <img src={productImageUrl(record.id, img.fileName, undefined, img.folder)} alt={img.originalName}
                               className="aspect-square w-full object-cover" loading="lazy" />
                           </button>
-                          <button type="button" disabled={deletingImage === img.fileName}
-                            onClick={() => handleDeleteImage(img.fileName)}
-                            className={cn("absolute bottom-1 end-1 flex size-7 items-center justify-center rounded-full",
-                              "bg-black/60 text-red-400 hover:bg-red-500/80 hover:text-white transition active:scale-95",
-                              deletingImage === img.fileName && "opacity-50")}>
-                            {deletingImage === img.fileName
-                              ? <Loader2 className="size-3.5 animate-spin" />
-                              : <Trash2 className="size-3.5" />}
-                          </button>
+                          {!isImageLocked && (
+                            <button type="button" disabled={deletingImage === img.fileName}
+                              onClick={() => handleDeleteImage(img.fileName)}
+                              className={cn("absolute bottom-1 end-1 flex size-7 items-center justify-center rounded-full",
+                                "bg-black/60 text-red-400 hover:bg-red-500/80 hover:text-white transition active:scale-95",
+                                deletingImage === img.fileName && "opacity-50")}>
+                              {deletingImage === img.fileName
+                                ? <Loader2 className="size-3.5 animate-spin" />
+                                : <Trash2 className="size-3.5" />}
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <label className={cn("mb-3 grid cursor-pointer place-items-center rounded-xl border border-dashed px-4 py-4 text-center transition", s.dropzone)}>
-                    <input className="sr-only" type="file" accept="image/*" multiple
-                      onChange={(e) => {
-                        const sel = Array.from(e.currentTarget.files ?? []);
-                        setImageFiles(sel);
-                        setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return sel.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })); });
-                      }} />
-                    <span className={cn("mb-2 flex size-10 items-center justify-center rounded-xl ring-1", s.dropIcon)}>
-                      <ImagePlus className="size-4" />
-                    </span>
-                    <span className={cn("text-sm font-extrabold", s.title)}>{t.addImages}</span>
-                    <span className={cn("mt-0.5 text-xs", s.muted)}>{t.addImagesHelp}</span>
-                  </label>
-                  {imagePreviews.length > 0 && (
+                  {!isImageLocked && (
+                    <label className={cn("mb-3 grid cursor-pointer place-items-center rounded-xl border border-dashed px-4 py-4 text-center transition", s.dropzone)}>
+                      <input className="sr-only" type="file" accept="image/*" multiple
+                        onChange={(e) => {
+                          const sel = Array.from(e.currentTarget.files ?? []);
+                          setImageFiles(sel);
+                          setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return sel.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })); });
+                          e.currentTarget.value = "";
+                        }} />
+                      <span className={cn("mb-2 flex size-10 items-center justify-center rounded-xl ring-1", s.dropIcon)}>
+                        <ImagePlus className="size-4" />
+                      </span>
+                      <span className={cn("text-sm font-extrabold", s.title)}>{t.addImages}</span>
+                      <span className={cn("mt-0.5 text-xs", s.muted)}>{t.addImagesHelp}</span>
+                    </label>
+                  )}
+                  
+                  {imagePreviews.length > 0 && !isImageLocked && (
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                       {imagePreviews.map((prev) => (
                         <figure key={prev.name} className={cn("overflow-hidden rounded-xl border", s.panelBorder)}>
@@ -917,6 +965,60 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           deletingFileName={deletingImage}
         />
       )}
+
+      {/* Shopify Preview Modal */}
+      {showShopifyPreview && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowShopifyPreview(false)}>
+          <div className={cn("w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden", s.panel)} onClick={(e) => e.stopPropagation()}>
+            <div className={cn("flex items-center justify-between border-b px-4 py-3", s.panelBorder)}>
+              <h2 className={cn("text-sm font-black flex items-center gap-2", s.title)}>
+                <ShoppingBag className="size-4 text-emerald-500" />
+                {t.shopifyPreviewTitle}
+              </h2>
+              <button type="button" onClick={() => setShowShopifyPreview(false)} className={cn("rounded-lg p-1 transition", s.controlIdle)}>
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="p-4 flex flex-col gap-3">
+              <div className="text-sm">
+                <span className={cn("font-bold", s.muted)}>{t.rawTitle}:</span> <span className={s.strong}>{p.titleRaw}</span>
+              </div>
+              <div className="text-sm">
+                <span className={cn("font-bold", s.muted)}>{t.price}:</span> <span className={s.strong}>{p.priceAmount} {p.currency || "EUR"}</span>
+              </div>
+              <div className="text-sm">
+                <span className={cn("font-bold", s.muted)}>{t.originalDescription || "Açıklama"}:</span> 
+                <p className={cn("mt-1 whitespace-pre-wrap rounded-lg border p-2 text-xs", s.panelBorder, s.muted)}>{record.description}</p>
+              </div>
+              <div className="text-sm">
+                <span className={cn("font-bold", s.muted)}>{t.size}:</span>
+                <ul className="mt-1 flex flex-wrap gap-2">
+                  {record.sizeStocks.map((sz) => (
+                    <li key={sz.size} className={cn("rounded-md border px-2 py-0.5 text-xs font-bold", s.panelBorder, s.muted)}>
+                      {sz.size} ({sz.qty})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div className="mt-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-xs font-bold text-red-500 flex items-start gap-2">
+                <ArchiveRestore className="size-4 shrink-0" />
+                <p>{t.shopifyPreviewWarning}</p>
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" onClick={() => setShowShopifyPreview(false)} className={cn("px-4 py-2 text-xs font-bold rounded-lg border transition", s.controlIdle)}>
+                  {t.close}
+                </button>
+                <button type="button" onClick={() => { setShowShopifyPreview(false); handlePushToShopify(); }} disabled={busy} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs font-bold rounded-lg transition disabled:opacity-50">
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : t.shopifyConfirm}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </>
   );
 }

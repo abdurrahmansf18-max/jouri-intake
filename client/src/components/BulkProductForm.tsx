@@ -46,16 +46,22 @@ function makeDraft(): BulkDraft {
 
 // ── Ana bileşen ───────────────────────────────────────────────────────────────
 
-export default function BulkProductForm() {
+export default function BulkProductForm({ initialCards }: { initialCards?: BulkDraft[] }) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
   const navigate = useNavigate();
 
-  const [cards, setCards] = useState<BulkDraft[]>([makeDraft(), makeDraft()]);
+  const [cards, setCards] = useState<BulkDraft[]>(() => initialCards || [makeDraft(), makeDraft()]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [quickCount, setQuickCount] = useState(5);
+  const [quickCount, setQuickCount] = useState(1);
+
+  useEffect(() => {
+    if (initialCards && initialCards.length > 0) {
+      setCards(initialCards);
+    }
+  }, [initialCards]);
 
   // Unmount'ta blob URL'leri temizle
   const cardsRef = useRef<BulkDraft[]>(cards);

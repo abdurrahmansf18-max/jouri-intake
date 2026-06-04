@@ -58,7 +58,7 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
           {record.images.map((img) => (
             <img
               key={img.fileName}
-              src={productImageUrl(record.id, img.fileName, "originals")}
+              src={productImageUrl(record.id, img.fileName)}
               alt={img.originalName}
               className="h-28 w-28 shrink-0 rounded-lg object-cover ring-1 ring-white/10"
               loading="lazy"

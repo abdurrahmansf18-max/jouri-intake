@@ -11,7 +11,7 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { createProduct, fetchProducts, updateRelatedProducts } from "../api";
+import { createProduct, fetchProducts, updateRelatedProducts, parseProductText } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
@@ -57,6 +57,10 @@ export default function AddProductPage() {
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [allProducts, setAllProducts] = useState<ProductRecord[]>([]);
   const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
+
+  // AI Parsing State
+  const [aiText, setAiText] = useState("");
+  const [isParsing, setIsParsing] = useState(false);
 
   useEffect(() => {
     fetchProducts().then(setAllProducts).catch(() => {});
@@ -124,6 +128,61 @@ export default function AddProductPage() {
     }
   }
 
+  // Bulk Mode state from AI
+  const [bulkCards, setBulkCards] = useState<any[] | undefined>(undefined);
+
+  async function handleAIParsing() {
+    if (!aiText.trim()) return;
+    setIsParsing(true);
+    try {
+      const result = await parseProductText(aiText);
+      const parsed = result.parsed;
+      
+      const variants = result.variants || [];
+      if (variants.length > 1) {
+         // Create bulk cards
+         const newCards = variants.map((v: any, idx: number) => {
+             const sizes = v.sizes ? v.sizes.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+             return {
+                 id: `ai-${Date.now()}-${idx}`,
+                 titleRaw: parsed.titleRaw || "",
+                 priceAmount: parsed.priceAmount || "",
+                 colorRaw: v.color || "",
+                 categorySuggestion: parsed.categorySuggestion || "",
+                 productTypeSuggestion: parsed.productTypeSuggestion || "",
+                 description: result.description || "",
+                 notes: "",
+                 files: [],
+                 previews: [],
+                 sizeRows: sizes.length > 0 ? sizes.map((s: string) => ({ size: s, qty: "1" })) : [{ size: "", qty: "1" }]
+             };
+         });
+         setBulkCards(newCards);
+         setAddMode("bulk");
+         showToast(t.aiBulkSwitched, "success");
+      } else {
+         if (result.description) setDescription(result.description);
+         if (parsed.titleRaw) patch("titleRaw", parsed.titleRaw);
+         if (parsed.priceAmount) patch("priceAmount", parsed.priceAmount);
+         if (parsed.colorRaw) patch("colorRaw", parsed.colorRaw);
+         if (parsed.categorySuggestion) patch("categorySuggestion", parsed.categorySuggestion);
+         if (parsed.productTypeSuggestion) patch("productTypeSuggestion", parsed.productTypeSuggestion);
+         
+         if (parsed.sizesRaw) {
+           const sizes = parsed.sizesRaw.split(",").map((s: string) => s.trim()).filter(Boolean);
+           if (sizes.length > 0) {
+             setSizeRows(sizes.map((s: string) => ({ size: s, qty: "1" })));
+           }
+         }
+         showToast(t.aiSuccess, "success");
+      }
+    } catch (err) {
+      showToast(t.aiFailed, "error");
+    } finally {
+      setIsParsing(false);
+    }
+  }
+
   function handleFiles(selected: File[]) {
     setFiles((prev) => {
       const combined = [...prev, ...selected].slice(0, 5);
@@ -148,6 +207,31 @@ export default function AddProductPage() {
 
   return (
     <div className="grid gap-5">
+      {/* AI ile Hızlı Ekleme (Her iki modda da çalışır) */}
+      <section className={cn("rounded-xl border p-4", s.subPanel)}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className={cn("flex items-center gap-2 text-sm font-extrabold", s.title)}>
+            {t.aiAutoFill}
+          </h3>
+        </div>
+        <textarea
+          className={cn("min-h-24 w-full resize-y rounded-xl border px-4 py-3 text-sm leading-6 outline-none transition focus:ring-4", s.input)}
+          value={aiText}
+          onChange={(e) => setAiText(e.target.value)}
+          placeholder={t.aiPlaceholder}
+          dir="auto"
+        />
+        <button
+          type="button"
+          onClick={handleAIParsing}
+          disabled={isParsing || !aiText.trim()}
+          className={cn("mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-70", s.primary)}
+        >
+          {isParsing ? <Loader2 className="size-4 animate-spin" /> : <Layers className="size-4" />}
+          {isParsing ? t.aiAnalyzing : t.aiAnalyzeBtn}
+        </button>
+      </section>
+
       {/* Mod seçici */}
       <div className={cn("grid grid-cols-2 gap-0 rounded-xl border overflow-hidden", s.controlGroup)}>
         <button
@@ -176,7 +260,7 @@ export default function AddProductPage() {
       </div>
 
       {/* Çoklu ekleme modu */}
-      {addMode === "bulk" && <BulkProductForm />}
+      {addMode === "bulk" && <BulkProductForm initialCards={bulkCards} />}
 
       {/* Tekli ekleme modu */}
       {addMode === "single" && <form ref={formRef} onSubmit={handleSubmit} className={cn("rounded-xl border", s.panel)}>
@@ -188,6 +272,7 @@ export default function AddProductPage() {
         </div>
 
         <div className="grid gap-5 p-5">
+
           {/* Görsel yükleme */}
           <label className={cn("group relative grid min-h-44 cursor-pointer place-items-center rounded-xl border border-dashed px-4 py-6 text-center transition", s.dropzone)}>
             <input

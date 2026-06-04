@@ -5,7 +5,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Optional
 
 import pyotp
 from collections import defaultdict
@@ -17,10 +17,12 @@ from sqlalchemy.orm import Session
 
 import activity_logger
 import file_manager
+import shopify
 from database import SessionLocal, get_db
 from db_models import ActivityLog, Product
 from models import (
     AuthRequest,
+    ParseRequest,
     ParsedProduct,
     ProductRecord,
     ProductStatus,
@@ -36,7 +38,7 @@ from models import (
     StatusUpdateRequest,
     UpdateRelatedRequest,
 )
-from parser import parse_description
+from parser import parse_description, parse_description_ai
 
 TOTP_SECRET = os.environ.get("TOTP_SECRET", "").strip()
 USER_PASSWORD = os.environ.get("USER_PASSWORD", "").strip()
@@ -401,6 +403,16 @@ async def websocket_endpoint(
     except WebSocketDisconnect:
         ws_manager.disconnect(ws)
 
+
+# ── AI Parsing ────────────────────────────────────────────────────────────────
+
+@app.post("/api/parse-product")
+async def parse_product_text(
+    req: ParseRequest,
+    _: Annotated[None, Depends(verify_access)]
+):
+    result = await parse_description_ai(req.text)
+    return result
 
 # ── Products ──────────────────────────────────────────────────────────────────
 
@@ -909,6 +921,28 @@ async def add_product_images(
     record = _to_record(p)
     await ws_manager.broadcast({"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
+
+
+
+@app.post("/api/products/{product_id}/shopify-push", response_model=ProductRecord)
+async def push_product_to_shopify(
+    product_id: str,
+    _: Annotated[None, Depends(verify_access)] = None,
+    db: Session = Depends(get_db)
+):
+    p = _get_or_404(db, product_id)
+    record = _to_record(p)
+    
+    try:
+        res = await shopify.push_to_shopify(record.model_dump(), record.images)
+        p.notes = (p.notes or "") + f"\n[Shopify] Product ID: {res.get('product', {}).get('id')}"
+        db.commit()
+        db.refresh(p)
+        record = _to_record(p)
+        await ws_manager.broadcast({"type": "product_updated", "product": record.model_dump(mode="json")})
+        return record
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"code": "ERR_GENERAL", "message": str(e)})
 
 
 @app.delete("/api/products/{product_id}")

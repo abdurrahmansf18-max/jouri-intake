@@ -36,9 +36,10 @@ class ParsedProduct(BaseModel):
 class SavedImage(BaseModel):
     fileName: str
     originalName: str
-    mimeType: str
-    size: int
-    relativePath: str
+    mimeType: str = "image/jpeg"
+    size: int = 0
+    relativePath: str = ""
+    folder: str = "originals"  # "originals" veya "enhanced"
 
 
 class SaleRecord(BaseModel):
@@ -126,3 +127,6 @@ class UpdateRelatedRequest(BaseModel):
 
 class AuthRequest(BaseModel):
     code: str
+
+class ParseRequest(BaseModel):
+    text: str

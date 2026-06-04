@@ -258,7 +258,7 @@ export default function DashboardPage() {
                 <div key={p.id} className={cn("overflow-hidden rounded-xl border", s.subPanel)}>
                   {firstImg ? (
                     <img
-                      src={productImageUrl(p.id, firstImg.fileName, "originals")}
+                      src={productImageUrl(p.id, firstImg.fileName)}
                       alt={firstImg.originalName}
                       className="aspect-video w-full object-cover"
                       loading="lazy"

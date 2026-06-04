@@ -59,7 +59,7 @@ export default function ImageLightbox({ images, initialIndex, productId, onClose
       >
         <img
           key={img.fileName}
-          src={productImageUrl(productId, img.fileName, "originals")}
+          src={productImageUrl(productId, img.fileName, undefined, img.folder)}
           alt={img.originalName}
           className="max-h-[80vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
           draggable={false}

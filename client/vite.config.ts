@@ -15,5 +15,20 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    warmup: {
+      clientFiles: [
+        "./src/main.tsx",
+        "./src/App.tsx",
+        "./src/api.ts",
+        "./src/components/ProductDetail.tsx",
+        "./src/components/ProductCard.tsx",
+        "./src/components/ImageLightbox.tsx",
+        "./src/pages/ProductsPage.tsx",
+        "./src/pages/DashboardPage.tsx",
+      ],
+    },
+  },
+  optimizeDeps: {
+    include: ["react", "react-dom", "react-router-dom", "lucide-react"],
   },
 });
