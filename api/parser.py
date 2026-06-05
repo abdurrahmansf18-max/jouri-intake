@@ -170,7 +170,7 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
             sizesRaw=sizes_raw,
             tags=[]
         ).model_dump(),
-        "description": _field(data.get("description", "")) or structured.get("description", ""),
+        "description": _safe_description(description, data.get("description", ""), structured.get("description", "")),
         "variants": variants,
         "provider": provider,
     }
@@ -232,7 +232,7 @@ def parse_description_structured(description: str) -> dict:
         parsed.priceAmount = price
         parsed.currency = "EUR"
 
-    translated_title = _translate_title(parsed.titleRaw)
+    translated_title = _translate_title(_title_source(description, parsed.titleRaw))
     if translated_title:
         parsed.titleRaw = translated_title
     if not parsed.productTypeSuggestion:
@@ -359,6 +359,8 @@ def _translate_color(value: str) -> str:
         "أوف وايت": "Off White",
         "سكري": "Ivory",
         "حليبي": "Milk White",
+        "عسلي": "Honey",
+        "جملي": "Camel",
         "اسود": "Black",
         "أسود": "Black",
         "احمر": "Red",
@@ -410,6 +412,7 @@ def _translate_title(value: str) -> str:
 
     audience = _audience_prefix(text)
     style = "Parachute " if re.search(r"(?:باراشوت|براشوت|parachute)", text, re.IGNORECASE) else ""
+    material = _material_phrase(text)
     has_pajama = "بيجاما" in text or "بجاما" in text
     has_short = "شورت" in text
     if has_pajama and has_short:
@@ -417,29 +420,31 @@ def _translate_title(value: str) -> str:
     if has_pajama:
         return f"{audience}{style}Pajama Set".strip()
     if re.search(r"(?:فستان|dress)", text, re.IGNORECASE):
-        return f"{audience}{style}Dress".strip()
-    if re.search(r"(?:طقم|set)", text, re.IGNORECASE):
+        return f"{audience}{style}{material}Dress".strip()
+    if re.search(r"(?:توينز|طقم|set)", text, re.IGNORECASE):
         pieces = _known_piece_words(text)
         if pieces:
-            return f"{audience}{style}{' and '.join(pieces)} Set".strip()
-        return f"{audience}{style}Set".strip()
+            return f"{audience}{style}{material}{' and '.join(pieces)} Set".strip()
+        return f"{audience}{style}{material}Set".strip()
     if has_short:
         return f"{audience}{style}Shorts".strip()
     pieces = _known_piece_words(text)
     if pieces:
-        return f"{audience}{style}{' and '.join(pieces)}".strip()
+        return f"{audience}{style}{material}{' and '.join(pieces)}".strip()
     return text
 
 
 def _guess_product_type(description: str) -> str:
     text = description.lower()
+    if re.search(r"(?:توينز|طقم|set)", description, re.IGNORECASE):
+        return "Set"
     if "بيجاما" in description or "pajama" in text:
         return "Pajamas"
     if re.search(r"(?:فستان|dress)", description, re.IGNORECASE):
         return "Dress"
     if re.search(r"(?:طقم|set)", description, re.IGNORECASE):
         return "Set"
-    if re.search(r"(?:تيشيرت|تشيرت|t-?shirt)", description, re.IGNORECASE):
+    if re.search(r"(?:تيشيرت|تيشرت|تشيرت|t-?shirt)", description, re.IGNORECASE):
         return "T-Shirt"
     if re.search(r"(?:بلوزة|blouse|top)", description, re.IGNORECASE):
         return "Top"
@@ -457,7 +462,7 @@ def _guess_product_type(description: str) -> str:
 
 
 def _guess_category(sizes_raw: str, description: str) -> str:
-    if re.search(r"(?:ولادي|اولاد|أولاد|للأولاد|boy|boys)", description, re.IGNORECASE):
+    if re.search(r"(?:صبياني|صبيان|ولادي|اولاد|أولاد|للأولاد|boy|boys)", description, re.IGNORECASE):
         return "Boys"
     if re.search(r"(?:بناتي|بنات|للبنات|girl|girls)", description, re.IGNORECASE):
         return "Girls"
@@ -481,7 +486,7 @@ def _known_piece_words(text: str) -> list[str]:
     pieces = []
     piece_patterns = [
         (r"(?:بلوزة|blouse|top)", "Top"),
-        (r"(?:تيشيرت|تشيرت|t-?shirt)", "T-Shirt"),
+        (r"(?:تيشيرت|تيشرت|تشيرت|t-?shirt)", "T-Shirt"),
         (r"(?:بنطلون|pants|trousers)", "Pants"),
         (r"(?:شورت|shorts?)", "Shorts"),
         (r"(?:تنورة|skirt)", "Skirt"),
@@ -492,6 +497,62 @@ def _known_piece_words(text: str) -> list[str]:
         if re.search(pattern, text, re.IGNORECASE) and label not in pieces:
             pieces.append(label)
     return pieces
+
+
+def _title_source(description: str, fallback: str) -> str:
+    title_lines = []
+    for raw_line in description.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if re.search(r"(?:القياسات|المقاسات|beden|size|السعر|price|fiyat)", line, re.IGNORECASE):
+            break
+        if ":" in line or "：" in line:
+            break
+        title_lines.append(line)
+        if len(title_lines) >= 3:
+            break
+    return " ".join(title_lines) or fallback
+
+
+def _material_phrase(text: str) -> str:
+    materials = []
+    material_matches = [
+        ("Cotton", re.search(r"(?:قطن|cotton)", text, re.IGNORECASE)),
+        ("Linen", re.search(r"(?:كتان|linen)", text, re.IGNORECASE)),
+    ]
+    for label, match in sorted(
+        ((label, match) for label, match in material_matches if match),
+        key=lambda item: item[1].start(),
+    ):
+        materials.append(label)
+    return f"{' and '.join(materials)} " if materials else ""
+
+
+def _safe_description(source: str, ai_description, fallback: str) -> str:
+    description = _field(ai_description)
+    if not description:
+        return fallback
+    if _contains_unsupported_material_claim(source, description):
+        return fallback
+    return description
+
+
+def _contains_unsupported_material_claim(source: str, description: str) -> bool:
+    source_lower = source.lower()
+    description_lower = description.lower()
+    material_terms = [
+        ("cotton", ["cotton", "قطن"]),
+        ("linen", ["linen", "كتان"]),
+        ("blend", ["blend", "mixed", "خليط", "ممزوج"]),
+        ("wool", ["wool", "صوف"]),
+        ("silk", ["silk", "حرير"]),
+        ("denim", ["denim", "jeans", "جينز"]),
+    ]
+    for english_term, source_terms in material_terms:
+        if english_term in description_lower and not any(term in source_lower for term in source_terms):
+            return True
+    return False
 
 
 def _fallback_description(parsed: ParsedProduct) -> str:
