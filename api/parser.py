@@ -33,6 +33,13 @@ Translate the title and description to English.
 
 IMPORTANT for Description: Write a rich, appealing, and well-structured product description. It should not be too short nor too long. Describe the style, comfort, and occasions it fits. DO NOT just repeat the title. Use 2-3 sentences.
 
+SOURCE-GROUNDING RULES:
+- Do not invent colors, product pieces, materials, themes, or category.
+- If the text lists product pieces, preserve exactly those pieces translated to English. Do not add extra pieces.
+- If category is not explicit, infer it only from clear words like boys/girls/women/men/baby or sizes such as 1Y, 2Y, 3Y.
+- If information is missing, leave the field empty instead of guessing.
+- The description may be appealing, but it must not claim a fabric/material/feature that is not present in the input.
+
 IMPORTANT for Variants: If the user provides multiple colors (e.g. Beige size 2, Brown size 3), extract them into the `variants` array so we know exactly which sizes belong to which color. If sizes are not tied to colors, just list the same sizes for each color variant.
 For color lines like "رمادي :3/2/1 Y" and "ابيض : 2 Y", return two variants: Gray with "3Y, 2Y, 1Y" and White with "2Y".
 
@@ -114,12 +121,15 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
     structured = parse_description_structured(description)
     structured_parsed = structured["parsed"]
     structured_variants = structured.get("variants", [])
-    variants = _normalize_variants(data.get("variants", []))
-    if not variants and structured_variants:
-        variants = structured_variants
+    ai_variants = _normalize_variants(data.get("variants", []))
+    variants = structured_variants or ai_variants
 
     color_raw = _field(data.get("colorRaw", ""))
     sizes_raw = _field(data.get("sizesRaw", ""))
+
+    if structured_variants:
+        color_raw = structured_parsed.get("colorRaw", "")
+        sizes_raw = structured_parsed.get("sizesRaw", "")
 
     if not color_raw and variants:
         color_raw = ", ".join([v.get("color", "") for v in variants if v.get("color")])
@@ -135,17 +145,25 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
     title_raw = _field(data.get("titleRaw", ""))
     if _contains_arabic(title_raw):
         title_raw = ""
+    structured_title = structured_parsed.get("titleRaw", "")
+    if _contains_arabic(description) and structured_title and not _contains_arabic(structured_title):
+        title_raw = structured_title
 
     category = _field(data.get("categorySuggestion", ""))
     if _looks_like_kids_sizes(sizes_raw or structured_parsed.get("sizesRaw", "")) and category.lower() not in {"boys", "girls", "kids"}:
         category = ""
+    if structured_parsed.get("categorySuggestion"):
+        category = structured_parsed.get("categorySuggestion", "")
+
+    price_amount = structured_parsed.get("priceAmount", "") or _field(data.get("priceAmount", ""))
+    product_type = structured_parsed.get("productTypeSuggestion", "") or _field(data.get("productTypeSuggestion", ""))
 
     return {
         "parsed": ParsedProduct(
-            titleRaw=title_raw or structured_parsed.get("titleRaw", ""),
+            titleRaw=title_raw or structured_title,
             categorySuggestion=category or structured_parsed.get("categorySuggestion", ""),
-            productTypeSuggestion=_field(data.get("productTypeSuggestion", "")) or structured_parsed.get("productTypeSuggestion", ""),
-            priceAmount=_field(data.get("priceAmount", "")) or structured_parsed.get("priceAmount", ""),
+            productTypeSuggestion=product_type,
+            priceAmount=price_amount,
             currency=_field(data.get("currency", "")) or "EUR",
             colorRaw=color_raw,
             colorGermanSuggestion="",
@@ -337,42 +355,79 @@ def _translate_color(value: str) -> str:
         "رصاصي": "Gray",
         "ابيض": "White",
         "أبيض": "White",
+        "اوف وايت": "Off White",
+        "أوف وايت": "Off White",
+        "سكري": "Ivory",
+        "حليبي": "Milk White",
         "اسود": "Black",
         "أسود": "Black",
         "احمر": "Red",
         "أحمر": "Red",
+        "خمري": "Burgundy",
+        "عنابي": "Burgundy",
         "ازرق": "Blue",
         "أزرق": "Blue",
+        "سماوي": "Sky Blue",
         "كحلي": "Navy",
         "تركواز": "Turquoise",
         "فيروزي": "Turquoise",
         "فيروزى": "Turquoise",
         "وردي": "Pink",
         "زهري": "Pink",
+        "فوشي": "Fuchsia",
+        "موف": "Mauve",
+        "ليلكي": "Lilac",
         "بيج": "Beige",
         "بني": "Brown",
         "اخضر": "Green",
         "أخضر": "Green",
+        "زيتي": "Olive",
+        "نعناعي": "Mint",
         "اصفر": "Yellow",
         "أصفر": "Yellow",
         "بنفسجي": "Purple",
         "برتقالي": "Orange",
+        "فضي": "Silver",
+        "ذهبي": "Gold",
     }
-    return colors.get(value.strip(), value.strip())
+    key = _normalize_color_key(value)
+    return colors.get(key, value.strip())
+
+
+def _normalize_color_key(value: str) -> str:
+    key = " ".join(value.strip().split())
+    key = re.sub(r"^(?:ال)", "", key)
+    key = key.replace("إ", "ا").replace("أ", "ا").replace("آ", "ا").replace("ى", "ي")
+    return key
 
 
 def _translate_title(value: str) -> str:
     text = value.strip()
     if not text:
         return ""
+    if not _contains_arabic(text):
+        return text
+
+    audience = _audience_prefix(text)
+    style = "Parachute " if re.search(r"(?:باراشوت|براشوت|parachute)", text, re.IGNORECASE) else ""
     has_pajama = "بيجاما" in text or "بجاما" in text
     has_short = "شورت" in text
     if has_pajama and has_short:
-        return "Short Pajama Set"
+        return f"{audience}{style}Short Pajama Set".strip()
     if has_pajama:
-        return "Pajama Set"
+        return f"{audience}{style}Pajama Set".strip()
+    if re.search(r"(?:فستان|dress)", text, re.IGNORECASE):
+        return f"{audience}{style}Dress".strip()
+    if re.search(r"(?:طقم|set)", text, re.IGNORECASE):
+        pieces = _known_piece_words(text)
+        if pieces:
+            return f"{audience}{style}{' and '.join(pieces)} Set".strip()
+        return f"{audience}{style}Set".strip()
     if has_short:
-        return "Shorts"
+        return f"{audience}{style}Shorts".strip()
+    pieces = _known_piece_words(text)
+    if pieces:
+        return f"{audience}{style}{' and '.join(pieces)}".strip()
     return text
 
 
@@ -380,15 +435,63 @@ def _guess_product_type(description: str) -> str:
     text = description.lower()
     if "بيجاما" in description or "pajama" in text:
         return "Pajamas"
+    if re.search(r"(?:فستان|dress)", description, re.IGNORECASE):
+        return "Dress"
+    if re.search(r"(?:طقم|set)", description, re.IGNORECASE):
+        return "Set"
+    if re.search(r"(?:تيشيرت|تشيرت|t-?shirt)", description, re.IGNORECASE):
+        return "T-Shirt"
+    if re.search(r"(?:بلوزة|blouse|top)", description, re.IGNORECASE):
+        return "Top"
+    if re.search(r"(?:بنطلون|pants|trousers)", description, re.IGNORECASE):
+        return "Pants"
+    if re.search(r"(?:تنورة|skirt)", description, re.IGNORECASE):
+        return "Skirt"
+    if re.search(r"(?:جاكيت|jacket)", description, re.IGNORECASE):
+        return "Jacket"
+    if re.search(r"(?:هودي|hoodie)", description, re.IGNORECASE):
+        return "Hoodie"
     if "شورت" in description or "short" in text:
         return "Shorts"
     return ""
 
 
 def _guess_category(sizes_raw: str, description: str) -> str:
+    if re.search(r"(?:ولادي|اولاد|أولاد|للأولاد|boy|boys)", description, re.IGNORECASE):
+        return "Boys"
+    if re.search(r"(?:بناتي|بنات|للبنات|girl|girls)", description, re.IGNORECASE):
+        return "Girls"
+    if re.search(r"(?:نسائي|حريمي|women|woman|ladies)", description, re.IGNORECASE):
+        return "Women"
+    if re.search(r"(?:رجالي|men|man)", description, re.IGNORECASE):
+        return "Men"
+    if re.search(r"(?:بيبي|مواليد|رضع|baby|newborn)", description, re.IGNORECASE):
+        return "Baby"
     if re.search(r"\b\d+\s*y\b", sizes_raw, re.IGNORECASE) or re.search(r"\b\d+\s*y\b", description, re.IGNORECASE):
         return "Kids"
     return ""
+
+
+def _audience_prefix(text: str) -> str:
+    category = _guess_category("", text)
+    return f"{category} " if category and category != "Kids" else ""
+
+
+def _known_piece_words(text: str) -> list[str]:
+    pieces = []
+    piece_patterns = [
+        (r"(?:بلوزة|blouse|top)", "Top"),
+        (r"(?:تيشيرت|تشيرت|t-?shirt)", "T-Shirt"),
+        (r"(?:بنطلون|pants|trousers)", "Pants"),
+        (r"(?:شورت|shorts?)", "Shorts"),
+        (r"(?:تنورة|skirt)", "Skirt"),
+        (r"(?:جاكيت|jacket)", "Jacket"),
+        (r"(?:هودي|hoodie)", "Hoodie"),
+    ]
+    for pattern, label in piece_patterns:
+        if re.search(pattern, text, re.IGNORECASE) and label not in pieces:
+            pieces.append(label)
+    return pieces
 
 
 def _fallback_description(parsed: ParsedProduct) -> str:
