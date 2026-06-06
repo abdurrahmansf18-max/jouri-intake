@@ -24,6 +24,7 @@ export default function ProductsPage() {
   const [allProducts, setAllProducts] = useState<ProductRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
@@ -74,13 +75,27 @@ export default function ProductsPage() {
     sold_archive: 0,
   };
 
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set<string>();
+    records.forEach(r => {
+      const c = r.parsed?.categorySuggestion?.trim();
+      if (c) cats.add(c);
+    });
+    return Array.from(cats).sort((a, b) => a.localeCompare(b));
+  }, [records]);
+
   // Filtre veya arama değişince sayfa 1'e dön
-  useEffect(() => { setPage(1); }, [filter, search]);
+  useEffect(() => { setPage(1); }, [filter, search, categoryFilter]);
 
   const filtered = useMemo(() => {
     const tokens = searchTokens(search);
     return records.filter((r) => {
       if (filter !== "all" && r.status !== filter) return false;
+      
+      const cat = r.parsed?.categorySuggestion?.trim() || "";
+      if (categoryFilter === "uncategorized" && cat) return false;
+      if (categoryFilter !== "all" && categoryFilter !== "uncategorized" && cat !== categoryFilter) return false;
+
       if (tokens.length === 0) return true;
       const p = r.parsed;
       const haystack = normalizeText([
@@ -134,25 +149,48 @@ export default function ProductsPage() {
 
       {/* Filtreler + arama */}
       <div className={cn("rounded-xl border p-4", s.panel)}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
-              <button key={f} type="button" onClick={() => setFilter(f)}
-                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition",
-                  filter === f ? s.filterActive : s.filterIdle)}>
-                {filterLabel(f, locale)}
-                <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black", filter === f ? "bg-white/20" : "bg-white/5")}>
-                  {counts[f]}
-                </span>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-wrap gap-1.5">
+              {FILTERS.map((f) => (
+                <button key={f} type="button" onClick={() => setFilter(f)}
+                  className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition",
+                    filter === f ? s.filterActive : s.filterIdle)}>
+                  {filterLabel(f, locale)}
+                  <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black", filter === f ? "bg-white/20" : "bg-white/5")}>
+                    {counts[f]}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
+              <Search className="size-4 shrink-0 text-violet-400" />
+              <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.searchPlaceholder} dir="auto" />
+            </label>
+          </div>
+
+          {/* Categories */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-thin -mx-4 px-4 sm:mx-0 sm:px-0">
+            <button type="button" onClick={() => setCategoryFilter("all")}
+              className={cn("shrink-0 rounded-full border px-4 py-1.5 text-xs font-bold transition whitespace-nowrap", 
+                categoryFilter === "all" ? "bg-violet-500 text-white border-violet-500" : cn("border-white/5", s.filterIdle))}>
+              {t.allCategories}
+            </button>
+            {uniqueCategories.map(c => (
+              <button key={c} type="button" onClick={() => setCategoryFilter(c)}
+                className={cn("shrink-0 rounded-full border px-4 py-1.5 text-xs font-bold transition whitespace-nowrap", 
+                  categoryFilter === c ? "bg-violet-500 text-white border-violet-500" : cn("border-white/5", s.filterIdle))}>
+                {c}
               </button>
             ))}
+            <button type="button" onClick={() => setCategoryFilter("uncategorized")}
+              className={cn("shrink-0 rounded-full border px-4 py-1.5 text-xs font-bold transition whitespace-nowrap", 
+                categoryFilter === "uncategorized" ? "bg-violet-500 text-white border-violet-500" : cn("border-white/5", s.filterIdle))}>
+                {t.uncategorized}
+            </button>
           </div>
-          <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
-            <Search className="size-4 shrink-0 text-violet-400" />
-            <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
-              value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder={t.searchPlaceholder} dir="auto" />
-          </label>
         </div>
       </div>
 
