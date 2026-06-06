@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArchiveRestore, ExternalLink, ImageOff, Pencil, Ruler } from "lucide-react";
-import { productImageUrl, updateStatus } from "../api";
+import { productImageUrl, restoreProduct } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
@@ -27,7 +27,7 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
     if (busy) return;
     setBusy(true);
     try {
-      const updated = await updateStatus(record.id, "pending");
+      const updated = await restoreProduct(record.id, Math.max(1, record.stockQuantity || 1));
       onReplace(updated);
       showToast(t.toastRestored, "success");
     } catch {

@@ -87,6 +87,7 @@ def sell_product(
         new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, "sold_archive")
         p.folder_path = new_path
         p.status = "sold_archive"
+        p.images = file_manager.rebase_image_relative_paths(p.images, p.folder_name, "sold_archive")
 
     activity_logger.log(
         db, "sell",
@@ -146,6 +147,7 @@ def restore_product(
     new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, "pending")
     p.folder_path = new_path
     p.status = "pending"
+    p.images = file_manager.rebase_image_relative_paths(p.images, p.folder_name, "pending")
     p.stock_quantity = max(1, int(body.stockQuantity))
     p.sold_sizes = []
 
@@ -210,6 +212,7 @@ def restore_product_size(
         new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, "pending")
         p.folder_path = new_path
         p.status = "pending"
+        p.images = file_manager.rebase_image_relative_paths(p.images, p.folder_name, "pending")
 
     activity_logger.log(
         db, "restore",

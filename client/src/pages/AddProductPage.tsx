@@ -423,10 +423,31 @@ function splitAiSizes(value: string | string[] | undefined): string[] {
     .map((item) => item.trim().replace(/\s+/g, ""))
     .filter(Boolean)
     .forEach((item) => {
-      const normalized = suffix && /^\d+(?:[.,]\d+)?$/.test(item) ? `${item}${suffix}` : item.toUpperCase();
+      const normalized = normalizeAiSizeToken(item, suffix);
       if (!sizes.includes(normalized)) sizes.push(normalized);
     });
   return sizes;
+}
+
+function normalizeAiSizeToken(item: string, inheritedSuffix: string): string {
+  if ((inheritedSuffix === "Y" || inheritedSuffix === "M") && /^\d+(?:[.,]\d+)?$/.test(item)) {
+    return formatAgeSize(item, inheritedSuffix);
+  }
+  const ownSuffix = item.match(/^(\d+(?:[.,]\d+)?)([YM])$/i);
+  if (ownSuffix) {
+    return formatAgeSize(ownSuffix[1], ownSuffix[2].toUpperCase());
+  }
+  return item.toUpperCase();
+}
+
+function formatAgeSize(value: string, suffix: string): string {
+  const number = value.replace(",", ".");
+  const displayNumber = number.endsWith(".0") ? number.slice(0, -2) : number;
+  const singular = number === "1" || number === "1.0";
+  const unit = suffix === "Y"
+    ? (singular ? "Year" : "Years")
+    : (singular ? "Month" : "Months");
+  return `${displayNumber} ${unit}`;
 }
 
 function getProviderNote(

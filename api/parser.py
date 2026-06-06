@@ -36,12 +36,13 @@ IMPORTANT for Description: Write a rich, appealing, and well-structured product 
 SOURCE-GROUNDING RULES:
 - Do not invent colors, product pieces, materials, themes, or category.
 - If the text lists product pieces, preserve exactly those pieces translated to English. Do not add extra pieces.
-- If category is not explicit, infer it only from clear words like boys/girls/women/men/baby or sizes such as 1Y, 2Y, 3Y.
+- If category is not explicit, infer it only from clear words like boys/girls/women/men/baby or age sizes such as 1 Year, 2 Years, 6 Months.
 - If information is missing, leave the field empty instead of guessing.
 - The description may be appealing, but it must not claim a fabric/material/feature that is not present in the input.
 
 IMPORTANT for Variants: If the user provides multiple colors (e.g. Beige size 2, Brown size 3), extract them into the `variants` array so we know exactly which sizes belong to which color. If sizes are not tied to colors, just list the same sizes for each color variant.
-For color lines like "رمادي :3/2/1 Y" and "ابيض : 2 Y", return two variants: Gray with "3Y, 2Y, 1Y" and White with "2Y".
+For color lines like "رمادي :3/2/1 Y" and "ابيض : 2 Y", return two variants: Gray with "3 Years, 2 Years, 1 Year" and White with "2 Years".
+Size suffix rule: when Y or M is attached to a number, translate it fully as Years or Months. Examples: 9Y -> 9 Years, 1Y -> 1 Year, 6M -> 6 Months, 1M -> 1 Month. A standalone adult size like S, M, L must stay as S, M, L.
 
 Return ONLY valid JSON. No markdown formatting like ```json.
 
@@ -275,7 +276,10 @@ def _contains_arabic(value: str) -> bool:
 
 
 def _looks_like_kids_sizes(value: str) -> bool:
-    return bool(re.search(r"\b\d+\s*y\b", value, re.IGNORECASE))
+    return bool(
+        re.search(r"\b\d+\s*y\b", value, re.IGNORECASE)
+        or re.search(r"\b\d+\s*(?:year|years|month|months)\b", value, re.IGNORECASE)
+    )
 
 
 def _extract_variants(description: str) -> list[dict[str, str]]:
@@ -328,13 +332,33 @@ def _normalize_sizes(value: str) -> list[str]:
         cleaned = re.sub(r"[^0-9A-Za-z.+-]", "", cleaned)
         if not cleaned:
             continue
-        if suffix and re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
+        if suffix in {"Y", "M"} and re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
+            cleaned = _format_age_size(cleaned, suffix)
+        elif suffix and re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
             cleaned = f"{cleaned}{suffix}"
         else:
-            cleaned = cleaned.upper()
+            cleaned = _expand_age_suffix(cleaned.upper())
         if cleaned not in sizes:
             sizes.append(cleaned)
     return sizes
+
+
+def _expand_age_suffix(value: str) -> str:
+    match = re.fullmatch(r"(\d+(?:[.,]\d+)?)([YM])", value, re.IGNORECASE)
+    if not match:
+        return value
+    return _format_age_size(match.group(1), match.group(2).upper())
+
+
+def _format_age_size(number: str, suffix: str) -> str:
+    cleaned_number = number.replace(",", ".")
+    singular = cleaned_number in {"1", "1.0"}
+    if suffix == "Y":
+        unit = "Year" if singular else "Years"
+    else:
+        unit = "Month" if singular else "Months"
+    display_number = cleaned_number[:-2] if cleaned_number.endswith(".0") else cleaned_number
+    return f"{display_number} {unit}"
 
 
 def _extract_price(description: str) -> str:
@@ -472,7 +496,7 @@ def _guess_category(sizes_raw: str, description: str) -> str:
         return "Men"
     if re.search(r"(?:بيبي|مواليد|رضع|baby|newborn)", description, re.IGNORECASE):
         return "Baby"
-    if re.search(r"\b\d+\s*y\b", sizes_raw, re.IGNORECASE) or re.search(r"\b\d+\s*y\b", description, re.IGNORECASE):
+    if _looks_like_kids_sizes(sizes_raw) or _looks_like_kids_sizes(description):
         return "Kids"
     return ""
 

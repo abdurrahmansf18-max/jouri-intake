@@ -2,10 +2,11 @@ import json
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 import activity_logger
+import auth_service
 import file_manager
 import product_service
 import shopify
@@ -23,6 +24,12 @@ from realtime import ws_manager
 
 
 router = APIRouter()
+
+_ACTIVE_STATUS_RANK = {
+    "pending": 0,
+    "ai_enhanced": 1,
+    "published": 2,
+}
 
 
 @router.get("/api/products", response_model=list[ProductRecord])
@@ -139,15 +146,20 @@ def update_status(
     body: StatusUpdateRequest,
     background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
+    jouri_edit_unlock: Annotated[str | None, Cookie()] = None,
     db: Session = Depends(get_db),
 ):
     p = product_service.get_or_404(db, product_id)
     old_status = p.status
     new_status = body.status.value
 
+    if _status_change_requires_unlock(old_status, new_status) and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
+        raise HTTPException(status_code=403, detail={"code": "ERR_EDIT_LOCK_REQUIRED"})
+
     if old_status != new_status:
         new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, new_status)
         p.folder_path = new_path
+        p.images = file_manager.rebase_image_relative_paths(p.images, p.folder_name, new_status)
 
     p.status = new_status
     if new_status == "sold_archive":
@@ -168,6 +180,18 @@ def update_status(
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
+
+
+def _status_change_requires_unlock(old_status: str, new_status: str) -> bool:
+    if old_status == new_status:
+        return False
+    if new_status == "sold_archive":
+        return True
+    if old_status == "sold_archive":
+        return True
+    if old_status in _ACTIVE_STATUS_RANK and new_status in _ACTIVE_STATUS_RANK:
+        return _ACTIVE_STATUS_RANK[new_status] < _ACTIVE_STATUS_RANK[old_status]
+    return False
 
 
 @router.patch("/api/products/{product_id}", response_model=ProductRecord)

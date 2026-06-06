@@ -15,10 +15,13 @@ USER_PASSWORD = os.environ.get("USER_PASSWORD", "").strip()
 USER_PASSWORD_2 = os.environ.get("USER_PASSWORD_2", "").strip()
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
 AUTH_COOKIE_NAME = "jouri_session"
+EDIT_UNLOCK_COOKIE_NAME = "jouri_edit_unlock"
 SESSION_TTL = 60 * 60 * 24  # 24 saat
+EDIT_UNLOCK_TTL = 60 * 30  # 30 dakika
 EDIT_LOCK_CODE = os.environ.get("EDIT_LOCK_CODE", "").strip()
 
 _sessions: dict[str, float] = {}
+_edit_unlock_sessions: dict[str, float] = {}
 
 _auth_attempts: dict[str, list[float]] = defaultdict(list)
 _AUTH_MAX = 10
@@ -79,11 +82,26 @@ def verify_login(code: str, client_ip: str) -> str | None:
     return _create_session()
 
 
-def verify_edit_lock_code(code: str) -> None:
+def verify_edit_lock_code(code: str) -> str | None:
     if not EDIT_LOCK_CODE:
-        return
+        return None
     if code.strip() != EDIT_LOCK_CODE:
         raise HTTPException(status_code=401, detail={"code": "ERR_WRONG_CODE"})
+    return _create_edit_unlock_session()
+
+
+def is_valid_edit_unlock(token: str | None) -> bool:
+    if not EDIT_LOCK_CODE:
+        return True
+    if not token:
+        return False
+    ts = _edit_unlock_sessions.get(token)
+    if ts is None:
+        return False
+    if time.time() - ts > EDIT_UNLOCK_TTL:
+        _edit_unlock_sessions.pop(token, None)
+        return False
+    return True
 
 
 def _create_session() -> str:
@@ -92,6 +110,15 @@ def _create_session() -> str:
     expired = [t for t, ts in list(_sessions.items()) if time.time() - ts > SESSION_TTL]
     for t in expired:
         _sessions.pop(t, None)
+    return token
+
+
+def _create_edit_unlock_session() -> str:
+    token = secrets.token_urlsafe(32)
+    _edit_unlock_sessions[token] = time.time()
+    expired = [t for t, ts in list(_edit_unlock_sessions.items()) if time.time() - ts > EDIT_UNLOCK_TTL]
+    for t in expired:
+        _edit_unlock_sessions.pop(t, None)
     return token
 
 

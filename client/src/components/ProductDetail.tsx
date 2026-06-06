@@ -88,6 +88,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [unlockCode, setUnlockCode] = useState("");
   const [unlockError, setUnlockError] = useState(false);
   const [unlockBusy, setUnlockBusy] = useState(false);
+  const [showStatusUnlock, setShowStatusUnlock] = useState(false);
   const [sellError, setSellError] = useState("");
   const [showShopifyPreview, setShowShopifyPreview] = useState(false);
   
@@ -104,6 +105,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setEditUnlocked(false);
     setUnlockCode("");
     setUnlockError(false);
+    setShowStatusUnlock(false);
     setSellError("");
     setShowShopifyPreview(false);
 
@@ -114,6 +116,12 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
   function patch(key: keyof Draft, val: string) { setDraft((d) => ({ ...d, [key]: val })); }
   function num(val: string, fb: number) { const n = parseInt(val, 10); return Number.isFinite(n) ? n : fb; }
+  function statusCanMoveWithoutUnlock(from: ProductStatus, to: ProductStatus) {
+    const fromRank = ACTIVE_STATUSES.indexOf(from);
+    const toRank = ACTIVE_STATUSES.indexOf(to);
+    if (fromRank === -1 || toRank === -1) return false;
+    return toRank >= fromRank;
+  }
 
   async function handleSave() {
     const validSizes = sizeRows
@@ -168,7 +176,11 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       const updated = await updateStatus(record.id, status);
       onReplace(updated);
       showToast(t.toastStatusUpdated, "success");
-    } catch { showToast(t.errors.ERR_GENERAL, "error"); }
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      if (code === "ERR_EDIT_LOCK_REQUIRED") setEditUnlocked(false);
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
+    }
     finally { setBusy(false); }
   }
 
@@ -289,6 +301,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
   const isPublishedLocked = (record.status === "published" || record.status === "sold_archive") && !editUnlocked;
   const isImageLocked = (record.status === "ai_enhanced" || record.status === "published" || record.status === "sold_archive") && !editUnlocked;
+  const hasLockedStatusTargets = !isArchive && ACTIVE_STATUSES.some((st) =>
+    st !== record.status && !statusCanMoveWithoutUnlock(record.status, st)
+  );
 
   // Satış için geçerli bedenler (stok > 0)
   const availableSizes = record.sizeStocks.filter((ss) => ss.qty > 0);
@@ -299,7 +314,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setUnlockError(false);
     try {
       const ok = await verifyEditLock(unlockCode);
-      if (ok) { setEditUnlocked(true); setUnlockCode(""); }
+      if (ok) { setEditUnlocked(true); setShowStatusUnlock(false); setUnlockCode(""); }
       else setUnlockError(true);
     } catch { setUnlockError(true); }
     finally { setUnlockBusy(false); }
@@ -553,36 +568,73 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {/* Durum değiştirme */}
                 {!isArchive && (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <h3 className={cn("text-xs font-black uppercase tracking-wide", s.muted)}>{t.changeStatus}</h3>
-                      {record.status === "published" && (
-                        <button type="button" onClick={() => setShowShopifyPreview(true)} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-md transition disabled:opacity-50 shadow-sm">
-                          <ShoppingBag className="size-3" /> {t.shopifyBtn}
-                        </button>
-                      )}
-                    </div>
-                    {isPublishedLocked ? (
-                      <div className={cn("flex items-center gap-2 text-xs font-semibold", s.muted)}>
-                        <Lock className="size-3.5 text-emerald-400 shrink-0" />
-                        {t.editLockedPublished}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {ACTIVE_STATUSES.map((st) => {
-                          const isTransitionAllowed = editUnlocked || record.status === st || 
-                            (record.status === "pending" && st === "ai_enhanced") || 
-                            (record.status === "ai_enhanced" && st === "published");
-                          
-                          return (
-                            <button key={st} type="button" disabled={busy || !isTransitionAllowed} onClick={() => handleStatusChange(st)}
-                              className={cn("rounded-lg border px-3 py-1.5 text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50",
-                                record.status === st ? statusActiveBadge(st, s) : cn(statusBadge(st, s), isTransitionAllowed ? "opacity-60 hover:opacity-100" : "opacity-30 cursor-not-allowed"))}>
-                              {statusLabel(st, locale)}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {hasLockedStatusTargets && (
+                          editUnlocked ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-extrabold text-emerald-400">
+                              <Unlock className="size-3" /> {t.statusUnlocked}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setShowStatusUnlock((v) => !v)}
+                              className={cn("inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-extrabold transition active:scale-95", s.controlGroup, s.controlIdle)}
+                            >
+                              <Lock className="size-3" /> {t.unlockToEdit}
                             </button>
-                          );
-                        })}
+                          )
+                        )}
+                        {record.status === "published" && (
+                          <button type="button" onClick={() => setShowShopifyPreview(true)} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-md transition disabled:opacity-50 shadow-sm">
+                            <ShoppingBag className="size-3" /> {t.shopifyBtn}
+                          </button>
+                        )}
                       </div>
+                    </div>
+                    {showStatusUnlock && !editUnlocked && (
+                      <form onSubmit={handleVerifyUnlock} className="mb-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          value={unlockCode}
+                          onChange={(e) => { setUnlockCode(e.target.value); setUnlockError(false); }}
+                          placeholder={t.unlockCodePlaceholder}
+                          autoComplete="off"
+                          className={cn(
+                            "min-h-10 rounded-xl border px-3 text-sm font-extrabold outline-none focus:ring-4",
+                            s.input,
+                            unlockError && "border-red-400 focus:ring-red-500/15",
+                          )}
+                        />
+                        <button
+                          type="submit"
+                          disabled={unlockBusy || !unlockCode}
+                          className={cn("inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-extrabold transition disabled:opacity-50", s.success)}
+                        >
+                          {unlockBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Unlock className="size-3.5" />}
+                          {t.unlockSubmit}
+                        </button>
+                        {unlockError && (
+                          <p className="text-xs font-semibold text-red-400 sm:col-span-2">{t.unlockWrongCode}</p>
+                        )}
+                        <p className={cn("text-xs font-semibold sm:col-span-2", s.muted)}>{t.statusLockHint}</p>
+                      </form>
                     )}
+                    <div className="flex flex-wrap gap-2">
+                      {ACTIVE_STATUSES.map((st) => {
+                        const isTransitionAllowed = editUnlocked || record.status === st || statusCanMoveWithoutUnlock(record.status, st);
+                        
+                        return (
+                          <button key={st} type="button" disabled={busy || !isTransitionAllowed} onClick={() => handleStatusChange(st)}
+                            className={cn("rounded-lg border px-3 py-1.5 text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50",
+                              record.status === st ? statusActiveBadge(st, s) : cn(statusBadge(st, s), isTransitionAllowed ? "opacity-60 hover:opacity-100" : "opacity-30 cursor-not-allowed"))}>
+                            {statusLabel(st, locale)}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </section>
                 )}
 

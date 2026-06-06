@@ -42,12 +42,22 @@ def auth_check(_: Annotated[None, Depends(verify_access)]):
 @router.post("/api/auth/logout")
 def auth_logout(response: Response):
     response.delete_cookie(auth_service.AUTH_COOKIE_NAME, path="/")
+    response.delete_cookie(auth_service.EDIT_UNLOCK_COOKIE_NAME, path="/")
     return {"ok": True}
 
 
 @router.post("/api/auth/verify-edit-lock")
-def verify_edit_lock(body: AuthRequest, _: Annotated[None, Depends(verify_access)]):
-    auth_service.verify_edit_lock_code(body.code)
+def verify_edit_lock(body: AuthRequest, response: Response, _: Annotated[None, Depends(verify_access)]):
+    token = auth_service.verify_edit_lock_code(body.code)
+    if token:
+        response.set_cookie(
+            auth_service.EDIT_UNLOCK_COOKIE_NAME,
+            token,
+            httponly=True,
+            samesite="lax",
+            secure=auth_service.COOKIE_SECURE,
+            max_age=auth_service.EDIT_UNLOCK_TTL,
+        )
     return {"ok": True}
 
 

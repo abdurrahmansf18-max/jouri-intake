@@ -41,6 +41,8 @@ export const COPY = {
     unlockCodePlaceholder: "Düzenleme kodu",
     unlockSubmit: "Doğrula ve düzenle",
     unlockWrongCode: "Yanlış kilit kodu.",
+    statusLockHint: "Geri durumlara dönmek için kilidi kaldırmalısın; ileri akış serbesttir.",
+    statusUnlocked: "Durum kilidi açık",
     logFieldDescription: "Açıklama",
     editBtn: "Düzenle",
     viewDetails: "Detaylar",
@@ -182,7 +184,7 @@ export const COPY = {
     // Size stocks UI
     sizeStocksLabel: "Bedenler",
     addSizeRow: "+ Beden ekle",
-    sizeNamePlaceholder: "S / M / L / XL",
+    sizeNamePlaceholder: "S / M / L / 2 Years / 6 Months",
     sizeQtyPlaceholder: "Adet",
     selectSizeForSale: "Satılacak beden",
     sizeStockDisplay: (size: string, qty: number) => `${size}: ${qty} adet`,
@@ -196,6 +198,7 @@ export const COPY = {
     errors: {
       ERR_UNAUTHORIZED: "Yetkisiz erişim.",
       ERR_WRONG_CODE: "Yanlış erişim kodu.",
+      ERR_EDIT_LOCK_REQUIRED: "Bu durum değişikliği için kilidi kaldırmalısın.",
       ERR_PRODUCT_NOT_FOUND: "Ürün bulunamadı.",
       ERR_IMAGE_NOT_FOUND: "Görsel bulunamadı.",
       ERR_TITLE_REQUIRED: "Ürün adı zorunludur.",
@@ -342,6 +345,8 @@ export const COPY = {
     unlockCodePlaceholder: "رمز التعديل",
     unlockSubmit: "تحقق والتعديل",
     unlockWrongCode: "رمز القفل خاطئ.",
+    statusLockHint: "للرجوع إلى حالات سابقة يجب فك القفل؛ التقدم للأمام متاح بدون قفل.",
+    statusUnlocked: "قفل الحالة مفتوح",
     logFieldDescription: "الوصف",
     editBtn: "تعديل",
     viewDetails: "التفاصيل",
@@ -483,7 +488,7 @@ export const COPY = {
     // Size stocks UI
     sizeStocksLabel: "المقاسات",
     addSizeRow: "+ إضافة مقاس",
-    sizeNamePlaceholder: "S / M / L / XL",
+    sizeNamePlaceholder: "S / M / L / 2 Years / 6 Months",
     sizeQtyPlaceholder: "الكمية",
     selectSizeForSale: "المقاس المباع",
     sizeStockDisplay: (size: string, qty: number) => `${size}: ${qty} قطعة`,
@@ -497,6 +502,7 @@ export const COPY = {
     errors: {
       ERR_UNAUTHORIZED: "وصول غير مصرح.",
       ERR_WRONG_CODE: "رمز الدخول خاطئ.",
+      ERR_EDIT_LOCK_REQUIRED: "يجب فك القفل لتغيير الحالة بهذا الاتجاه.",
       ERR_PRODUCT_NOT_FOUND: "المنتج غير موجود.",
       ERR_IMAGE_NOT_FOUND: "الصورة غير موجودة.",
       ERR_TITLE_REQUIRED: "اسم المنتج مطلوب.",

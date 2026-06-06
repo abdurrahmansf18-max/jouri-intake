@@ -144,6 +144,21 @@ def build_image_folders(folder_path: Path, folder_name: str, status: str) -> Ima
     )
 
 
+def rebase_image_relative_paths(images: list[dict] | None, folder_name: str, status: str) -> list[dict]:
+    status_dir = _STATUS_DIR_NAMES.get(status, "catalog-drafts")
+    rebased: list[dict] = []
+    for image in images or []:
+        item = dict(image)
+        file_name = Path(str(item.get("fileName", ""))).name
+        folder = item.get("folder") or "originals"
+        if folder not in {"originals", "enhanced", "thumbnails"}:
+            folder = "originals"
+        if file_name:
+            item["relativePath"] = f"products_photo/{status_dir}/{folder_name}/{folder}/{file_name}"
+        rebased.append(item)
+    return rebased
+
+
 def get_next_image_index(images: list[dict]) -> int:
     highest = 0
     for image in images:
