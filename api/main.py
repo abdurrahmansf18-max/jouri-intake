@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 import activity_logger
+import backup_service
 import file_manager
 import shopify
 from database import SessionLocal, get_db
@@ -1030,44 +1031,10 @@ def delete_product_image(
 
 # ── Backup management ─────────────────────────────────────────────────────────
 
-BACKUP_ROOT = Path("/backups")
-
 
 @app.get("/api/backups")
 def get_backups(_: Annotated[None, Depends(verify_access)]):
-    import json as _json
-    import subprocess as _sp
-
-    status_file = BACKUP_ROOT / "status.json"
-    status = {}
-    if status_file.exists():
-        try:
-            status = _json.loads(status_file.read_text())
-        except Exception:
-            pass
-
-    backups = []
-    if BACKUP_ROOT.exists():
-        for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
-            if not entry.is_dir() or not entry.name.startswith("20"):
-                continue
-            backups.append(_backup_entry(entry))
-
-    drive_backups: list[str] = []
-    try:
-        r = _sp.run(
-            ["rclone", "lsf", "gdrive:jouri-backups/", "--dirs-only"],
-            capture_output=True, text=True, timeout=15,
-        )
-        if r.returncode == 0:
-            drive_backups = sorted(
-                [d.rstrip("/") for d in r.stdout.strip().split("\n") if d.strip()],
-                reverse=True,
-            )
-    except Exception:
-        pass
-
-    return {"status": status, "backups": backups, "drive_backups": drive_backups}
+    return backup_service.get_backup_overview()
 
 
 @app.post("/api/backups/run")
@@ -1075,140 +1042,7 @@ def run_backup(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    """Manuel yedekleme: pg_dump db.sql + JSON export + artımlı fotoğraf kopyalama."""
-    import json as _json
-    import shutil as _shutil
-
-    if not BACKUP_ROOT.exists():
-        raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
-
-    now = datetime.now(timezone.utc)
-    date_str = now.strftime("%Y-%m-%d")
-    started_str = now.strftime("%Y-%m-%dT%H:%M:%S")
-
-    today_dir = BACKUP_ROOT / date_str
-    today_dir.mkdir(parents=True, exist_ok=True)
-
-    try:
-        # 1. DB — kritik yedek: PostgreSQL dump (db.sql)
-        db_sql_file = today_dir / "db.sql"
-        db_sql_error = _write_pg_dump(db_sql_file)
-
-        # 2. DB — okunabilir yardımcı export (db.json)
-        products = db.query(Product).all()
-        logs = db.query(ActivityLog).all()
-        db_data = {
-            "exported_at": started_str,
-            "products": [
-                {
-                    "id": p.id,
-                    "created_at": p.created_at.isoformat() if p.created_at else None,
-                    "folder_name": p.folder_name,
-                    "folder_path": p.folder_path,
-                    "description": p.description,
-                    "status": p.status,
-                    "notes": p.notes,
-                    "stock_quantity": p.stock_quantity,
-                    "sold_quantity": p.sold_quantity,
-                    "last_sold_at": p.last_sold_at.isoformat() if p.last_sold_at else None,
-                    "title_raw": p.title_raw,
-                    "category": p.category,
-                    "product_type": p.product_type,
-                    "price_amount": p.price_amount,
-                    "currency": p.currency,
-                    "color_raw": p.color_raw,
-                    "color_german": p.color_german,
-                    "sizes_raw": p.sizes_raw,
-                    "tags": p.tags,
-                    "images": p.images,
-                    "sale_history": p.sale_history,
-                    "size_stocks": p.size_stocks,
-                    "sold_sizes": p.sold_sizes,
-                    "related_products": p.related_products,
-                }
-                for p in products
-            ],
-            "activity_logs": [
-                {
-                    "id": log.id,
-                    "created_at": log.created_at.isoformat() if log.created_at else None,
-                    "action": log.action,
-                    "product_id": log.product_id,
-                    "product_title": log.product_title,
-                    "details": log.details,
-                }
-                for log in logs
-            ],
-        }
-        db_json_file = today_dir / "db.json"
-        db_json_tmp = today_dir / "db.json.tmp"
-        db_json_tmp.write_text(_json.dumps(db_data, ensure_ascii=False, indent=2), encoding="utf-8")
-        db_json_tmp.replace(db_json_file)
-
-        # 3. Fotoğraflar — artımlı kopyalama (sadece yeni/değişen dosyalar)
-        photos_src = Path("/products_photo")
-        photos_dst = today_dir / "products_photo"
-        if photos_src.exists():
-            photos_dst.mkdir(exist_ok=True)
-            for item in photos_src.rglob("*"):
-                if not item.is_file():
-                    continue
-                rel = item.relative_to(photos_src)
-                dst_file = photos_dst / rel
-                dst_file.parent.mkdir(parents=True, exist_ok=True)
-                if not dst_file.exists() or item.stat().st_mtime > dst_file.stat().st_mtime:
-                    _shutil.copy2(item, dst_file)
-
-        # 4. Google Drive upload + verification (rclone)
-        import subprocess as _subprocess
-        drive_ok, drive_error = _copy_backup_to_drive(today_dir, date_str)
-
-        # 5. status.json güncelle
-        db_sql_size = _dir_size(db_sql_file)
-        db_json_size = _dir_size(db_json_file)
-        img_size = _dir_size(photos_dst) if photos_dst.exists() else "-"
-
-        backups_list = []
-        for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
-            if not entry.is_dir() or not entry.name.startswith("20"):
-                continue
-            backups_list.append(_backup_entry(entry))
-
-        status_data: dict = {
-            "last_run": started_str,
-            "last_date": date_str,
-            "last_db_size": db_sql_size,
-            "last_db_sql_size": db_sql_size,
-            "last_db_json_size": db_json_size,
-            "last_db_sql_error": db_sql_error,
-            "last_img_size": img_size,
-            "drive_ok": drive_ok,
-            "drive_error": drive_error,
-            "backups": backups_list,
-        }
-        (BACKUP_ROOT / "status.json").write_text(
-            _json.dumps(status_data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-
-        drive_backups: list[str] = []
-        try:
-            dr = _subprocess.run(
-                ["rclone", "lsf", "gdrive:jouri-backups/", "--dirs-only"],
-                capture_output=True, text=True, timeout=15,
-            )
-            if dr.returncode == 0:
-                drive_backups = sorted(
-                    [d.rstrip("/") for d in dr.stdout.strip().split("\n") if d.strip()],
-                    reverse=True,
-                )
-        except Exception:
-            pass
-
-        return {"status": status_data, "backups": backups_list, "drive_backups": drive_backups}
-
-    except Exception as exc:
-        print(f"[backup] Manuel yedekleme hatası: {exc}")
-        raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
+    return backup_service.run_manual_backup(db)
 
 
 @app.delete("/api/backups/{date}")
@@ -1216,20 +1050,7 @@ def delete_backup(
     date: str,
     _: Annotated[None, Depends(verify_access)],
 ):
-    import re as _re
-    import shutil as _shutil
-
-    if not _re.match(r"^\d{4}-\d{2}-\d{2}$", date):
-        raise HTTPException(status_code=400, detail={"code": "ERR_GENERAL"})
-
-    backup_dir = BACKUP_ROOT / date
-    if not backup_dir.exists():
-        raise HTTPException(status_code=404, detail={"code": "ERR_PRODUCT_NOT_FOUND"})
-
-    # Local sil (Drive'a dokunma — Drive'da tüm yedekler korunur)
-    _shutil.rmtree(str(backup_dir))
-
-    return {"ok": True}
+    return backup_service.delete_local_backup(date)
 
 
 @app.delete("/api/backups/drive/{date}")
@@ -1237,197 +1058,7 @@ def delete_drive_backup(
     date: str,
     _: Annotated[None, Depends(verify_access)],
 ):
-    import re as _re
-    import subprocess as _sp
-
-    if not _re.match(r"^\d{4}-\d{2}-\d{2}$", date):
-        raise HTTPException(status_code=400, detail={"code": "ERR_GENERAL"})
-
-    try:
-        _sp.run(
-            ["rclone", "purge", f"gdrive:jouri-backups/{date}", "--quiet"],
-            capture_output=True, timeout=30,
-        )
-    except Exception:
-        raise HTTPException(status_code=500, detail={"code": "ERR_GENERAL"})
-
-    return {"ok": True}
-
-
-def _dir_size(path) -> str:
-    from pathlib import Path as P
-    p = P(path)
-    if not p.exists():
-        return "-"
-    if p.is_file():
-        size = p.stat().st_size
-    else:
-        size = sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
-    for unit in ["B", "KB", "MB", "GB"]:
-        if size < 1024:
-            return f"{size:.1f} {unit}"
-        size /= 1024
-    return f"{size:.1f} TB"
-
-
-def _backup_entry(entry: Path) -> dict:
-    db_sql = entry / "db.sql"
-    db_json = entry / "db.json"
-    primary = db_sql if db_sql.exists() else db_json
-    return {
-        "date": entry.name,
-        "db_size": _dir_size(primary),
-        "db_sql_size": _dir_size(db_sql),
-        "db_json_size": _dir_size(db_json),
-        "img_size": _dir_size(entry / "products_photo"),
-        "db_primary": "db.sql" if db_sql.exists() else "db.json",
-    }
-
-
-def _write_pg_dump(target: Path) -> str | None:
-    import subprocess as _sp
-    from urllib.parse import unquote, urlparse
-
-    database_url = os.environ.get(
-        "DATABASE_URL",
-        "postgresql://jouri:jouri@db:5432/jouri",
-    )
-    parsed = urlparse(database_url)
-    db_name = unquote((parsed.path or "").lstrip("/") or "jouri")
-    db_user = unquote(parsed.username or "jouri")
-    db_password = unquote(parsed.password or "")
-    db_host = parsed.hostname or "db"
-    db_port = str(parsed.port or 5432)
-
-    tmp_target = target.with_suffix(target.suffix + ".tmp")
-    tmp_target.unlink(missing_ok=True)
-    env = os.environ.copy()
-    if db_password:
-        env["PGPASSWORD"] = db_password
-
-    try:
-        result = _sp.run(
-            [
-                "pg_dump",
-                "-h", db_host,
-                "-p", db_port,
-                "-U", db_user,
-                "-d", db_name,
-                "-f", str(tmp_target),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env,
-        )
-    except FileNotFoundError:
-        tmp_target.unlink(missing_ok=True)
-        return "pg_dump komutu bulunamadı; SQL yedeği üretilemedi."
-    except _sp.TimeoutExpired:
-        tmp_target.unlink(missing_ok=True)
-        return "pg_dump zaman aşımına uğradı; SQL yedeği üretilemedi."
-
-    if result.returncode != 0:
-        tmp_target.unlink(missing_ok=True)
-        compact = " ".join((result.stderr or result.stdout or "").split())
-        return (compact[:240] if compact else f"pg_dump çıkış kodu {result.returncode}; SQL yedeği üretilemedi.")
-
-    tmp_target.replace(target)
-    return None
-
-
-def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | None]:
-    import subprocess as _sp
-
-    remote = f"gdrive:jouri-backups/{date_str}"
-    common_flags = [
-        "--timeout", "5m",
-        "--contimeout", "30s",
-        "--retries", "3",
-        "--retries-sleep", "20s",
-        "--low-level-retries", "10",
-        "--tpslimit", "4",
-        "--tpslimit-burst", "4",
-    ]
-
-    try:
-        copy_result = _sp.run(
-            [
-                "rclone", "copy", str(source_dir), remote,
-                "--create-empty-src-dirs",
-                "--fast-list",
-                "--transfers", "2",
-                "--checkers", "2",
-                "--stats", "30s",
-                *common_flags,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=900,
-        )
-    except FileNotFoundError:
-        return False, "rclone komutu bulunamadı."
-    except _sp.TimeoutExpired as exc:
-        return False, _summarize_rclone_error(_timeout_output(exc) or "rclone copy zaman aşımına uğradı.")
-
-    if copy_result.returncode != 0:
-        return False, _summarize_rclone_error(
-            copy_result.stderr or copy_result.stdout or f"rclone copy exit code {copy_result.returncode}"
-        )
-
-    try:
-        check_result = _sp.run(
-            [
-                "rclone", "check", str(source_dir), remote,
-                "--one-way",
-                "--size-only",
-                *common_flags,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=600,
-        )
-    except _sp.TimeoutExpired as exc:
-        return False, _summarize_rclone_error(_timeout_output(exc) or "rclone check zaman aşımına uğradı.")
-
-    if check_result.returncode != 0:
-        message = _summarize_rclone_error(
-            check_result.stderr or check_result.stdout or f"rclone check exit code {check_result.returncode}"
-        )
-        return False, f"Drive doğrulaması başarısız: {message}"
-
-    return True, None
-
-
-def _timeout_output(exc) -> str:
-    output = ""
-    for part in (getattr(exc, "stderr", None), getattr(exc, "stdout", None)):
-        if isinstance(part, bytes):
-            output += part.decode("utf-8", errors="ignore")
-        elif isinstance(part, str):
-            output += part
-    return output
-
-
-def _summarize_rclone_error(output: str) -> str:
-    text = (output or "").strip()
-    compact = " ".join(text.split())
-    lower = compact.lower()
-
-    if "rate_limit_exceeded" in lower or "ratelimitexceeded" in lower or "quota exceeded" in lower:
-        return "Google Drive API kota limiti aşıldı (RATE_LIMIT_EXCEEDED)."
-    if "read-only file system" in lower or "failed to save config" in lower:
-        return "rclone yapılandırma klasörü yazılabilir değil."
-    if "invalid_grant" in lower or "token" in lower and "expired" in lower:
-        return "Google Drive yetki anahtarı yenilenmeli."
-    if "couldn't find root directory" in lower or "directory not found" in lower:
-        return "Google Drive hedef klasörü bulunamadı."
-    if "config file" in lower or "failed to create file system" in lower:
-        return "rclone yapılandırması okunamadı."
-    if "zaman aşımına" in lower or "timeout" in lower or "timed out" in lower:
-        return "Google Drive senkronu zaman aşımına uğradı."
-
-    return compact[:240] if compact else "Google Drive senkronu başarısız oldu."
+    return backup_service.delete_drive_backup(date)
 
 
 # ── Activity logs ─────────────────────────────────────────────────────────────
