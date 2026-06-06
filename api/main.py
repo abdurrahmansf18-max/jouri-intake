@@ -1,14 +1,9 @@
 import json
-import os
-import secrets
-import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
-import pyotp
-from collections import defaultdict
 from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -16,11 +11,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 import activity_logger
+import auth_service
 import backup_service
 import file_manager
+import log_service
 import shopify
 from database import SessionLocal, get_db
-from db_models import ActivityLog, Product
+from db_models import Product
 from models import (
     AuthRequest,
     ParseRequest,
@@ -40,17 +37,6 @@ from models import (
     UpdateRelatedRequest,
 )
 from parser import parse_description, parse_description_ai
-
-TOTP_SECRET = os.environ.get("TOTP_SECRET", "").strip()
-USER_PASSWORD = os.environ.get("USER_PASSWORD", "").strip()
-USER_PASSWORD_2 = os.environ.get("USER_PASSWORD_2", "").strip()
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
-AUTH_COOKIE_NAME = "jouri_session"
-SESSION_TTL = 60 * 60 * 24  # 24 saat
-EDIT_LOCK_CODE = os.environ.get("EDIT_LOCK_CODE", "").strip()
-
-# Bellek içi oturum deposu: {token: oluşturulma_zamanı}
-_sessions: dict[str, float] = {}
 
 
 # ── WebSocket bağlantı yöneticisi ─────────────────────────────────────────────
@@ -78,28 +64,6 @@ class ConnectionManager:
             self.disconnect(ws)
 
 ws_manager = ConnectionManager()
-
-
-def _create_session() -> str:
-    token = secrets.token_urlsafe(32)
-    _sessions[token] = time.time()
-    # Süresi dolmuş oturumları temizle
-    expired = [t for t, ts in list(_sessions.items()) if time.time() - ts > SESSION_TTL]
-    for t in expired:
-        _sessions.pop(t, None)
-    return token
-
-
-def _is_valid_session(token: str | None) -> bool:
-    if not token:
-        return False
-    ts = _sessions.get(token)
-    if ts is None:
-        return False
-    if time.time() - ts > SESSION_TTL:
-        _sessions.pop(token, None)
-        return False
-    return True
 
 
 # ── Startup helpers (defined before lifespan so they are in scope) ────────────
@@ -227,22 +191,6 @@ async def lifespan(_: FastAPI):
     yield
 
 
-# Auth endpoint rate limiter: IP başına 10 deneme / 60 saniye, sonra 5 dk ban
-_auth_attempts: dict[str, list[float]] = defaultdict(list)
-_AUTH_MAX = 10
-_AUTH_WINDOW = 60
-_AUTH_LOCKOUT = 300
-
-def _auth_rate_ok(ip: str) -> bool:
-    now = time.time()
-    attempts = [t for t in _auth_attempts[ip] if now - t < _AUTH_WINDOW]
-    _auth_attempts[ip] = attempts
-    if len(attempts) >= _AUTH_MAX:
-        return False
-    attempts.append(now)
-    return True
-
-
 app = FastAPI(title="Jouri Intake API", lifespan=lifespan, docs_url=None, redoc_url=None)
 
 app.add_middleware(
@@ -259,10 +207,7 @@ app.add_middleware(
 def verify_access(
     jouri_session: Annotated[str | None, Cookie()] = None,
 ):
-    if not TOTP_SECRET:
-        return  # Auth yapılandırılmamış, serbest
-    if not _is_valid_session(jouri_session):
-        raise HTTPException(status_code=401, detail={"code": "ERR_UNAUTHORIZED"})
+    auth_service.verify_access_token(jouri_session)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -313,60 +258,25 @@ def _get_or_404(db: Session, product_id: str) -> Product:
 
 @app.post("/api/auth/verify")
 def auth_verify(body: AuthRequest, response: Response, request: Request):
-    # Auth yapılandırılmamışsa serbest geç
-    if not TOTP_SECRET and not USER_PASSWORD:
+    client_ip = (request.client.host if request.client else "unknown")
+    token = auth_service.verify_login(body.code, client_ip)
+    if token is None:
         return {"ok": True}
 
-    client_ip = (request.client.host if request.client else "unknown")
-    if not _auth_rate_ok(client_ip):
-        raise HTTPException(status_code=429, detail={"code": "ERR_RATE_LIMITED"})
-
-    code = body.code.strip()
-
-    # TOTP kontrolü (6 haneli sayı)
-    totp_ok = False
-    if TOTP_SECRET and code.isdigit() and len(code) == 6:
-        totp_ok = pyotp.TOTP(TOTP_SECRET).verify(code, valid_window=1)
-
-    # Sabit şifre kontrolü
-    pw1_ok = bool(USER_PASSWORD and code == USER_PASSWORD)
-    pw2_ok = bool(USER_PASSWORD_2 and code == USER_PASSWORD_2)
-    password_ok = pw1_ok or pw2_ok
-
-    if not totp_ok and not password_ok:
-        raise HTTPException(status_code=401, detail={"code": "ERR_WRONG_CODE"})
-
-    # Giriş yapan kullanıcıyı logla
-    if totp_ok:
-        login_user = "TOTP"
-    elif pw1_ok:
-        login_user = "Kullanıcı 1"
-    else:
-        login_user = "Kullanıcı 2"
-
-    try:
-        log_db = SessionLocal()
-        activity_logger.log(log_db, "login", product_id=None, product_title=None, details={"user": login_user})
-        log_db.commit()
-        log_db.close()
-    except Exception:
-        pass  # Loglama hatası girişi engellemez
-
-    token = _create_session()
     response.set_cookie(
-        AUTH_COOKIE_NAME,
+        auth_service.AUTH_COOKIE_NAME,
         token,
         httponly=True,
         samesite="lax",
-        secure=COOKIE_SECURE,
-        max_age=SESSION_TTL,
+        secure=auth_service.COOKIE_SECURE,
+        max_age=auth_service.SESSION_TTL,
     )
     return {"ok": True}
 
 
 @app.get("/api/auth/required")
 def auth_required():
-    return {"required": bool(TOTP_SECRET)}
+    return {"required": auth_service.is_auth_required()}
 
 
 @app.get("/api/auth/check")
@@ -376,16 +286,13 @@ def auth_check(_: Annotated[None, Depends(verify_access)]):
 
 @app.post("/api/auth/logout")
 def auth_logout(response: Response):
-    response.delete_cookie(AUTH_COOKIE_NAME, path="/")
+    response.delete_cookie(auth_service.AUTH_COOKIE_NAME, path="/")
     return {"ok": True}
 
 
 @app.post("/api/auth/verify-edit-lock")
 def verify_edit_lock(body: AuthRequest, _: Annotated[None, Depends(verify_access)]):
-    if not EDIT_LOCK_CODE:
-        return {"ok": True}
-    if body.code.strip() != EDIT_LOCK_CODE:
-        raise HTTPException(status_code=401, detail={"code": "ERR_WRONG_CODE"})
+    auth_service.verify_edit_lock_code(body.code)
     return {"ok": True}
 
 
@@ -394,7 +301,7 @@ async def websocket_endpoint(
     ws: WebSocket,
     jouri_session: Annotated[str | None, Cookie()] = None,
 ):
-    if TOTP_SECRET and not _is_valid_session(jouri_session):
+    if auth_service.is_auth_required() and not auth_service.is_valid_session(jouri_session):
         await ws.close(code=4001)
         return
     await ws_manager.connect(ws)
@@ -1069,28 +976,7 @@ def get_logs(
     db: Session = Depends(get_db),
     limit: int = Query(default=50, le=200),
 ):
-    # 7 günden eski logları otomatik sil
-    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-    db.query(ActivityLog).filter(ActivityLog.created_at < cutoff).delete()
-    db.commit()
-
-    logs = (
-        db.query(ActivityLog)
-        .order_by(ActivityLog.created_at.desc())
-        .limit(limit)
-        .all()
-    )
-    return [
-        {
-            "id": log.id,
-            "created_at": log.created_at.isoformat(),
-            "action": log.action,
-            "product_id": log.product_id,
-            "product_title": log.product_title,
-            "details": log.details,
-        }
-        for log in logs
-    ]
+    return log_service.list_logs(db, limit)
 
 
 @app.delete("/api/logs/{log_id}")
@@ -1099,9 +985,4 @@ def delete_log(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    log = db.query(ActivityLog).filter(ActivityLog.id == log_id).first()
-    if not log:
-        raise HTTPException(status_code=404, detail={"code": "ERR_PRODUCT_NOT_FOUND"})
-    db.delete(log)
-    db.commit()
-    return {"ok": True}
+    return log_service.delete_log(db, log_id)
