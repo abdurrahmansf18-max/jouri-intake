@@ -3,24 +3,23 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 import activity_logger
-import auth_service
-import backup_service
+import auth_routes
+import backup_routes
 import file_manager
-import log_service
+import log_routes
+import parse_routes
 import product_service
 import shopify
 import startup_service
 from database import get_db
 from db_models import Product
 from models import (
-    AuthRequest,
-    ParseRequest,
     ProductRecord,
     ProductUpdateRequest,
     ResetSalesRequest,
@@ -30,34 +29,9 @@ from models import (
     StatusUpdateRequest,
     UpdateRelatedRequest,
 )
-from parser import parse_description, parse_description_ai
-
-
-# ── WebSocket bağlantı yöneticisi ─────────────────────────────────────────────
-
-class ConnectionManager:
-    def __init__(self) -> None:
-        self._conns: list[WebSocket] = []
-
-    async def connect(self, ws: WebSocket) -> None:
-        await ws.accept()
-        self._conns.append(ws)
-
-    def disconnect(self, ws: WebSocket) -> None:
-        if ws in self._conns:
-            self._conns.remove(ws)
-
-    async def broadcast(self, data: dict) -> None:
-        dead: list[WebSocket] = []
-        for ws in list(self._conns):
-            try:
-                await ws.send_json(data)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            self.disconnect(ws)
-
-ws_manager = ConnectionManager()
+from dependencies import verify_access
+from parser import parse_description
+from realtime import ws_manager
 
 
 @asynccontextmanager
@@ -77,81 +51,10 @@ app.add_middleware(
 )
 
 
-# ── Auth guard ────────────────────────────────────────────────────────────────
-
-def verify_access(
-    jouri_session: Annotated[str | None, Cookie()] = None,
-):
-    auth_service.verify_access_token(jouri_session)
-
-
-# ── Auth endpoints ────────────────────────────────────────────────────────────
-
-@app.post("/api/auth/verify")
-def auth_verify(body: AuthRequest, response: Response, request: Request):
-    client_ip = (request.client.host if request.client else "unknown")
-    token = auth_service.verify_login(body.code, client_ip)
-    if token is None:
-        return {"ok": True}
-
-    response.set_cookie(
-        auth_service.AUTH_COOKIE_NAME,
-        token,
-        httponly=True,
-        samesite="lax",
-        secure=auth_service.COOKIE_SECURE,
-        max_age=auth_service.SESSION_TTL,
-    )
-    return {"ok": True}
-
-
-@app.get("/api/auth/required")
-def auth_required():
-    return {"required": auth_service.is_auth_required()}
-
-
-@app.get("/api/auth/check")
-def auth_check(_: Annotated[None, Depends(verify_access)]):
-    return {"authed": True}
-
-
-@app.post("/api/auth/logout")
-def auth_logout(response: Response):
-    response.delete_cookie(auth_service.AUTH_COOKIE_NAME, path="/")
-    return {"ok": True}
-
-
-@app.post("/api/auth/verify-edit-lock")
-def verify_edit_lock(body: AuthRequest, _: Annotated[None, Depends(verify_access)]):
-    auth_service.verify_edit_lock_code(body.code)
-    return {"ok": True}
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(
-    ws: WebSocket,
-    jouri_session: Annotated[str | None, Cookie()] = None,
-):
-    if auth_service.is_auth_required() and not auth_service.is_valid_session(jouri_session):
-        await ws.close(code=4001)
-        return
-    await ws_manager.connect(ws)
-    try:
-        while True:
-            await ws.receive_text()
-    except WebSocketDisconnect:
-        ws_manager.disconnect(ws)
-
-
-# ── AI Parsing ────────────────────────────────────────────────────────────────
-
-@app.post("/api/parse-product")
-async def parse_product_text(
-    req: ParseRequest,
-    _: Annotated[None, Depends(verify_access)]
-):
-    result = await parse_description_ai(req.text)
-    return result
+app.include_router(auth_routes.router)
+app.include_router(parse_routes.router)
+app.include_router(backup_routes.router)
+app.include_router(log_routes.router)
 
 # ── Products ──────────────────────────────────────────────────────────────────
 
@@ -765,55 +668,3 @@ def delete_product_image(
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
-
-
-# ── Backup management ─────────────────────────────────────────────────────────
-
-
-@app.get("/api/backups")
-def get_backups(_: Annotated[None, Depends(verify_access)]):
-    return backup_service.get_backup_overview()
-
-
-@app.post("/api/backups/run")
-def run_backup(
-    _: Annotated[None, Depends(verify_access)],
-    db: Session = Depends(get_db),
-):
-    return backup_service.run_manual_backup(db)
-
-
-@app.delete("/api/backups/{date}")
-def delete_backup(
-    date: str,
-    _: Annotated[None, Depends(verify_access)],
-):
-    return backup_service.delete_local_backup(date)
-
-
-@app.delete("/api/backups/drive/{date}")
-def delete_drive_backup(
-    date: str,
-    _: Annotated[None, Depends(verify_access)],
-):
-    return backup_service.delete_drive_backup(date)
-
-
-# ── Activity logs ─────────────────────────────────────────────────────────────
-
-@app.get("/api/logs")
-def get_logs(
-    _: Annotated[None, Depends(verify_access)],
-    db: Session = Depends(get_db),
-    limit: int = Query(default=50, le=200),
-):
-    return log_service.list_logs(db, limit)
-
-
-@app.delete("/api/logs/{log_id}")
-def delete_log(
-    log_id: int,
-    _: Annotated[None, Depends(verify_access)],
-    db: Session = Depends(get_db),
-):
-    return log_service.delete_log(db, log_id)
