@@ -13,6 +13,7 @@ import auth_service
 import backup_service
 import file_manager
 import log_service
+import product_service
 import shopify
 import startup_service
 from database import get_db
@@ -20,18 +21,12 @@ from db_models import Product
 from models import (
     AuthRequest,
     ParseRequest,
-    ParsedProduct,
     ProductRecord,
-    ProductStatus,
     ProductUpdateRequest,
     ResetSalesRequest,
     RestoreProductRequest,
     RestoreSizeRequest,
-    SaleRecord,
-    SavedImage,
     SellProductRequest,
-    SizeStock,
-    SoldSizeEntry,
     StatusUpdateRequest,
     UpdateRelatedRequest,
 )
@@ -88,50 +83,6 @@ def verify_access(
     jouri_session: Annotated[str | None, Cookie()] = None,
 ):
     auth_service.verify_access_token(jouri_session)
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _to_record(p: Product) -> ProductRecord:
-    from pathlib import Path
-    folder_path = Path(p.folder_path)
-    image_folders = file_manager.build_image_folders(folder_path, p.folder_name, p.status)
-    return ProductRecord(
-        id=p.id,
-        createdAt=p.created_at.isoformat(),
-        folderName=p.folder_name,
-        folderPath=p.folder_path,
-        imageFolders=image_folders,
-        description=p.description,
-        parsed=ParsedProduct(
-            titleRaw=p.title_raw,
-            categorySuggestion=p.category,
-            productTypeSuggestion=p.product_type,
-            priceAmount=p.price_amount,
-            currency=p.currency,
-            colorRaw=p.color_raw,
-            colorGermanSuggestion=p.color_german,
-            sizesRaw=p.sizes_raw,
-            tags=p.tags or [],
-        ),
-        images=[SavedImage(**img) for img in (p.images or [])],
-        status=ProductStatus(p.status),
-        notes=p.notes or "",
-        stockQuantity=max(0, p.stock_quantity),
-        soldQuantity=max(0, p.sold_quantity),
-        lastSoldAt=p.last_sold_at.isoformat() if p.last_sold_at else None,
-        saleHistory=[SaleRecord(**s) for s in (p.sale_history or [])],
-        sizeStocks=[SizeStock(**ss) for ss in (p.size_stocks or [])],
-        soldSizes=[SoldSizeEntry(**ss) for ss in (p.sold_sizes or [])],
-        relatedProducts=list(p.related_products or []),
-    )
-
-
-def _get_or_404(db: Session, product_id: str) -> Product:
-    p = db.query(Product).filter(Product.id == product_id).first()
-    if not p:
-        raise HTTPException(status_code=404, detail={"code": "ERR_PRODUCT_NOT_FOUND"})
-    return p
 
 
 # ── Auth endpoints ────────────────────────────────────────────────────────────
@@ -210,7 +161,7 @@ def get_products(
     db: Session = Depends(get_db),
 ):
     products = db.query(Product).order_by(Product.created_at.desc()).all()
-    return [_to_record(p) for p in products]
+    return [product_service.to_record(p) for p in products]
 
 
 @app.post("/api/products", response_model=ProductRecord)
@@ -309,7 +260,7 @@ async def create_product(
     )
     db.commit()
     db.refresh(product)
-    return _to_record(product)
+    return product_service.to_record(product)
 
 
 @app.patch("/api/products/{product_id}/status", response_model=ProductRecord)
@@ -320,7 +271,7 @@ def update_status(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     old_status = p.status
     new_status = body.status.value
 
@@ -344,7 +295,7 @@ def update_status(
     )
     db.commit()
     db.refresh(p)
-    record = _to_record(p)
+    record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
@@ -357,7 +308,7 @@ def update_product(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
 
     # Değişiklikleri takip et
     changes: dict[str, dict] = {}
@@ -411,7 +362,7 @@ def update_product(
     )
     db.commit()
     db.refresh(p)
-    record = _to_record(p)
+    record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
@@ -424,7 +375,7 @@ def sell_product(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     quantity = max(1, int(body.quantity))
     size_stocks = list(p.size_stocks or [])
     now = datetime.now(timezone.utc)
@@ -490,7 +441,7 @@ def sell_product(
     )
     db.commit()
     db.refresh(p)
-    record = _to_record(p)
+    record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
@@ -503,7 +454,7 @@ def reset_sales(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     p.sold_quantity = 0
     p.last_sold_at = None
     p.sale_history = []
@@ -523,7 +474,7 @@ def reset_sales(
     activity_logger.log(db, "reset_sales", product_id=p.id, product_title=p.title_raw)
     db.commit()
     db.refresh(p)
-    record = _to_record(p)
+    record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
@@ -536,7 +487,7 @@ def restore_product(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, "pending")
     p.folder_path = new_path
     p.status = "pending"
@@ -562,7 +513,7 @@ def restore_product(
     )
     db.commit()
     db.refresh(p)
-    record = _to_record(p)
+    record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
@@ -576,7 +527,7 @@ def restore_product_size(
     db: Session = Depends(get_db),
 ):
     """Satılan belirli bir bedeni geri alır (iade)."""
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     size_name = body.size.strip()
 
     sold = list(p.sold_sizes or [])
@@ -613,7 +564,7 @@ def restore_product_size(
     )
     db.commit()
     db.refresh(p)
-    record = _to_record(p)
+    record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
@@ -627,7 +578,7 @@ def update_related_products(
     db: Session = Depends(get_db),
 ):
     """Renk varyantlarını çift yönlü günceller."""
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
 
     new_ids = [rid for rid in body.relatedIds if rid != product_id]  # kendini ekleme
 
@@ -667,9 +618,9 @@ def update_related_products(
     for aff in affected:
         db.refresh(aff)
 
-    record = _to_record(p)
+    record = product_service.to_record(p)
     for aff in affected:
-        aff_rec = _to_record(aff)
+        aff_rec = product_service.to_record(aff)
         background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": aff_rec.model_dump(mode="json")})
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
 
@@ -686,7 +637,7 @@ async def add_product_images(
     if not images:
         raise HTTPException(status_code=422, detail={"code": "ERR_IMAGE_REQUIRED"})
 
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     existing = list(p.images or [])
     next_idx = file_manager.get_next_image_index(existing)
 
@@ -706,7 +657,7 @@ async def add_product_images(
     )
     db.commit()
     db.refresh(p)
-    record = _to_record(p)
+    record = product_service.to_record(p)
     await ws_manager.broadcast({"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
@@ -718,15 +669,15 @@ async def push_product_to_shopify(
     _: Annotated[None, Depends(verify_access)] = None,
     db: Session = Depends(get_db)
 ):
-    p = _get_or_404(db, product_id)
-    record = _to_record(p)
+    p = product_service.get_or_404(db, product_id)
+    record = product_service.to_record(p)
     
     try:
         res = await shopify.push_to_shopify(record.model_dump(), record.images)
         p.notes = (p.notes or "") + f"\n[Shopify] Product ID: {res.get('product', {}).get('id')}"
         db.commit()
         db.refresh(p)
-        record = _to_record(p)
+        record = product_service.to_record(p)
         await ws_manager.broadcast({"type": "product_updated", "product": record.model_dump(mode="json")})
         return record
     except Exception as e:
@@ -740,7 +691,7 @@ def delete_product(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     title = p.title_raw or product_id
     folder_path = p.folder_path
 
@@ -774,7 +725,7 @@ def product_image(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     try:
         path = file_manager.resolve_image_path(p.folder_path, kind, file_name)
         return FileResponse(path)
@@ -791,7 +742,7 @@ def delete_product_image(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
 ):
-    p = _get_or_404(db, product_id)
+    p = product_service.get_or_404(db, product_id)
     try:
         path = file_manager.resolve_image_path(p.folder_path, kind, file_name)
         path.unlink()
@@ -811,7 +762,7 @@ def delete_product_image(
                         details={"changed": {"image_deleted": {"from": file_name, "to": ""}}})
     db.commit()
     db.refresh(p)
-    record = _to_record(p)
+    record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
