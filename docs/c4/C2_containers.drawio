@@ -1,0 +1,153 @@
+<mxfile host="65bd71144e">
+    <diagram id="c2-containers" name="C2 - Containers">
+        <mxGraphModel dx="1910" dy="851" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1150" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Jouri Intake - C2 Container Diagram" style="text;html=1;strokeColor=none;fillColor=none;fontSize=26;fontStyle=1;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="25" width="740" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="browser" value="Browser&#xa;Mobile/Desktop&#xa;React SPA user interface" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="530" width="240" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend" value="Color legend&#xa;Blue: browser/client traffic&#xa;Purple: proxy/app routing&#xa;Yellow: AI/parser flow&#xa;Green: database, storage, Drive, Shopify&#xa;Gray: config/runtime support" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=13;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="150" width="280" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="boundary" value="VPS / Docker Runtime" style="swimlane;html=1;whiteSpace=wrap;startSize=32;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="112.5" width="1080" height="880" as="geometry"/>
+                </mxCell>
+                <mxCell id="caddy" value="Caddy Reverse Proxy&#xa;HTTPS, headers, route /api/* and /ws to API, client to static UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" parent="boundary" vertex="1">
+                    <mxGeometry x="70" y="67.5" width="280" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="client" value="Client Container&#xa;React + Vite&#xa;Pages: Dashboard, Add, Products, Archive, Backup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" parent="boundary" vertex="1">
+                    <mxGeometry x="60" y="335" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="api" value="API Container&#xa;FastAPI + SQLAlchemy&#xa;Auth, product, stock, image, backup, parser, logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;" parent="boundary" vertex="1">
+                    <mxGeometry x="450" y="377.5" width="310" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="db" value="PostgreSQL Container&#xa;postgres:16-alpine&#xa;products, activity_logs, JSON stock/image fields" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" parent="boundary" vertex="1">
+                    <mxGeometry x="870" y="95" width="180" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="ollama" value="Ollama Container&#xa;gemma3:4b-it-qat&#xa;Local AI fallback, internal port 11434 only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" parent="boundary" vertex="1">
+                    <mxGeometry x="890" y="280" width="180" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="photos" value="products_photo Volume/Directory&#xa;Originals, thumbnails, enhanced images&#xa;Mounted at /products_photo" style="shape=folder;tabWidth=40;tabHeight=14;tabPosition=left;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" parent="boundary" vertex="1">
+                    <mxGeometry x="450" y="647.5" width="260" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="backups" value="backups Volume/Directory&#xa;db.sql, db.json, products_photo copy, status.json&#xa;Mounted at /backups" style="shape=folder;tabWidth=40;tabHeight=14;tabPosition=left;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" parent="boundary" vertex="1">
+                    <mxGeometry x="760" y="710" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="rclone" value="rclone config mount&#xa;/root/.config/rclone&#xa;Google Drive remote credentials" style="shape=folder;tabWidth=40;tabHeight=14;tabPosition=left;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" parent="boundary" vertex="1">
+                    <mxGeometry x="60" y="725" width="250" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" value="serves SPA" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" parent="boundary" source="caddy" target="client" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="200" y="260"/>
+                            <mxPoint x="200" y="305"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3" value="/api/* and /ws" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" parent="boundary" source="caddy" target="api" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="390" y="150"/>
+                            <mxPoint x="390" y="395"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e4" value="fetch API + WebSocket" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" parent="boundary" source="client" target="api" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="390" y="395"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e5" value="SQLAlchemy / psycopg2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="boundary" source="api" target="db" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="810" y="395"/>
+                            <mxPoint x="810" y="190"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e6" value="OpenAI-compatible API" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#d6b656;fontColor=#b7791f;" parent="boundary" source="api" target="ollama" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="810" y="420"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e7" value="read/write images" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="boundary" source="api" target="photos" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="605" y="525"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e8" value="write local backups" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="boundary" source="api" target="backups" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="660" y="540"/>
+                            <mxPoint x="900" y="540"/>
+                            <mxPoint x="900" y="675"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e9" value="uses rclone config" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#777777;fontColor=#777777;" parent="boundary" source="api" target="rclone" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="395" y="650"/>
+                            <mxPoint x="185" y="650"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="gemini" value="Google Gemini API&#xa;External AI primary provider" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1585" y="210" width="245" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="gdrive" value="Google Drive&#xa;External backup target&#xa;jouri-backups folders" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1585" y="500" width="245" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="shopify" value="Shopify Admin API&#xa;External product publishing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1585" y="760" width="245" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" parent="1" source="browser" target="caddy" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="330" y="583"/>
+                            <mxPoint x="330" y="258"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e10" value="Gemini first" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#d6b656;fontColor=#b7791f;" parent="1" source="api" target="gemini" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1240" y="505"/>
+                            <mxPoint x="1240" y="180"/>
+                            <mxPoint x="1535" y="180"/>
+                            <mxPoint x="1535" y="257"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e11" value="rclone copy + check" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="1" source="api" target="gdrive" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1260" y="505"/>
+                            <mxPoint x="1260" y="553"/>
+                            <mxPoint x="1535" y="553"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e12" value="push product" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="1" source="api" target="shopify" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1240" y="505"/>
+                            <mxPoint x="1240" y="808"/>
+                            <mxPoint x="1535" y="808"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

@@ -1,0 +1,91 @@
+<mxfile host="app.diagrams.net" modified="2026-06-06T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+    <diagram id="c1-context" name="C1 - System Context">
+        <mxGraphModel dx="3017" dy="1751" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1050" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Jouri Intake - C1 System Context" style="text;html=1;strokeColor=none;fillColor=none;fontSize=26;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="510" y="30" width="680" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="user" value="Store Owner / Staff&#xa;Uses mobile or desktop browser&#xa;Adds products, manages stock, backups, archive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="430" width="250" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="system" value="Jouri Clothing Store Intake System&#xa;Product intake, AI parsing, image storage, stock/sales, archive, backups, activity logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=15;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="390" width="390" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="drive" value="Google Drive&#xa;External cloud backup target&#xa;rclone remote: gdrive:jouri-backups" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="120" width="290" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="gemini" value="Google Gemini API&#xa;External AI provider&#xa;Primary product text analysis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="330" width="290" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="shopify" value="Shopify Admin API&#xa;External commerce system&#xa;Optional product push" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="560" width="290" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="vps" value="VPS Runtime Boundary&#xa;Docker services, local files, PostgreSQL, Ollama/Gemma, API, client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="790" width="470" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="fallback" value="Local Gemma / Parser&#xa;Fallback when Gemini fails or quota is hit&#xa;Runs inside Jouri runtime, not public" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="145" width="390" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend" value="Color legend&#xa;Blue: user/UI traffic&#xa;Yellow: AI parsing&#xa;Green: backup/commerce external flow&#xa;Red: runtime/hosting boundary&#xa;Gray dashed: fallback or containment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=13;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="120" width="280" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="Uses HTTPS UI and WebSocket updates" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" parent="1" source="user" target="system" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="420" y="490"/>
+                            <mxPoint x="520" y="490"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e2" value="Manual/nightly backup copy + check" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="1" source="system" target="drive" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1140" y="490"/>
+                            <mxPoint x="1140" y="175"/>
+                            <mxPoint x="1280" y="175"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3" value="AI parse first choice" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeWidth=3;strokeColor=#d6b656;fontColor=#b7791f;" parent="1" source="system" target="gemini" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1130" y="455"/>
+                            <mxPoint x="1130" y="385"/>
+                            <mxPoint x="1280" y="385"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e4" value="Optional publish/push product" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="1" source="system" target="shopify" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1140" y="530"/>
+                            <mxPoint x="1140" y="615"/>
+                            <mxPoint x="1280" y="615"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e5" value="Hosted in" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeWidth=3;dashed=1;strokeColor=#b85450;fontColor=#b85450;" parent="1" source="system" target="vps" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="795" y="690"/>
+                            <mxPoint x="795" y="760"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e6" value="Fallback AI/local deterministic parse" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeWidth=3;strokeColor=#777777;fontColor=#777777;dashed=1;" parent="1" source="system" target="fallback" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="795" y="320"/>
+                            <mxPoint x="795" y="285"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="note" value="Scope: Jouri product intake and store-management helper.&#xa;Primary users are authenticated staff. External dependencies are Google Drive, Gemini, and Shopify." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="955" width="1550" height="65" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

@@ -1,0 +1,84 @@
+<mxfile host="app.diagrams.net" modified="2026-06-06T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="c4-code" name="C4 - Code Level">
+    <mxGraphModel dx="2200" dy="1350" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1350" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Jouri Intake - C4 Code / Function-Level View" style="text;html=1;strokeColor=none;fillColor=none;fontSize=26;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="640" y="25" width="920" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="backend" value="Selected Backend Code Paths" style="swimlane;html=1;whiteSpace=wrap;startSize=32;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="90" width="1960" height="1120" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend" value="Color legend&#xa;Blue: incoming request/use case&#xa;Red: authentication and parser logic&#xa;Yellow: product/AI/backup work&#xa;Green: database, files, Shopify, Drive outputs&#xa;Purple: shared mapping/helper code" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=13;align=left;spacingLeft=10;" vertex="1" parent="backend">
+          <mxGeometry x="1540" y="55" width="300" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="request" value="HTTP Request&#xa;Browser fetch()/WebSocket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="backend">
+          <mxGeometry x="50" y="85" width="200" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="guard" value="dependencies.verify_access()&#xa;auth_service.verify_access_token()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="340" y="85" width="250" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth" value="auth_service.py&#xa;verify_login()&#xa;is_valid_session()&#xa;verify_edit_lock_code()&#xa;_create_session()&#xa;_auth_rate_ok()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="700" y="65" width="240" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="productCore" value="product_core_routes.py&#xa;get_products()&#xa;create_product()&#xa;update_status()&#xa;update_product()&#xa;update_related_products()&#xa;push_product_to_shopify()&#xa;delete_product()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" vertex="1" parent="backend">
+          <mxGeometry x="50" y="285" width="270" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="productStock" value="product_stock_routes.py&#xa;sell_product()&#xa;reset_sales()&#xa;restore_product()&#xa;restore_product_size()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" vertex="1" parent="backend">
+          <mxGeometry x="390" y="285" width="250" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="productImage" value="product_image_routes.py&#xa;add_product_images()&#xa;product_image()&#xa;delete_product_image()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" vertex="1" parent="backend">
+          <mxGeometry x="710" y="285" width="250" height="135" as="geometry"/>
+        </mxCell>
+        <mxCell id="productService" value="product_service.py&#xa;to_record(Product) -> ProductRecord&#xa;get_or_404(db, product_id)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="1070" y="295" width="270" height="105" as="geometry"/>
+        </mxCell>
+        <mxCell id="db" value="db_models.py / database.py&#xa;Product ORM&#xa;ActivityLog ORM&#xa;SessionLocal / get_db()" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="1490" y="285" width="240" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="fileManager" value="file_manager.py&#xa;create_product_folder()&#xa;save_images() / _process_image()&#xa;move_product_folder()&#xa;delete_product_folder()&#xa;resolve_image_path()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="1070" y="510" width="270" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="parser" value="parser.py AI parse flow&#xa;parse_description_ai()&#xa;_parse_with_ai()&#xa;_request_ai_content()&#xa;_merge_ai_data()&#xa;parse_description_structured()&#xa;_extract_variants(), _translate_color(), _translate_title()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;fontStyle=1;" vertex="1" parent="backend">
+          <mxGeometry x="50" y="590" width="330" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="aiProviders" value="AI Providers&#xa;1. Gemini API&#xa;2. Ollama/Gemma local&#xa;3. Deterministic parser fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="470" y="615" width="260" height="125" as="geometry"/>
+        </mxCell>
+        <mxCell id="backup" value="backup_service.py backup flow&#xa;get_backup_overview()&#xa;run_manual_backup()&#xa;_write_pg_dump()&#xa;_copy_backup_to_drive()&#xa;_backup_entry()&#xa;_summarize_rclone_error()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;fontStyle=1;" vertex="1" parent="backend">
+          <mxGeometry x="50" y="900" width="320" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="backupTargets" value="Backup outputs&#xa;/backups/YYYY-MM-DD/db.sql&#xa;/backups/YYYY-MM-DD/db.json&#xa;/backups/YYYY-MM-DD/products_photo&#xa;Google Drive jouri-backups/date" style="shape=folder;tabWidth=40;tabHeight=14;tabPosition=left;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="470" y="915" width="320" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="logs" value="activity_logger.py + log_service.py&#xa;activity_logger.log()&#xa;log_service.list_logs()&#xa;log_service.delete_log()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="900" y="920" width="280" height="125" as="geometry"/>
+        </mxCell>
+        <mxCell id="startup" value="startup_service.py&#xa;run_startup_tasks()&#xa;_startup_migrate()&#xa;_import_from_filesystem()&#xa;_migrate_size_stocks()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="1290" y="900" width="280" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="shopify" value="shopify.py&#xa;push_to_shopify(product_data, images)&#xa;uses env Shopify settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="backend">
+          <mxGeometry x="1490" y="520" width="250" height="105" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="Depends(verify_access)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" edge="1" parent="backend" source="request" target="guard"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="session/login" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#b85450;fontColor=#b85450;" edge="1" parent="backend" source="guard" target="auth"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="product CRUD" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" edge="1" parent="backend" source="request" target="productCore"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="stock operations" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" edge="1" parent="backend" source="request" target="productStock"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="235"/><mxPoint x="515" y="235"/></Array></mxGeometry></mxCell>
+        <mxCell id="e5" value="image operations" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" edge="1" parent="backend" source="request" target="productImage"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="215"/><mxPoint x="835" y="215"/></Array></mxGeometry></mxCell>
+        <mxCell id="e6" value="load/map product" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" edge="1" parent="backend" source="productCore" target="productService"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="load/map product" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" edge="1" parent="backend" source="productStock" target="productService"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" value="load/map product" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" edge="1" parent="backend" source="productImage" target="productService"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="ORM query/commit" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" edge="1" parent="backend" source="productService" target="db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="folder/image work" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" edge="1" parent="backend" source="productImage" target="fileManager"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="835" y="465"/><mxPoint x="1205" y="465"/></Array></mxGeometry></mxCell>
+        <mxCell id="e11" value="AI parse request" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" edge="1" parent="backend" source="request" target="parser"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="545"/><mxPoint x="215" y="545"/></Array></mxGeometry></mxCell>
+        <mxCell id="e12" value="calls/fallbacks" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#d6b656;fontColor=#b7791f;" edge="1" parent="backend" source="parser" target="aiProviders"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e13" value="manual backup" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" edge="1" parent="backend" source="request" target="backup"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="845"/><mxPoint x="210" y="845"/></Array></mxGeometry></mxCell>
+        <mxCell id="e14" value="writes/verifies" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" edge="1" parent="backend" source="backup" target="backupTargets"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e15" value="activity records" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" edge="1" parent="backend" source="productCore" target="logs"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="340" y="520"/><mxPoint x="1040" y="520"/><mxPoint x="1040" y="880"/></Array></mxGeometry></mxCell>
+        <mxCell id="e16" value="product push" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" edge="1" parent="backend" source="productCore" target="shopify"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="360" y="500"/><mxPoint x="1615" y="500"/></Array></mxGeometry></mxCell>
+        <mxCell id="e17" value="startup uses DB/filesystem" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" edge="1" parent="backend" source="startup" target="db"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1430" y="820"/><mxPoint x="1610" y="820"/></Array></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

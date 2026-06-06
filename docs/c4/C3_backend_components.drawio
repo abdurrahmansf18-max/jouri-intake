@@ -1,0 +1,169 @@
+<mxfile host="65bd71144e">
+    <diagram id="c3-backend" name="C3 - Backend Components">
+        <mxGraphModel dx="1569" dy="701" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1300" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Jouri Intake - C3 Backend Component Diagram" style="text;html=1;strokeColor=none;fillColor=none;fontSize=26;fontStyle=1;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="675" y="25" width="850" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="client" value="React Client&#xa;client/src/api.ts&#xa;Calls REST endpoints and /ws" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="555" width="240" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend" value="Color legend&#xa;Blue: client/API endpoint traffic&#xa;Purple: app composition/router include flow&#xa;Yellow: product route composition&#xa;Green: DB/files/external persistence&#xa;Red: auth/parser/service logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=13;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="160" width="280" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="apiBoundary" value="FastAPI Backend Container" style="swimlane;html=1;whiteSpace=wrap;startSize=32;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="90" width="1260" height="1000" as="geometry"/>
+                </mxCell>
+                <mxCell id="main" value="main.py&#xa;FastAPI app factory/config&#xa;CORS + include_router + lifespan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;fontStyle=1;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="505" y="65" width="250" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="deps" value="dependencies.py&#xa;verify_access dependency&#xa;Cookie session guard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="60" y="80" width="210" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="realtime" value="realtime.py&#xa;ConnectionManager&#xa;broadcast product_updated/deleted" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="990" y="80" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="authRoutes" value="auth_routes.py&#xa;/api/auth/* + /ws&#xa;login, logout, edit lock, websocket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="60" y="255" width="220" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="parseRoutes" value="parse_routes.py&#xa;/api/parse-product&#xa;AI product text analysis endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="310" y="255" width="220" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="productRoutes" value="product_routes.py&#xa;Router aggregator&#xa;core + stock + image product routes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="560" y="255" width="220" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="backupRoutes" value="backup_routes.py&#xa;/api/backups*&#xa;status, run, local delete, Drive delete" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="810" y="255" width="220" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="logRoutes" value="log_routes.py&#xa;/api/logs*&#xa;list and delete activity logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="1060" y="255" width="220" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="coreRoutes" value="product_core_routes.py&#xa;list/create/update/status/related/delete/shopify" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="310" y="450" width="230" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="stockRoutes" value="product_stock_routes.py&#xa;sell, reset sales, restore product, restore size" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="590" y="450" width="230" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="imageRoutes" value="product_image_routes.py&#xa;add image, serve image, delete image" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="870" y="450" width="230" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="authService" value="auth_service.py&#xa;TOTP/password login, session cookie, rate limit, edit lock" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="60" y="655" width="230" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="parser" value="parser.py&#xa;Gemini -&gt; Gemma/Ollama -&gt; deterministic parser&#xa;grounded Arabic product parsing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="330" y="655" width="240" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="productService" value="product_service.py&#xa;to_record() and get_or_404()&#xa;DB model -&gt; API model mapping" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="610" y="655" width="230" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="fileManager" value="file_manager.py&#xa;create folders, save/process images, move/delete folders, image paths" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="890" y="655" width="230" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="backupService" value="backup_service.py&#xa;db.sql pg_dump, db.json export, photo copy, rclone copy/check" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="60" y="835" width="240" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="logService" value="log_service.py + activity_logger.py&#xa;read/delete logs, create activity records, purge old logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="340" y="835" width="250" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="startupService" value="startup_service.py&#xa;filesystem import, DB column maintenance, size stock migration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="630" y="835" width="240" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="shopifyComp" value="shopify.py&#xa;push_to_shopify()&#xa;Shopify Admin integration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="apiBoundary" vertex="1">
+                    <mxGeometry x="910" y="835" width="210" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2" value="include_router" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" parent="apiBoundary" source="main" target="authRoutes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3" value="include_router" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" parent="apiBoundary" source="main" target="parseRoutes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c4" value="include_router" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" parent="apiBoundary" source="main" target="productRoutes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c5" value="include_router" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" parent="apiBoundary" source="main" target="backupRoutes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c6" value="include_router" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#9673a6;fontColor=#9673a6;" parent="apiBoundary" source="main" target="logRoutes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c7" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#b85450;fontColor=#b85450;" parent="apiBoundary" source="authRoutes" target="authService" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c8" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#b85450;fontColor=#b85450;" parent="apiBoundary" source="parseRoutes" target="parser" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c9" value="includes" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#d6b656;fontColor=#b7791f;" parent="apiBoundary" source="productRoutes" target="coreRoutes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c10" value="includes" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#d6b656;fontColor=#b7791f;" parent="apiBoundary" source="productRoutes" target="stockRoutes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c11" value="includes" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#d6b656;fontColor=#b7791f;" parent="apiBoundary" source="productRoutes" target="imageRoutes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c12" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#b85450;fontColor=#b85450;" parent="apiBoundary" source="coreRoutes" target="productService" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c13" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#b85450;fontColor=#b85450;" parent="apiBoundary" source="stockRoutes" target="productService" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c14" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#b85450;fontColor=#b85450;" parent="apiBoundary" source="imageRoutes" target="fileManager" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c15" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#b85450;fontColor=#b85450;" parent="apiBoundary" source="backupRoutes" target="backupService" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c16" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#b85450;fontColor=#b85450;" parent="apiBoundary" source="logRoutes" target="logService" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="c17" value="broadcasts" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" parent="apiBoundary" source="coreRoutes" target="realtime" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="dbModels" value="database.py + db_models.py&#xa;SessionLocal, Base, Product, ActivityLog" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1810" y="250" width="250" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="storage" value="/products_photo&#xa;Image folders: originals, thumbnails, enhanced" style="shape=folder;tabWidth=40;tabHeight=14;tabPosition=left;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1810" y="520" width="250" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="external" value="External Services&#xa;Gemini API, Ollama/Gemma, Google Drive, Shopify" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1810" y="790" width="250" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1" value="REST + WS" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#1f77b4;fontColor=#1f77b4;" parent="1" source="client" target="main" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="345" y="608"/>
+                            <mxPoint x="345" y="203"/>
+                            <mxPoint x="1020" y="203"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="c18" value="DB sessions" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="1" source="productService" target="dbModels" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1670" y="800"/>
+                            <mxPoint x="1670" y="315"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="c19" value="files" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="1" source="fileManager" target="storage" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1685" y="800"/>
+                            <mxPoint x="1685" y="575"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="c20" value="AI / backup / commerce calls" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;strokeColor=#2ca02c;fontColor=#2ca02c;" parent="1" source="parser" target="external" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1695" y="805"/>
+                            <mxPoint x="1695" y="848"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
