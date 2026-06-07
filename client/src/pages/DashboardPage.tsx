@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertTriangle, ArchiveIcon, Box,
   CheckCircle2, Clock, DollarSign, Images, Loader2,
@@ -8,9 +8,41 @@ import { deleteLog, fetchLogs, fetchProducts, productImageUrl } from "../api";
 import { useProductSync } from "../hooks/useProductSync";
 import { useApp } from "../context";
 import { COPY, cn, logActionLabel, statusLabel } from "../i18n";
-import { DARK, LIGHT } from "../theme";
+import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import { statusBadge } from "../components/ProductCard";
 import type { ActivityLog, ProductRecord } from "../types";
+
+type NamedCount = { label: string; count: number };
+
+function hasEnhancedImage(product: ProductRecord): boolean {
+  return product.images.some((img) => img.folder === "enhanced");
+}
+
+function isMissingValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return !normalized || normalized === "-" || normalized === "—" || normalized === "unknown";
+}
+
+function topCounts(
+  products: ProductRecord[],
+  read: (product: ProductRecord) => string,
+  limit = 5,
+): NamedCount[] {
+  const counts = new Map<string, number>();
+  for (const product of products) {
+    const label = read(product).trim();
+    if (isMissingValue(label)) continue;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, limit);
+}
+
+function percent(part: number, total: number): number {
+  return total > 0 ? Math.round((part / total) * 100) : 0;
+}
 
 export default function DashboardPage() {
   const { locale, theme } = useApp();
@@ -46,7 +78,7 @@ export default function DashboardPage() {
 
   // ── Hesaplamalar ──────────────────────────────────────────────────────────
 
-  const active = products.filter((p) => p.status !== "sold_archive");
+  const active = useMemo(() => products.filter((p) => p.status !== "sold_archive"), [products]);
 
   const counts = {
     pending:      products.filter((p) => p.status === "pending").length,
@@ -60,6 +92,33 @@ export default function DashboardPage() {
     totalSold: products.reduce((n, p) => n + Math.max(0, p.soldQuantity), 0),
   };
 
+  const imageStats = active.reduce(
+    (stats, product) => {
+      for (const image of product.images) {
+        if (image.folder === "enhanced") stats.ai += 1;
+        else stats.original += 1;
+      }
+      return stats;
+    },
+    { original: 0, ai: 0 },
+  );
+
+  const smart = {
+    aiReadyPending: active.filter((p) => p.status === "pending" && hasEnhancedImage(p)).length,
+    aiImageProducts: active.filter(hasEnhancedImage).length,
+    noCategory: active.filter((p) => isMissingValue(p.parsed.categorySuggestion)).length,
+    noProductType: active.filter((p) => isMissingValue(p.parsed.productTypeSuggestion)).length,
+    lowStock: active.filter((p) => p.stockQuantity > 0 && p.stockQuantity <= 2).length,
+    outOfStock: active.filter((p) => p.stockQuantity === 0).length,
+  };
+
+  const avgImages = active.length > 0 ? (counts.totalImages / active.length).toFixed(1) : "0";
+  const aiImagePct = percent(imageStats.ai, counts.totalImages);
+  const originalImagePct = percent(imageStats.original, counts.totalImages);
+  const aiProductPct = percent(smart.aiImageProducts, active.length);
+  const topCategories = topCounts(active, (p) => p.parsed.categorySuggestion);
+  const topProductTypes = topCounts(active, (p) => p.parsed.productTypeSuggestion);
+
   // Stok değeri: sadece fiyatı girilmiş ve stoku olan aktif ürünler
   const stockValue = active.reduce((sum, p) => {
     const price = parseFloat(p.parsed.priceAmount);
@@ -72,7 +131,10 @@ export default function DashboardPage() {
     noPrice:  active.filter((p) => !p.parsed.priceAmount).length,
     noImages: active.filter((p) => p.images.length === 0).length,
   };
-  const hasAttention = attention.noPrice > 0 || attention.noImages > 0;
+  const hasAttention = attention.noPrice > 0 || attention.noImages > 0
+    || smart.noCategory > 0 || smart.noProductType > 0
+    || smart.lowStock > 0 || smart.outOfStock > 0
+    || smart.aiReadyPending > 0;
 
   // Son eklenen ürünler (arşiv hariç, en yeni 6)
   const recentProducts = [...active]
@@ -174,7 +236,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── 2. Metrikler ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <MetricCard
           icon={<Box className="size-4 text-emerald-400" />}
           label={t.dashActiveStock}
@@ -204,9 +266,62 @@ export default function DashboardPage() {
           color="text-amber-400"
           bg="bg-amber-400/10 border-amber-400/20"
         />
+        <MetricCard
+          icon={<Images className="size-4 text-blue-400" />}
+          label={t.dashAiImages}
+          value={imageStats.ai}
+          color="text-blue-400"
+          bg="bg-blue-400/10 border-blue-400/20"
+        />
+        <MetricCard
+          icon={<Activity className="size-4 text-fuchsia-400" />}
+          label={t.dashAvgImages}
+          value={avgImages}
+          color="text-fuchsia-400"
+          bg="bg-fuchsia-400/10 border-fuchsia-400/20"
+        />
       </div>
 
-      {/* ── 3. Arşiv sayacı ── */}
+      {/* ── 3. Akıllı özet ── */}
+      <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className={cn("rounded-xl border", s.panel)}>
+          <PanelHeader icon={<Images className="size-5 text-sky-400" />} title={t.dashImageHealth} s={s} />
+          <div className="grid gap-4 p-4 sm:grid-cols-3">
+            <ImageStat
+              label={t.dashOriginalImages}
+              value={imageStats.original}
+              pct={originalImagePct}
+              color="bg-sky-400"
+              s={s}
+            />
+            <ImageStat
+              label={t.dashAiImages}
+              value={imageStats.ai}
+              pct={aiImagePct}
+              color="bg-blue-400"
+              s={s}
+            />
+            <ImageStat
+              label={t.dashAiCoverage}
+              value={`${smart.aiImageProducts}/${active.length}`}
+              pct={aiProductPct}
+              color="bg-violet-400"
+              s={s}
+            />
+          </div>
+        </div>
+
+        <div className={cn("rounded-xl border", s.panel)}>
+          <PanelHeader icon={<AlertTriangle className="size-5 text-amber-400" />} title={t.dashSmartCheck} s={s} />
+          <div className="grid divide-y" style={{ borderColor: "inherit" }}>
+            <SmartRow label={t.dashAiReadyPending} value={smart.aiReadyPending} tone="blue" s={s} />
+            <SmartRow label={t.dashLowStock} value={smart.lowStock} tone="amber" s={s} />
+            <SmartRow label={t.dashOutOfStock} value={smart.outOfStock} tone="red" s={s} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── 4. Arşiv sayacı ── */}
       {counts.sold_archive > 0 && (
         <div className={cn("flex items-center gap-3 rounded-xl border px-4 py-3", "bg-slate-400/5 border-slate-400/20")}>
           <ArchiveIcon className="size-4 text-slate-400 shrink-0" />
@@ -218,7 +333,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── 4. İnceleme Gerekiyor — sadece sorun varsa göster ── */}
+      {/* ── 5. İnceleme Gerekiyor — sadece sorun varsa göster ── */}
       {hasAttention && (
       <div className={cn("rounded-xl border", s.panel)}>
         <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
@@ -240,11 +355,64 @@ export default function DashboardPage() {
               s={s}
             />
           )}
+          {smart.noCategory > 0 && (
+            <AttentionRow
+              icon={<Tag className="size-4 text-violet-400" />}
+              text={t.dashNoCategory(smart.noCategory)}
+              s={s}
+            />
+          )}
+          {smart.noProductType > 0 && (
+            <AttentionRow
+              icon={<Box className="size-4 text-sky-400" />}
+              text={t.dashNoProductType(smart.noProductType)}
+              s={s}
+            />
+          )}
+          {smart.aiReadyPending > 0 && (
+            <AttentionRow
+              icon={<PackageCheck className="size-4 text-blue-400" />}
+              text={t.dashAiReadyPendingText(smart.aiReadyPending)}
+              s={s}
+            />
+          )}
+          {smart.lowStock > 0 && (
+            <AttentionRow
+              icon={<Box className="size-4 text-amber-400" />}
+              text={t.dashLowStockText(smart.lowStock)}
+              s={s}
+            />
+          )}
+          {smart.outOfStock > 0 && (
+            <AttentionRow
+              icon={<PackageX className="size-4 text-red-400" />}
+              text={t.dashOutOfStockText(smart.outOfStock)}
+              s={s}
+            />
+          )}
         </div>
       </div>
       )}
 
-      {/* ── 5. Son Eklenen Ürünler ── */}
+      {/* ── 6. Kategori ve tip özeti ── */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <TopListPanel
+          title={t.dashTopCategories}
+          items={topCategories}
+          emptyText={t.dashNoCategoryData}
+          icon={<Tag className="size-5 text-violet-400" />}
+          s={s}
+        />
+        <TopListPanel
+          title={t.dashTopProductTypes}
+          items={topProductTypes}
+          emptyText={t.dashNoProductTypeData}
+          icon={<Box className="size-5 text-sky-400" />}
+          s={s}
+        />
+      </div>
+
+      {/* ── 7. Son Eklenen Ürünler ── */}
       {recentProducts.length > 0 && (
         <div className={cn("rounded-xl border", s.panel)}>
           <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
@@ -258,7 +426,7 @@ export default function DashboardPage() {
                 <div key={p.id} className={cn("overflow-hidden rounded-xl border", s.subPanel)}>
                   {firstImg ? (
                     <img
-                      src={productImageUrl(p.id, firstImg.fileName)}
+                      src={productImageUrl(p.id, firstImg.fileName, undefined, firstImg.folder)}
                       alt={firstImg.originalName}
                       className="aspect-video w-full object-cover"
                       loading="lazy"
@@ -290,7 +458,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── 6. Son İşlemler ── */}
+      {/* ── 8. Son İşlemler ── */}
       <div className={cn("rounded-xl border", s.panel)}>
         <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
           <Activity className="size-5 text-violet-400" />
@@ -386,8 +554,80 @@ function MetricCard({
   );
 }
 
+function PanelHeader({ icon, title, s }: {
+  icon: React.ReactNode; title: string; s: ThemeStyles;
+}) {
+  return (
+    <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
+      {icon}
+      <h2 className={cn("text-base font-extrabold", s.title)}>{title}</h2>
+    </div>
+  );
+}
+
+function ImageStat({ label, value, pct, color, s }: {
+  label: string; value: string | number; pct: number; color: string; s: ThemeStyles;
+}) {
+  return (
+    <div className={cn("rounded-xl border p-3", s.subPanel)}>
+      <div className={cn("text-xs font-black", s.muted)}>{label}</div>
+      <div className={cn("mt-2 flex items-end justify-between gap-3", s.title)}>
+        <span className="text-2xl font-black">{value}</span>
+        <span className={cn("text-xs font-extrabold", s.muted)}>{pct}%</span>
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/10">
+        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function SmartRow({ label, value, tone, s }: {
+  label: string; value: number; tone: "blue" | "amber" | "red"; s: ThemeStyles;
+}) {
+  const color = tone === "blue" ? "text-blue-400" : tone === "amber" ? "text-amber-400" : "text-red-400";
+  const bg = tone === "blue" ? "bg-blue-400/10" : tone === "amber" ? "bg-amber-400/10" : "bg-red-400/10";
+  return (
+    <div className={cn("flex items-center justify-between gap-3 px-4 sm:px-5 py-3", s.panelBorder)}>
+      <span className={cn("min-w-0 text-sm font-semibold", s.muted)}>{label}</span>
+      <span className={cn("rounded-lg px-2.5 py-1 text-sm font-black", bg, color)}>{value}</span>
+    </div>
+  );
+}
+
+function TopListPanel({ title, items, emptyText, icon, s }: {
+  title: string; items: NamedCount[]; emptyText: string; icon: React.ReactNode; s: ThemeStyles;
+}) {
+  const max = Math.max(1, ...items.map((item) => item.count));
+  return (
+    <div className={cn("rounded-xl border", s.panel)}>
+      <PanelHeader icon={icon} title={title} s={s} />
+      {items.length === 0 ? (
+        <div className={cn("px-4 py-6 text-sm font-semibold", s.muted)}>{emptyText}</div>
+      ) : (
+        <div className="grid gap-3 p-4">
+          {items.map((item) => {
+            const pct = Math.max(6, Math.round((item.count / max) * 100));
+            return (
+              <div key={item.label} className="grid gap-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className={cn("min-w-0 truncate text-sm font-extrabold", s.title)}>{item.label}</span>
+                  <span className={cn("shrink-0 text-xs font-black", s.muted)}>{item.count}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-black/10">
+                  <div className="h-full rounded-full bg-violet-400/80" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AttentionRow({ icon, text, s }: {
-  icon: React.ReactNode; text: string; s: ReturnType<typeof Object.assign>;
+  icon: React.ReactNode; text: string; s: ThemeStyles;
 }) {
   return (
     <div className={cn("flex items-center gap-3 px-4 sm:px-5 py-3", s.panelBorder)}>
