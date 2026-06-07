@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ClipboardList,
@@ -11,14 +11,14 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { createProduct, fetchProducts, updateRelatedProducts, parseProductText } from "../api";
+import { createProduct, updateRelatedProducts, parseProductText } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, normalizeCategory, normalizeProductType } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
-import type { ProductRecord } from "../types";
 import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEditor";
 import BulkProductForm from "../components/BulkProductForm";
 import VariantSelector from "../components/VariantSelector";
+import { useProductCacheActions, useProductsQuery } from "../queries";
 
 type Draft = {
   titleRaw: string;
@@ -60,16 +60,15 @@ export default function AddProductPage() {
   const [addMode, setAddMode] = useState<"single" | "bulk">("single");
   const [submitting, setSubmitting] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
-  const [allProducts, setAllProducts] = useState<ProductRecord[]>([]);
   const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
+  const productsQuery = useProductsQuery();
+  const cacheActions = useProductCacheActions();
 
   // AI Parsing State
   const [aiText, setAiText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
 
-  useEffect(() => {
-    fetchProducts().then(setAllProducts).catch(() => {});
-  }, []);
+  const allProducts = productsQuery.data ?? [];
 
   const existingCategories = Array.from(new Set(
     allProducts
@@ -121,9 +120,11 @@ export default function AddProductPage() {
           colorRaw: draft.colorRaw,
         },
       });
+      cacheActions.upsertProduct(newProduct);
 
       if (selectedVariantIds.length > 0) {
         await updateRelatedProducts(newProduct.id, selectedVariantIds);
+        cacheActions.invalidateProducts();
       }
 
       showToast(t.toastCreated, "success");

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
@@ -12,50 +13,47 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
-import { deleteBackup, deleteDriveBackup, fetchBackups, runBackup, type BackupEntry, type BackupStatus } from "../api";
+import { deleteBackup, deleteDriveBackup, runBackup } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT } from "../theme";
+import { queryKeys, useBackupsQuery, type BackupOverview } from "../queries";
 
 export default function BackupPage() {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
 
-  const [status, setStatus] = useState<BackupStatus>({});
-  const [backups, setBackups] = useState<BackupEntry[]>([]);
-  const [driveBackups, setDriveBackups] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingDrive, setDeletingDrive] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const queryClient = useQueryClient();
+  const backupsQuery = useBackupsQuery();
 
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
+  const status = backupsQuery.data?.status ?? {};
+  const backups = backupsQuery.data?.backups ?? [];
+  const driveBackups = backupsQuery.data?.drive_backups ?? [];
+  const loading = backupsQuery.isLoading;
+  const running = starting || !!status.running;
+  const refetchBackups = backupsQuery.refetch;
 
-  async function load() {
-    setLoading(true);
-    try {
-      const data = await fetchBackups();
-      setStatus(data.status);
-      setBackups(data.backups);
-      setDriveBackups(data.drive_backups ?? []);
-    } catch {
-      showToast(t.errors.ERR_GENERAL, "error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!status.running) return;
+    const timer = window.setInterval(() => {
+      refetchBackups();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [refetchBackups, status.running]);
 
   async function handleRunBackup() {
-    setRunning(true);
+    setStarting(true);
     try {
       const data = await runBackup();
-      setStatus(data.status);
-      setBackups(data.backups);
-      setDriveBackups(data.drive_backups ?? []);
-      if (data.status.last_db_sql_error) {
+      queryClient.setQueryData(queryKeys.backups, data);
+      if (data.status.running) {
+        showToast(t.backupManualStarted, "success");
+      } else if (data.status.last_db_sql_error) {
         showToast(t.backupManualSqlFail, "error");
       } else if (data.status.drive_ok === false) {
         showToast(t.backupManualPartialFail, "error");
@@ -65,7 +63,7 @@ export default function BackupPage() {
     } catch {
       showToast(t.backupManualFail, "error");
     } finally {
-      setRunning(false);
+      setStarting(false);
     }
   }
 
@@ -74,7 +72,9 @@ export default function BackupPage() {
     setDeleting(date);
     try {
       await deleteBackup(date);
-      setBackups(prev => prev.filter(b => b.date !== date));
+      queryClient.setQueryData<BackupOverview>(queryKeys.backups, (current) => current
+        ? { ...current, backups: current.backups.filter((b) => b.date !== date) }
+        : current);
       showToast(t.backupDeleted, "success");
     } catch {
       showToast(t.errors.ERR_GENERAL, "error");
@@ -88,7 +88,9 @@ export default function BackupPage() {
     setDeletingDrive(date);
     try {
       await deleteDriveBackup(date);
-      setDriveBackups(prev => prev.filter(d => d !== date));
+      queryClient.setQueryData<BackupOverview>(queryKeys.backups, (current) => current
+        ? { ...current, drive_backups: current.drive_backups.filter((d) => d !== date) }
+        : current);
       showToast(t.backupDriveDeleted, "success");
     } catch {
       showToast(t.errors.ERR_GENERAL, "error");
@@ -137,14 +139,14 @@ export default function BackupPage() {
           {/* Yenile */}
           <button
             type="button"
-            onClick={load}
-            disabled={loading}
+            onClick={() => backupsQuery.refetch()}
+            disabled={loading || backupsQuery.isFetching}
             className={cn(
               "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
               s.controlGroup, s.controlIdle,
             )}
           >
-            <RefreshCw className={cn("size-4", loading && "animate-spin")} />
+            <RefreshCw className={cn("size-4", (loading || backupsQuery.isFetching) && "animate-spin")} />
             <span>{t.backupRefresh}</span>
           </button>
         </div>

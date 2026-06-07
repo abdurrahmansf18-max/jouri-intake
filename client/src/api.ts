@@ -266,6 +266,8 @@ export interface BackupStatus {
   last_img_size?: string;
   drive_ok?: boolean;
   drive_error?: string | null;
+  running?: boolean;
+  running_started_at?: string | null;
   backups?: BackupEntry[];
 }
 

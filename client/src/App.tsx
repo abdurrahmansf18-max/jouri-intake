@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { checkAuth, clearCode, isAuthRequired, logout, storeCode, verifyCode } from "./api";
 import { AppContext, useToastState } from "./context";
+import { queryClient } from "./queries";
 import LoginGate from "./components/LoginGate";
 import AppLayout from "./layouts/AppLayout";
 import DashboardPage from "./pages/DashboardPage";
@@ -100,19 +102,21 @@ export default function App() {
 
   return (
     <AppContext.Provider value={{ locale, setLocale, theme, setTheme, showToast }}>
-      <BrowserRouter>
-        <AppLayout onLogout={authRequired ? handleLogout : undefined}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/add" element={<AddProductPage />} />
-            <Route path="/products" element={<ProductsPage />} />
-            <Route path="/archive" element={<ArchivePage />} />
-            <Route path="/backup" element={<BackupPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </AppLayout>
-      </BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AppLayout onLogout={authRequired ? handleLogout : undefined}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/add" element={<AddProductPage />} />
+              <Route path="/products" element={<ProductsPage />} />
+              <Route path="/archive" element={<ArchivePage />} />
+              <Route path="/backup" element={<BackupPage />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </AppLayout>
+        </BrowserRouter>
+      </QueryClientProvider>
       <ToastContainer toasts={toasts} onDismiss={dismiss} locale={locale} theme={theme} />
     </AppContext.Provider>
   );

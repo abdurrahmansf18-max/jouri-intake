@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArchiveIcon, Loader2, Search } from "lucide-react";
-import { fetchProducts } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, normalizeText, searchTokens } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -8,7 +7,7 @@ import type { ProductRecord } from "../types";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
-import { useProductSync } from "../hooks/useProductSync";
+import { useProductCacheActions, useProductCacheSync, useProductsQuery } from "../queries";
 
 const PAGE_SIZE = 30;
 
@@ -21,42 +20,18 @@ export default function ArchivePage() {
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
 
-  const [records, setRecords] = useState<ProductRecord[]>([]);
-  const [allProducts, setAllProducts] = useState<ProductRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
   const [page, setPage] = useState(1);
+  const productsQuery = useProductsQuery();
+  const cacheActions = useProductCacheActions();
 
-  useEffect(() => {
-    fetchProducts()
-      .then((all) => { setAllProducts(all); setRecords(all.filter(isArchived)); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  useProductCacheSync();
 
-  useProductSync({
-    onProductUpdated: (updated) => {
-      setAllProducts((prev) => {
-        const exists = prev.find((p) => p.id === updated.id);
-        return exists ? prev.map((p) => p.id === updated.id ? updated : p) : [updated, ...prev];
-      });
-      if (isArchived(updated)) {
-        setRecords((prev) => {
-          const exists = prev.find((r) => r.id === updated.id);
-          return exists ? prev.map((r) => r.id === updated.id ? updated : r) : [updated, ...prev];
-        });
-      } else {
-        setRecords((prev) => prev.filter((r) => r.id !== updated.id));
-      }
-    },
-    onProductDeleted: (id) => {
-      setAllProducts((prev) => prev.filter((p) => p.id !== id));
-      setRecords((prev) => prev.filter((r) => r.id !== id));
-      setSelectedId((cur) => cur === id ? null : cur);
-    },
-  });
+  const allProducts = productsQuery.data ?? [];
+  const records = useMemo(() => allProducts.filter(isArchived), [allProducts]);
+  const loading = productsQuery.isLoading;
 
   // Arama değişince sayfa 1'e dön
   useEffect(() => { setPage(1); }, [search]);
@@ -79,16 +54,14 @@ export default function ArchivePage() {
   }, [filtered, page]);
 
   function replaceRecord(updated: ProductRecord) {
+    cacheActions.upsertProduct(updated);
     if (!isArchived(updated)) {
-      setRecords((prev) => prev.filter((r) => r.id !== updated.id));
       setSelectedId(null);
-    } else {
-      setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     }
   }
 
   function removeRecord(id: string) {
-    setRecords((prev) => prev.filter((r) => r.id !== id));
+    cacheActions.removeProduct(id);
     if (selectedId === id) setSelectedId(null);
   }
 

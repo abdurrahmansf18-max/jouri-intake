@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag } from "lucide-react";
-import { fetchProducts } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -8,7 +7,7 @@ import type { ProductRecord, StatusFilter } from "../types";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
-import { useProductSync } from "../hooks/useProductSync";
+import { useProductCacheActions, useProductCacheSync, useProductsQuery } from "../queries";
 
 const PAGE_SIZE = 30;
 
@@ -20,9 +19,6 @@ export default function ProductsPage() {
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
 
-  const [records, setRecords] = useState<ProductRecord[]>([]);
-  const [allProducts, setAllProducts] = useState<ProductRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
@@ -32,43 +28,14 @@ export default function ProductsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
   const [page, setPage] = useState(1);
+  const productsQuery = useProductsQuery();
+  const cacheActions = useProductCacheActions();
 
-  useEffect(() => {
-    fetchProducts()
-      .then((all) => { setAllProducts(all); setRecords(all.filter((p) => p.status !== "sold_archive")); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  useProductCacheSync();
 
-  useProductSync({
-    onProductUpdated: (updated) => {
-      setAllProducts((prev) => {
-        const exists = prev.find((p) => p.id === updated.id);
-        return exists ? prev.map((p) => p.id === updated.id ? updated : p) : [updated, ...prev];
-      });
-      if (updated.status === "sold_archive") {
-        setRecords((prev) => prev.filter((r) => r.id !== updated.id));
-      } else {
-        setRecords((prev) => {
-          const exists = prev.find((r) => r.id === updated.id);
-          return exists
-            ? prev.map((r) => r.id === updated.id ? updated : r)
-            : [updated, ...prev];
-        });
-      }
-    },
-    onProductCreated: (created) => {
-      setAllProducts((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
-      if (created.status !== "sold_archive") {
-        setRecords((prev) => [created, ...prev.filter((r) => r.id !== created.id)]);
-      }
-    },
-    onProductDeleted: (id) => {
-      setAllProducts((prev) => prev.filter((p) => p.id !== id));
-      setRecords((prev) => prev.filter((r) => r.id !== id));
-      setSelectedId((cur) => cur === id ? null : cur);
-    },
-  });
+  const allProducts = productsQuery.data ?? [];
+  const records = useMemo(() => allProducts.filter((p) => p.status !== "sold_archive"), [allProducts]);
+  const loading = productsQuery.isLoading;
 
   const counts: Record<StatusFilter, number> = {
     all: records.length,
@@ -171,16 +138,14 @@ export default function ProductsPage() {
   }, [filtered, page]);
 
   function replaceRecord(updated: ProductRecord) {
+    cacheActions.upsertProduct(updated);
     if (updated.status === "sold_archive") {
-      setRecords((prev) => prev.filter((r) => r.id !== updated.id));
       setSelectedId(null);
-    } else {
-      setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     }
   }
 
   function removeRecord(id: string) {
-    setRecords((prev) => prev.filter((r) => r.id !== id));
+    cacheActions.removeProduct(id);
     if (selectedId === id) setSelectedId(null);
   }
 

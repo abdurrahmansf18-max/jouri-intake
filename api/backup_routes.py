@@ -1,10 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, BackgroundTasks, Depends
 
 import backup_service
-from database import get_db
 from dependencies import verify_access
 
 
@@ -18,10 +16,10 @@ def get_backups(_: Annotated[None, Depends(verify_access)]):
 
 @router.post("/api/backups/run")
 def run_backup(
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
-    db: Session = Depends(get_db),
 ):
-    return backup_service.run_manual_backup(db)
+    return backup_service.start_manual_backup(background_tasks)
 
 
 @router.delete("/api/backups/{date}")

@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity, AlertTriangle, ArchiveIcon, Box,
   CheckCircle2, Clock, DollarSign, Images, Loader2,
   LogIn, PackageCheck, PackageX, ShoppingBag, Tag, Trash2,
 } from "lucide-react";
-import { deleteLog, fetchLogs, fetchProducts, productImageUrl } from "../api";
-import { useProductSync } from "../hooks/useProductSync";
+import { deleteLog, productImageUrl } from "../api";
+import { queryKeys, useLogsQuery, useProductCacheSync, useProductsQuery } from "../queries";
 import { useApp } from "../context";
 import { COPY, cn, logActionLabel, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
@@ -48,33 +49,17 @@ export default function DashboardPage() {
   const { locale, theme } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
+  const queryClient = useQueryClient();
 
-  const [products, setProducts] = useState<ProductRecord[]>([]);
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const productsQuery = useProductsQuery();
+  const logsQuery = useLogsQuery(50);
 
-  useProductSync({
-    onProductUpdated: (updated) => {
-      setProducts((prev) => {
-        const exists = prev.find((p) => p.id === updated.id);
-        return exists ? prev.map((p) => p.id === updated.id ? updated : p) : [updated, ...prev];
-      });
-    },
-    onProductCreated: (created) => {
-      setProducts((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
-    },
-    onProductDeleted: (id) => {
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-    },
-  });
+  useProductCacheSync();
 
-  useEffect(() => {
-    Promise.all([fetchProducts(), fetchLogs(50)])
-      .then(([prods, activity]) => { setProducts(prods); setLogs(activity); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const products = productsQuery.data ?? [];
+  const logs = logsQuery.data ?? [];
+  const loading = productsQuery.isLoading || logsQuery.isLoading;
 
   // ── Hesaplamalar ──────────────────────────────────────────────────────────
 
@@ -161,7 +146,10 @@ export default function DashboardPage() {
 
   async function handleDeleteLog(id: number) {
     setDeletingId(id);
-    try { await deleteLog(id); setLogs((prev) => prev.filter((l) => l.id !== id)); }
+    try {
+      await deleteLog(id);
+      queryClient.setQueryData<ActivityLog[]>(queryKeys.logs(50), (current = []) => current.filter((l) => l.id !== id));
+    }
     catch { /* ignore */ } finally { setDeletingId(null); }
   }
 

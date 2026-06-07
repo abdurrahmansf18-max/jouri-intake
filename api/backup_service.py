@@ -6,13 +6,15 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 
+from database import SessionLocal
 from db_models import ActivityLog, Product
 
 
 BACKUP_ROOT = Path("/backups")
+RUNNING_FILE = BACKUP_ROOT / "running.json"
 
 
 def get_backup_overview() -> dict:
@@ -23,6 +25,10 @@ def get_backup_overview() -> dict:
             status = json.loads(status_file.read_text())
         except Exception:
             pass
+    running_status = _read_running_status()
+    status["running"] = bool(running_status)
+    if running_status:
+        status["running_started_at"] = running_status.get("started_at")
 
     backups = []
     if BACKUP_ROOT.exists():
@@ -36,6 +42,21 @@ def get_backup_overview() -> dict:
         "backups": backups,
         "drive_backups": _list_drive_backups(),
     }
+
+
+def start_manual_backup(background_tasks: BackgroundTasks) -> dict:
+    """Manuel yedeklemeyi arka planda başlatır ve mevcut durumu hemen döner."""
+    if not BACKUP_ROOT.exists():
+        raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
+
+    running_status = _read_running_status()
+    if running_status:
+        return get_backup_overview()
+
+    started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    _write_running_status({"started_at": started_at})
+    background_tasks.add_task(_run_manual_backup_background)
+    return get_backup_overview()
 
 
 def run_manual_backup(db: Session) -> dict:
@@ -139,6 +160,8 @@ def run_manual_backup(db: Session) -> dict:
             "last_img_size": img_size,
             "drive_ok": drive_ok,
             "drive_error": drive_error,
+            "running": False,
+            "running_started_at": None,
             "backups": backups_list,
         }
         (BACKUP_ROOT / "status.json").write_text(
@@ -153,7 +176,19 @@ def run_manual_backup(db: Session) -> dict:
 
     except Exception as exc:
         print(f"[backup] Manuel yedekleme hatası: {exc}")
+        _write_backup_error(started_str, str(exc))
         raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
+
+
+def _run_manual_backup_background() -> None:
+    db = SessionLocal()
+    try:
+        run_manual_backup(db)
+    except Exception as exc:
+        print(f"[backup] Arka plan yedekleme hatası: {exc}")
+    finally:
+        db.close()
+        RUNNING_FILE.unlink(missing_ok=True)
 
 
 def delete_local_backup(date: str) -> dict:
@@ -182,6 +217,55 @@ def delete_drive_backup(date: str) -> dict:
         raise HTTPException(status_code=500, detail={"code": "ERR_GENERAL"})
 
     return {"ok": True}
+
+
+def _read_running_status() -> dict | None:
+    if not RUNNING_FILE.exists():
+        return None
+    try:
+        data = json.loads(RUNNING_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        RUNNING_FILE.unlink(missing_ok=True)
+        return None
+
+    started_raw = data.get("started_at")
+    try:
+        started = datetime.fromisoformat(str(started_raw).replace("Z", "+00:00"))
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        age_seconds = (datetime.now(timezone.utc) - started).total_seconds()
+        if age_seconds > 6 * 60 * 60:
+            RUNNING_FILE.unlink(missing_ok=True)
+            return None
+    except Exception:
+        pass
+    return data
+
+
+def _write_running_status(data: dict) -> None:
+    BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
+    tmp_file = RUNNING_FILE.with_suffix(".json.tmp")
+    tmp_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_file.replace(RUNNING_FILE)
+
+
+def _write_backup_error(started_at: str, error: str) -> None:
+    status_file = BACKUP_ROOT / "status.json"
+    status = {}
+    if status_file.exists():
+        try:
+            status = json.loads(status_file.read_text(encoding="utf-8"))
+        except Exception:
+            status = {}
+
+    status.update({
+        "last_run": started_at,
+        "drive_ok": False,
+        "drive_error": _summarize_rclone_error(error) if error else "Yedekleme başarısız oldu.",
+        "running": False,
+        "running_started_at": None,
+    })
+    status_file.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _list_drive_backups() -> list[str]:
