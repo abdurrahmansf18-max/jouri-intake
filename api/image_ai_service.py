@@ -52,6 +52,7 @@ async def generate_product_images(
                     size=OPENAI_IMAGE_SIZE,
                     quality=OPENAI_IMAGE_QUALITY,
                     output_format="jpeg",
+                    response_format="b64_json",
                     input_fidelity="high",
                 )
         except HTTPException:
