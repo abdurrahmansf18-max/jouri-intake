@@ -9,7 +9,7 @@ interface Props {
   initialIndex: number;
   productId: string;
   onClose: () => void;
-  onDelete?: (fileName: string) => Promise<void>;
+  onDelete?: (image: SavedImage) => Promise<void>;
   deletingFileName?: string | null;
 }
 
@@ -59,7 +59,7 @@ export default function ImageLightbox({ images, initialIndex, productId, onClose
       >
         <img
           key={img.fileName}
-          src={productImageUrl(productId, img.fileName, "originals", img.folder)}
+          src={productImageUrl(productId, img.fileName, img.folder)}
           alt={img.originalName}
           className="max-h-[80vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
           draggable={false}
@@ -98,7 +98,7 @@ export default function ImageLightbox({ images, initialIndex, productId, onClose
           <button
             type="button"
             disabled={isDeletingThis}
-            onClick={() => onDelete(img.fileName)}
+            onClick={() => onDelete(img)}
             className={cn(
               "flex size-8 items-center justify-center rounded-full transition",
               "bg-red-500/20 text-red-400 hover:bg-red-500/40",

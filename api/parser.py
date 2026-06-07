@@ -629,9 +629,9 @@ def _translate_title(value: str) -> str:
     has_pajama = "بيجاما" in text or "بجاما" in text
     has_short = "شورت" in text
     if has_pajama and has_short:
-        return f"{audience}{style}Short Pajama Set".strip()
+        return f"{audience}{style}{material}Short Pajama Set".strip()
     if has_pajama:
-        return f"{audience}{style}Pajama Set".strip()
+        return f"{audience}{style}{material}Pajama Set".strip()
     if re.search(r"(?:افرول|اوفرول|jumpsuit|dungaree|overalls?|tulum|salopet)", text, re.IGNORECASE):
         return f"{audience}{style}{material}Jumpsuit".strip()
     if re.search(r"(?:فستان|dress)", text, re.IGNORECASE):
@@ -700,7 +700,15 @@ def _guess_category(sizes_raw: str, description: str) -> str:
 
 def _audience_prefix(text: str) -> str:
     category = _guess_category("", text)
+    if category == "Baby" and _is_mini_baby_text(text):
+        return "Mini Baby "
     return f"{category} " if category and category != "Kids" else ""
+
+
+def _is_mini_baby_text(text: str) -> bool:
+    has_mini = re.search(r"(?:ميني|mini)", text, re.IGNORECASE)
+    has_baby = re.search(r"(?:بيبي|baby|b\.?b\.?|bebe|bebek)", text, re.IGNORECASE)
+    return bool(has_mini and has_baby)
 
 
 def _known_piece_words(text: str) -> list[str]:

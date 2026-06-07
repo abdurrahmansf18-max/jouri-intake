@@ -1,4 +1,4 @@
-import type { ActivityLog, ParsedProduct, ProductRecord, ProductStatus, SizeStock } from "./types";
+import type { ActivityLog, AiImageGenerateRequest, ParsedProduct, ProductRecord, ProductStatus, SizeStock } from "./types";
 
 // Kimlik doğrulama artık session cookie ile yapılıyor (TOTP)
 export function getStoredCode(): string { return ""; }
@@ -189,11 +189,22 @@ export async function addProductImages(productId: string, files: File[]): Promis
 }
 
 export async function enhanceProductImage(productId: string, fileName: string, prompt?: string): Promise<ProductRecord> {
-  let url = `/api/products/${encodeURIComponent(productId)}/images/enhance?file_name=${encodeURIComponent(fileName)}`;
-  if (prompt) url += `&prompt=${encodeURIComponent(prompt)}`;
-  const res = await fetch(url, {
+  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/images/ai-generate`, {
     method: "POST",
-    headers: headers(),
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ sourceFileName: fileName, instructions: prompt || "" }),
+  });
+  return handleResponse<ProductRecord>(res);
+}
+
+export async function generateAiProductImages(
+  productId: string,
+  request: AiImageGenerateRequest,
+): Promise<ProductRecord> {
+  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/images/ai-generate`, {
+    method: "POST",
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify(request),
   });
   return handleResponse<ProductRecord>(res);
 }
@@ -285,6 +296,6 @@ export function productImageUrl(
   folder?: "originals" | "enhanced" | "thumbnails"
 ): string {
   // Öncelik sırası: açık kind parametresi > folder alanı > ai_ prefix tespiti > varsayılan thumbnails
-  const resolvedKind = kind ?? folder ?? (fileName.startsWith("ai_") ? "enhanced" : "thumbnails");
+  const resolvedKind = kind ?? folder ?? (fileName.startsWith("ai_") || fileName.startsWith("ai-") ? "enhanced" : "thumbnails");
   return `/api/products/${encodeURIComponent(productId)}/images/${resolvedKind}/${encodeURIComponent(fileName)}`;
 }

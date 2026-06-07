@@ -83,6 +83,15 @@ class StatusUpdateRequest(BaseModel):
     status: ProductStatus
 
 
+class AiImageGenerateRequest(BaseModel):
+    sourceFileName: str
+    sourceFolder: str = "originals"
+    gender: str = ""
+    age: str = ""
+    size: str = ""
+    instructions: str = ""
+
+
 class ParsedProductUpdate(BaseModel):
     titleRaw: Optional[str] = None
     categorySuggestion: Optional[str] = None

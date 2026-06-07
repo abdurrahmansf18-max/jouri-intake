@@ -1,20 +1,24 @@
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 import activity_logger
+import auth_service
 import file_manager
+import image_ai_service
 import product_service
 from database import get_db
 from dependencies import verify_access
-from models import ProductRecord
+from models import AiImageGenerateRequest, ProductRecord
 from realtime import ws_manager
 
 
 router = APIRouter()
+
+_IMAGE_LOCKED_STATUSES = {"ai_enhanced", "published", "sold_archive"}
 
 
 @router.post("/api/products/{product_id}/images", response_model=ProductRecord)
@@ -48,6 +52,45 @@ async def add_product_images(
     db.refresh(p)
     record = product_service.to_record(p)
     await ws_manager.broadcast({"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record
+
+
+@router.post("/api/products/{product_id}/images/ai-generate", response_model=ProductRecord)
+async def generate_ai_product_images(
+    product_id: str,
+    body: AiImageGenerateRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    jouri_edit_unlock: Annotated[str | None, Cookie()] = None,
+    db: Session = Depends(get_db),
+):
+    p = product_service.get_or_404(db, product_id)
+    if p.status in _IMAGE_LOCKED_STATUSES and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
+        raise HTTPException(status_code=403, detail={"code": "ERR_EDIT_LOCK_REQUIRED"})
+
+    source_folder = body.sourceFolder if body.sourceFolder in {"originals", "enhanced"} else "originals"
+    try:
+        source_path = file_manager.resolve_image_path(p.folder_path, source_folder, body.sourceFileName)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "ERR_IMAGE_NOT_FOUND"})
+
+    generated = await image_ai_service.generate_product_images(source_path, p, body)
+    existing = list(p.images or [])
+    next_idx = file_manager.get_next_enhanced_image_index(existing)
+    image_data = [(item.file_name, item.content, item.mime_type) for item in generated]
+    new_images = file_manager.save_enhanced_images(Path(p.folder_path), image_data, start_index=next_idx)
+    p.images = existing + [img.model_dump() for img in new_images]
+
+    activity_logger.log(
+        db, "ai_generate_images",
+        product_id=p.id,
+        product_title=p.title_raw,
+        details={"source": body.sourceFileName, "count": len(new_images)},
+    )
+    db.commit()
+    db.refresh(p)
+    record = product_service.to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
 
 

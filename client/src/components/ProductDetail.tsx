@@ -6,14 +6,15 @@ import {
 } from "lucide-react";
 import {
   addProductImages, deleteProduct, deleteProductImage,
+  generateAiProductImages,
   productImageUrl, resetSales, restoreProduct, restoreSize,
   sellProduct, updateProduct, updateRelatedProducts, updateStatus, verifyEditLock,
-  enhanceProductImage, pushToShopify
+  pushToShopify
 } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
-import type { ProductRecord, ProductStatus, SizeStock } from "../types";
+import type { ProductRecord, ProductStatus, SavedImage, SizeStock } from "../types";
 import { statusActiveBadge, statusBadge } from "./ProductCard";
 import ImageLightbox from "./ImageLightbox";
 import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
@@ -91,6 +92,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [showStatusUnlock, setShowStatusUnlock] = useState(false);
   const [sellError, setSellError] = useState("");
   const [showShopifyPreview, setShowShopifyPreview] = useState(false);
+  const [aiImageSource, setAiImageSource] = useState<SavedImage | null>(null);
+  const [aiImageBusy, setAiImageBusy] = useState(false);
+  const [aiImageForm, setAiImageForm] = useState({ gender: "", age: "", size: "", instructions: "" });
   
 
   useEffect(() => {
@@ -108,6 +112,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setShowStatusUnlock(false);
     setSellError("");
     setShowShopifyPreview(false);
+    setAiImageSource(null);
+    setAiImageBusy(false);
+    setAiImageForm({ gender: "", age: "", size: "", instructions: "" });
 
     setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
   }, [record.id, initialMode]);
@@ -255,10 +262,45 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     finally { setImageBusy(false); }
   }
 
-  async function handleDeleteImage(fileName: string) {
+  function openAiImagePanel(img: SavedImage) {
+    setAiImageSource(img);
+    setAiImageForm({
+      gender: p.categorySuggestion || "",
+      age: "",
+      size: record.sizeStocks[0]?.size || p.sizesRaw || "",
+      instructions: "",
+    });
+  }
+
+  async function handleGenerateAiImages() {
+    if (!aiImageSource) return;
+    setAiImageBusy(true);
+    try {
+      const updated = await generateAiProductImages(record.id, {
+        sourceFileName: aiImageSource.fileName,
+        sourceFolder: aiImageSource.folder ?? "originals",
+        gender: aiImageForm.gender,
+        age: aiImageForm.age,
+        size: aiImageForm.size,
+        instructions: aiImageForm.instructions,
+      });
+      onReplace(updated);
+      setAiImageSource(null);
+      showToast(t.aiImageGenerated, "success");
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
+    } finally {
+      setAiImageBusy(false);
+    }
+  }
+
+  async function handleDeleteImage(imageOrFileName: SavedImage | string, folder?: "originals" | "enhanced") {
+    const fileName = typeof imageOrFileName === "string" ? imageOrFileName : imageOrFileName.fileName;
+    const imageFolder = folder ?? (typeof imageOrFileName === "string" ? "originals" : imageOrFileName.folder ?? "originals");
     setDeletingImage(fileName);
     try {
-      const updated = await deleteProductImage(record.id, "originals", fileName);
+      const updated = await deleteProductImage(record.id, imageFolder, fileName);
       onReplace(updated);
       if (lightboxIdx !== null) {
         const len = updated.images.length;
@@ -930,19 +972,84 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                             <img src={productImageUrl(record.id, img.fileName, undefined, img.folder)} alt={img.originalName}
                               className="aspect-square w-full object-cover" loading="lazy" />
                           </button>
+                          {img.folder === "enhanced" && (
+                            <span className="absolute start-1 top-1 rounded-md bg-violet-600/90 px-1.5 py-0.5 text-[10px] font-black text-white">
+                              AI
+                            </span>
+                          )}
                           {!isImageLocked && (
-                            <button type="button" disabled={deletingImage === img.fileName}
-                              onClick={() => handleDeleteImage(img.fileName)}
-                              className={cn("absolute bottom-1 end-1 flex size-7 items-center justify-center rounded-full",
-                                "bg-black/60 text-red-400 hover:bg-red-500/80 hover:text-white transition active:scale-95",
-                                deletingImage === img.fileName && "opacity-50")}>
-                              {deletingImage === img.fileName
-                                ? <Loader2 className="size-3.5 animate-spin" />
-                                : <Trash2 className="size-3.5" />}
-                            </button>
+                            <>
+                              {img.folder !== "enhanced" && (
+                                <button type="button"
+                                  onClick={() => openAiImagePanel(img)}
+                                  className="absolute bottom-1 start-1 flex size-7 items-center justify-center rounded-full bg-violet-600/90 text-white transition hover:bg-violet-500 active:scale-95"
+                                  title={t.aiImageCreate}>
+                                  <Sparkles className="size-3.5" />
+                                </button>
+                              )}
+                              <button type="button" disabled={deletingImage === img.fileName}
+                                onClick={() => handleDeleteImage(img)}
+                                className={cn("absolute bottom-1 end-1 flex size-7 items-center justify-center rounded-full",
+                                  "bg-black/60 text-red-400 hover:bg-red-500/80 hover:text-white transition active:scale-95",
+                                  deletingImage === img.fileName && "opacity-50")}>
+                                {deletingImage === img.fileName
+                                  ? <Loader2 className="size-3.5 animate-spin" />
+                                  : <Trash2 className="size-3.5" />}
+                              </button>
+                            </>
                           )}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {aiImageSource && !isImageLocked && (
+                    <div className={cn("mb-3 grid gap-3 rounded-xl border p-3", s.panelBorder)}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className={cn("flex items-center gap-2 text-sm font-extrabold", s.title)}>
+                            <Sparkles className="size-4 text-violet-400" />
+                            {t.aiImageCreate}
+                          </h4>
+                          <p className={cn("mt-1 text-xs leading-5", s.muted)}>{t.aiImageHelp}</p>
+                        </div>
+                        <button type="button" onClick={() => setAiImageSource(null)}
+                          className={cn("inline-flex size-8 shrink-0 items-center justify-center rounded-lg border", s.controlGroup, s.controlIdle)}>
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <input
+                          value={aiImageForm.gender}
+                          onChange={(e) => setAiImageForm((v) => ({ ...v, gender: e.target.value }))}
+                          placeholder={t.aiImageGenderPlaceholder}
+                          className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
+                        />
+                        <input
+                          value={aiImageForm.age}
+                          onChange={(e) => setAiImageForm((v) => ({ ...v, age: e.target.value }))}
+                          placeholder={t.aiImageAgePlaceholder}
+                          className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
+                        />
+                        <input
+                          value={aiImageForm.size}
+                          onChange={(e) => setAiImageForm((v) => ({ ...v, size: e.target.value }))}
+                          placeholder={t.aiImageSizePlaceholder}
+                          className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
+                        />
+                      </div>
+                      <textarea
+                        value={aiImageForm.instructions}
+                        onChange={(e) => setAiImageForm((v) => ({ ...v, instructions: e.target.value }))}
+                        placeholder={t.aiImageInstructionsPlaceholder}
+                        className={cn("min-h-20 rounded-xl border px-3 py-2 text-sm leading-6 outline-none focus:ring-4", s.input)}
+                        dir="auto"
+                      />
+                      <button type="button" onClick={handleGenerateAiImages} disabled={aiImageBusy}
+                        className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-60", s.primary)}>
+                        {aiImageBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                        {aiImageBusy ? t.aiImageGenerating : t.aiImageGenerate}
+                      </button>
                     </div>
                   )}
 
@@ -1012,7 +1119,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           initialIndex={lightboxIdx}
           productId={record.id}
           onClose={() => setLightboxIdx(null)}
-          onDelete={mode === "edit" ? handleDeleteImage : undefined}
+          onDelete={mode === "edit" && !isImageLocked ? handleDeleteImage : undefined}
           deletingFileName={deletingImage}
         />
       )}

@@ -21,6 +21,15 @@ export interface SavedImage {
   folder?: "originals" | "enhanced";  // Hangi klasörde olduğunu belirtir
 }
 
+export interface AiImageGenerateRequest {
+  sourceFileName: string;
+  sourceFolder?: "originals" | "enhanced";
+  gender?: string;
+  age?: string;
+  size?: string;
+  instructions?: string;
+}
+
 export interface ImageFolder { path: string; relativePath: string; }
 export interface ImageFolders { originals: ImageFolder; enhanced: ImageFolder; }
 

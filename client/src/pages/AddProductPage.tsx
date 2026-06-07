@@ -445,7 +445,7 @@ function splitAiSizes(value: string | string[] | undefined): string[] {
   raw
     .replace(/،/g, ",")
     .split(/[,/]+/)
-    .map((item) => item.trim().replace(/\s+/g, ""))
+    .map((item) => item.trim().replace(/\s+/g, " "))
     .filter(Boolean)
     .forEach((item) => {
       const normalized = normalizeAiSizeToken(item, suffix);
@@ -455,10 +455,23 @@ function splitAiSizes(value: string | string[] | undefined): string[] {
 }
 
 function normalizeAiSizeToken(item: string, inheritedSuffix: string): string {
-  if ((inheritedSuffix === "Y" || inheritedSuffix === "M") && /^\d+(?:[.,]\d+)?$/.test(item)) {
+  const compact = item.replace(/\s+/g, "");
+  const ageRange = item.match(/^(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*(years?|months?)$/i);
+  if (ageRange) {
+    return formatAgeRange(ageRange[1], ageRange[2], ageRange[3]);
+  }
+  const ownRangeSuffix = compact.match(/^(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)([YM])$/i);
+  if (ownRangeSuffix) {
+    return formatAgeRange(ownRangeSuffix[1], ownRangeSuffix[2], ownRangeSuffix[3]);
+  }
+  if ((inheritedSuffix === "Y" || inheritedSuffix === "M") && /^\d+(?:[.,]\d+)?$/.test(compact)) {
     return formatAgeSize(item, inheritedSuffix);
   }
-  const ownSuffix = item.match(/^(\d+(?:[.,]\d+)?)([YM])$/i);
+  const inheritedRange = compact.match(/^(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)$/);
+  if ((inheritedSuffix === "Y" || inheritedSuffix === "M") && inheritedRange) {
+    return formatAgeRange(inheritedRange[1], inheritedRange[2], inheritedSuffix);
+  }
+  const ownSuffix = compact.match(/^(\d+(?:[.,]\d+)?)([YM])$/i);
   if (ownSuffix) {
     return formatAgeSize(ownSuffix[1], ownSuffix[2].toUpperCase());
   }
@@ -473,6 +486,19 @@ function formatAgeSize(value: string, suffix: string): string {
     ? (singular ? "Year" : "Years")
     : (singular ? "Month" : "Months");
   return `${displayNumber} ${unit}`;
+}
+
+function formatAgeRange(start: string, end: string, unitSource: string): string {
+  const displayStart = formatAgeNumber(start);
+  const displayEnd = formatAgeNumber(end);
+  const source = unitSource.toUpperCase();
+  const unit = source.startsWith("Y") ? "Years" : "Months";
+  return `${displayStart}-${displayEnd} ${unit}`;
+}
+
+function formatAgeNumber(value: string): string {
+  const number = value.replace(",", ".");
+  return number.endsWith(".0") ? number.slice(0, -2) : number;
 }
 
 function getProviderNote(

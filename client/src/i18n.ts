@@ -65,6 +65,7 @@ export const COPY = {
     logRestore: "Tekrar satışa alındı",
     logStatusChange: "Durum değiştirildi",
     logAddImages: (n: number) => `${n} görsel eklendi`,
+    logAiGenerateImages: (n: number) => `${n} AI görsel eklendi`,
     logResetSales: "Satış sıfırlandı",
     logUnknown: "İşlem yapıldı",
     // Pages
@@ -219,6 +220,8 @@ export const COPY = {
       ERR_DESCRIPTION_REQUIRED: "Açıklama boş olamaz.",
       ERR_OUT_OF_STOCK: "Bu bedenin stoğu tükendi.",
       ERR_BACKUP_FAILED: "Yedekleme başarısız oldu.",
+      ERR_AI_IMAGE_NOT_CONFIGURED: "AI görsel sistemi henüz yapılandırılmamış. OPENAI_API_KEY eklenmeli.",
+      ERR_AI_IMAGE_FAILED: "AI görsel üretimi başarısız oldu.",
       ERR_RATE_LIMITED: "Çok fazla deneme. Lütfen birkaç dakika bekle.",
       ERR_GENERAL: "Bir hata oluştu. Lütfen tekrar deneyin.",
     } as Record<string, string>,
@@ -231,6 +234,15 @@ export const COPY = {
     toastImagesAdded: "Görseller eklendi.",
     toastSalesReset: "Satış bilgileri sıfırlandı.",
     toastStatusUpdated: "Durum güncellendi.",
+    aiImageCreate: "AI görsel oluştur",
+    aiImageHelp: "Orijinal görsel korunur; iki yeni AI görsel enhanced klasörüne eklenir.",
+    aiImageGenderPlaceholder: "Cinsiyet/kitle: Boys, Girls, Baby...",
+    aiImageAgePlaceholder: "Yaş: 2 yaş, 6 ay...",
+    aiImageSizePlaceholder: "Beden: 1-3 Months, 3Y...",
+    aiImageInstructionsPlaceholder: "Ek talimat: sade oda, askılı sunum, özel not...",
+    aiImageGenerate: "2 AI görsel üret",
+    aiImageGenerating: "AI görseller üretiliyor...",
+    aiImageGenerated: "AI görseller eklendi. Orijinal görseller korundu.",
     // Backup page
     archiveCount: (n: number) => `${n} ürün arşivde`,
     navBackup: "Yedekler",
@@ -377,6 +389,7 @@ export const COPY = {
     logRestore: "تم إرجاعه للبيع",
     logStatusChange: "تم تغيير الحالة",
     logAddImages: (n: number) => `تمت إضافة ${n} صورة`,
+    logAiGenerateImages: (n: number) => `تمت إضافة ${n} صورة بالذكاء الاصطناعي`,
     logResetSales: "تم تصفير المبيعات",
     logUnknown: "تمت العملية",
     // Pages
@@ -531,6 +544,8 @@ export const COPY = {
       ERR_DESCRIPTION_REQUIRED: "لا يمكن ترك الوصف فارغًا.",
       ERR_OUT_OF_STOCK: "نفذ مخزون هذا المقاس.",
       ERR_BACKUP_FAILED: "فشل النسخ الاحتياطي.",
+      ERR_AI_IMAGE_NOT_CONFIGURED: "نظام صور الذكاء الاصطناعي غير مفعّل بعد. يجب إضافة OPENAI_API_KEY.",
+      ERR_AI_IMAGE_FAILED: "فشل إنشاء صور الذكاء الاصطناعي.",
       ERR_RATE_LIMITED: "محاولات كثيرة جداً. يرجى الانتظار بضع دقائق.",
       ERR_GENERAL: "حدث خطأ. يرجى المحاولة مرة أخرى.",
     } as Record<string, string>,
@@ -543,6 +558,15 @@ export const COPY = {
     toastImagesAdded: "تمت إضافة الصور.",
     toastSalesReset: "تم تصفير معلومات البيع.",
     toastStatusUpdated: "تم تحديث الحالة.",
+    aiImageCreate: "إنشاء صور بالذكاء",
+    aiImageHelp: "تبقى الصورة الأصلية محفوظة؛ ستُضاف صورتان جديدتان إلى مجلد الصور المحسّنة.",
+    aiImageGenderPlaceholder: "الفئة: Boys, Girls, Baby...",
+    aiImageAgePlaceholder: "العمر: سنتان، 6 أشهر...",
+    aiImageSizePlaceholder: "المقاس: 1-3 Months, 3Y...",
+    aiImageInstructionsPlaceholder: "تعليمات إضافية: غرفة بسيطة، عرض على علاقة، ملاحظة خاصة...",
+    aiImageGenerate: "إنشاء صورتين",
+    aiImageGenerating: "جارٍ إنشاء الصور...",
+    aiImageGenerated: "تمت إضافة صور الذكاء الاصطناعي. الصور الأصلية محفوظة.",
     // Backup page
     archiveCount: (n: number) => `${n} منتج في الأرشيف`,
     navBackup: "النسخ الاحتياطية",
@@ -820,6 +844,10 @@ export function logActionLabel(action: string, locale: Locale, details?: Record<
     case "add_images": {
       const count = typeof details?.count === "number" ? details.count : 1;
       return t.logAddImages(count);
+    }
+    case "ai_generate_images": {
+      const count = typeof details?.count === "number" ? details.count : 1;
+      return t.logAiGenerateImages(count);
     }
     case "reset_sales": return t.logResetSales;
     default: return t.logUnknown;

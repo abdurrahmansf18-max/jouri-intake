@@ -97,6 +97,33 @@ def save_images(
     return saved
 
 
+def save_enhanced_images(
+    folder_path: Path,
+    images: list[tuple[str, bytes, str]],
+    start_index: int = 1,
+) -> list[SavedImage]:
+    enhanced_path = folder_path / "enhanced"
+    enhanced_path.mkdir(parents=True, exist_ok=True)
+
+    status_dir = _detect_status_dir(folder_path)
+    saved: list[SavedImage] = []
+
+    for offset, (original_name, content, mime_type) in enumerate(images):
+        file_name = f"ai-{str(start_index + offset).zfill(2)}.jpg"
+        compressed = _process_image(content, max_size=(1920, 1920), quality=88)
+        (enhanced_path / file_name).write_bytes(compressed)
+
+        saved.append(SavedImage(
+            fileName=file_name,
+            originalName=original_name,
+            mimeType="image/jpeg",
+            size=len(compressed),
+            relativePath=f"products_photo/{status_dir}/{folder_path.name}/enhanced/{file_name}",
+            folder="enhanced",
+        ))
+    return saved
+
+
 def move_product_folder(current_folder_path: str, folder_name: str, new_status: str) -> str:
     current_path = Path(current_folder_path)
     new_root = _STATUS_DIRS[new_status]
@@ -163,6 +190,17 @@ def get_next_image_index(images: list[dict]) -> int:
     highest = 0
     for image in images:
         m = re.search(r"image-(\d+)", image.get("fileName", ""))
+        if m:
+            highest = max(highest, int(m.group(1)))
+    return highest + 1
+
+
+def get_next_enhanced_image_index(images: list[dict]) -> int:
+    highest = 0
+    for image in images:
+        if image.get("folder") != "enhanced":
+            continue
+        m = re.search(r"ai-(\d+)", image.get("fileName", ""))
         if m:
             highest = max(highest, int(m.group(1)))
     return highest + 1
