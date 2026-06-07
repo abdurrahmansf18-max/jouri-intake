@@ -179,19 +179,20 @@ def _infer_audience(product: Any) -> str:
             _value(product, "category"),
             _value(product, "product_type"),
             _value(product, "color_raw"),
+            _value(product, "sizes_raw"),
             _value(product, "description"),
             _value(product, "notes"),
         ]
     ).lower()
 
+    category = str(_value(product, "category") or "").strip()
+    if category.lower() == "baby" or re.search(r"\b(baby|newborn|infant|toddler|mini baby|bebe|bebek)\b|b\.?\s*b\.?|بيبي|رضيع|مواليد", text):
+        return "Baby"
     if re.search(r"\b(girls?|girl'?s)\b|بناتي|بنات|بنت|فتيات|kız", text):
         return "Girls"
     if re.search(r"\b(boys?|boy'?s)\b|ولادي|اولادي|أولادي|ولد|صبيان|erkek", text):
         return "Boys"
-    if re.search(r"\b(baby|newborn|infant|toddler|mini baby)\b|بيبي|bebe|bebek|رضيع|مواليد", text):
-        return "Baby"
 
-    category = str(_value(product, "category") or "").strip()
     if category.lower() in {"boys", "boy", "girls", "girl", "baby", "kids"}:
         return category
     return ""

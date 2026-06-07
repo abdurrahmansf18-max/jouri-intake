@@ -490,8 +490,13 @@ function formatAgeSize(value: string, suffix: string): string {
 }
 
 function formatAgeRange(start: string, end: string, unitSource: string): string {
-  const displayStart = formatAgeNumber(start);
-  const displayEnd = formatAgeNumber(end);
+  let startNumber = Number(start.replace(",", "."));
+  let endNumber = Number(end.replace(",", "."));
+  if (Number.isFinite(startNumber) && Number.isFinite(endNumber) && startNumber > endNumber) {
+    [startNumber, endNumber] = [endNumber, startNumber];
+  }
+  const displayStart = Number.isFinite(startNumber) ? formatAgeNumber(String(startNumber)) : formatAgeNumber(start);
+  const displayEnd = Number.isFinite(endNumber) ? formatAgeNumber(String(endNumber)) : formatAgeNumber(end);
   const source = unitSource.toUpperCase();
   const unit = source.startsWith("Y") ? "Years" : "Months";
   return `${displayStart}-${displayEnd} ${unit}`;

@@ -68,15 +68,16 @@ function inferAiAudience(record: ProductRecord): string {
     p.categorySuggestion,
     p.productTypeSuggestion,
     p.colorRaw,
+    p.sizesRaw,
     record.description,
     record.notes,
   ].join(" ").toLowerCase();
 
+  const category = p.categorySuggestion.trim();
+  if (/^baby$/i.test(category) || /\b(baby|newborn|infant|toddler|mini baby|bebe|bebek)\b|b\.?\s*b\.?|بيبي|رضيع|مواليد/.test(text)) return "Baby";
   if (/\b(girls?|girl'?s)\b|بناتي|بنات|بنت|فتيات|kız/.test(text)) return "Girls";
   if (/\b(boys?|boy'?s)\b|ولادي|اولادي|أولادي|ولد|صبيان|erkek/.test(text)) return "Boys";
-  if (/\b(baby|newborn|infant|toddler|mini baby|bebe)\b|بيبي|bebek|رضيع|مواليد/.test(text)) return "Baby";
 
-  const category = p.categorySuggestion.trim();
   if (/^(boys?|girls?|baby|kids)$/i.test(category)) return category;
   return category || "";
 }

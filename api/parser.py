@@ -155,6 +155,8 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
         category = ""
     if structured_parsed.get("categorySuggestion"):
         category = structured_parsed.get("categorySuggestion", "")
+    if _has_baby_signal(description, sizes_raw or structured_parsed.get("sizesRaw", "")):
+        category = "Baby"
     category = normalize_category(category)
 
     price_amount = structured_parsed.get("priceAmount", "") or _field(data.get("priceAmount", ""))
@@ -394,6 +396,7 @@ def normalize_product_type(value: str) -> str:
         "tulum": "Jumpsuit",
         "salopet": "Jumpsuit",
         "افرول": "Jumpsuit",
+        "افورول": "Jumpsuit",
         "اوفرول": "Jumpsuit",
     }
     return product_types.get(key, cleaned)
@@ -543,6 +546,11 @@ def _format_age_size(number: str, suffix: str) -> str:
 def _format_age_size_range(start: str, end: str, suffix: str) -> str:
     start_number = start.replace(",", ".")
     end_number = end.replace(",", ".")
+    try:
+        if float(start_number) > float(end_number):
+            start_number, end_number = end_number, start_number
+    except ValueError:
+        pass
     start_display = start_number[:-2] if start_number.endswith(".0") else start_number
     end_display = end_number[:-2] if end_number.endswith(".0") else end_number
     unit = "Years" if suffix == "Y" else "Months"
@@ -632,7 +640,7 @@ def _translate_title(value: str) -> str:
         return f"{audience}{style}{material}Short Pajama Set".strip()
     if has_pajama:
         return f"{audience}{style}{material}Pajama Set".strip()
-    if re.search(r"(?:افرول|اوفرول|jumpsuit|dungaree|overalls?|tulum|salopet)", text, re.IGNORECASE):
+    if re.search(r"(?:افرول|افورول|اوفرول|jumpsuit|dungaree|overalls?|tulum|salopet)", text, re.IGNORECASE):
         return f"{audience}{style}{material}Jumpsuit".strip()
     if re.search(r"(?:فستان|dress)", text, re.IGNORECASE):
         return f"{audience}{style}{material}Dress".strip()
@@ -651,7 +659,7 @@ def _translate_title(value: str) -> str:
 
 def _guess_product_type(description: str) -> str:
     text = description.lower()
-    if re.search(r"(?:jumpsuit|dungaree|overalls?|tulum|salopet|افرول|اوفرول)", description, re.IGNORECASE):
+    if re.search(r"(?:jumpsuit|dungaree|overalls?|tulum|salopet|افرول|افورول|اوفرول)", description, re.IGNORECASE):
         return "Jumpsuit"
     if re.search(r"(?:rompers?|سالوبيت|سلوبت|سالوبت)", description, re.IGNORECASE):
         return "Romper"
@@ -683,6 +691,8 @@ def _guess_product_type(description: str) -> str:
 
 
 def _guess_category(sizes_raw: str, description: str) -> str:
+    if _has_baby_signal(description, sizes_raw):
+        return "Baby"
     if re.search(r"(?:صبياني|صبيان|ولادي|اولاد|أولاد|للأولاد|boy|boys)", description, re.IGNORECASE):
         return "Boys"
     if re.search(r"(?:بناتي|بنات|للبنات|girl|girls)", description, re.IGNORECASE):
@@ -696,6 +706,19 @@ def _guess_category(sizes_raw: str, description: str) -> str:
     if _looks_like_kids_sizes(sizes_raw) or _looks_like_kids_sizes(description):
         return "Kids"
     return ""
+
+
+def _has_baby_signal(description: str, sizes_raw: str = "") -> bool:
+    text = f"{description}\n{sizes_raw}"
+    has_baby_word = re.search(
+        r"(?:بيبي|مواليد|رضيع|رضع|baby|babies|bebe|bebek|infant|newborn|toddler|b\.?\s*b\.?)",
+        text,
+        re.IGNORECASE,
+    )
+    has_mini_baby = _is_mini_baby_text(text)
+    has_month_sizes = re.search(r"\b\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?)?\s*(?:m|month|months)\b", text, re.IGNORECASE)
+    has_size_heading = re.search(r"(?:القياسات|المقاسات|beden|size)", text, re.IGNORECASE)
+    return bool(has_mini_baby or has_baby_word or (has_month_sizes and has_size_heading))
 
 
 def _audience_prefix(text: str) -> str:
