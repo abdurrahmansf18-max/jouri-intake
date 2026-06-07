@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { ImagePlus, Loader2, Search } from "lucide-react";
+import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag } from "lucide-react";
 import { fetchProducts } from "../api";
 import { useApp } from "../context";
-import { COPY, cn, filterLabel, normalizeText, searchTokens } from "../i18n";
+import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens } from "../i18n";
 import { DARK, LIGHT } from "../theme";
 import type { ProductRecord, StatusFilter } from "../types";
 import ProductCard from "../components/ProductCard";
@@ -25,6 +25,9 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
@@ -75,26 +78,80 @@ export default function ProductsPage() {
     sold_archive: 0,
   };
 
-  const uniqueCategories = useMemo(() => {
-    const cats = new Set<string>();
-    records.forEach(r => {
-      const c = r.parsed?.categorySuggestion?.trim();
-      if (c) cats.add(c);
+  const statusRecords = useMemo(
+    () => records.filter((r) => filter === "all" || r.status === filter),
+    [records, filter],
+  );
+
+  const recordsForCategoryCounts = useMemo(
+    () => statusRecords.filter((r) => {
+      const productType = normalizeProductType(r.parsed?.productTypeSuggestion ?? "");
+      if (typeFilter === "untyped") return !productType;
+      if (typeFilter !== "all") return productType === typeFilter;
+      return true;
+    }),
+    [statusRecords, typeFilter],
+  );
+
+  const recordsForTypeCounts = useMemo(
+    () => statusRecords.filter((r) => {
+      const category = normalizeCategory(r.parsed?.categorySuggestion ?? "");
+      if (categoryFilter === "uncategorized") return !category;
+      if (categoryFilter !== "all") return category === categoryFilter;
+      return true;
+    }),
+    [statusRecords, categoryFilter],
+  );
+
+  const categoryCounts = useMemo(() => {
+    const countsByCategory = new Map<string, number>();
+    let uncategorized = 0;
+    recordsForCategoryCounts.forEach((r) => {
+      const category = normalizeCategory(r.parsed?.categorySuggestion ?? "");
+      if (!category) {
+        uncategorized += 1;
+        return;
+      }
+      countsByCategory.set(category, (countsByCategory.get(category) ?? 0) + 1);
     });
-    return Array.from(cats).sort((a, b) => a.localeCompare(b));
-  }, [records]);
+    return {
+      categories: Array.from(countsByCategory.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      uncategorized,
+    };
+  }, [recordsForCategoryCounts]);
+
+  const typeCounts = useMemo(() => {
+    const countsByType = new Map<string, number>();
+    let untyped = 0;
+    recordsForTypeCounts.forEach((r) => {
+      const productType = normalizeProductType(r.parsed?.productTypeSuggestion ?? "");
+      if (!productType) {
+        untyped += 1;
+        return;
+      }
+      countsByType.set(productType, (countsByType.get(productType) ?? 0) + 1);
+    });
+    return {
+      types: Array.from(countsByType.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      untyped,
+    };
+  }, [recordsForTypeCounts]);
 
   // Filtre veya arama değişince sayfa 1'e dön
-  useEffect(() => { setPage(1); }, [filter, search, categoryFilter]);
+  useEffect(() => { setPage(1); }, [filter, search, categoryFilter, typeFilter]);
 
   const filtered = useMemo(() => {
     const tokens = searchTokens(search);
     return records.filter((r) => {
       if (filter !== "all" && r.status !== filter) return false;
       
-      const cat = r.parsed?.categorySuggestion?.trim() || "";
+      const cat = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (categoryFilter === "uncategorized" && cat) return false;
       if (categoryFilter !== "all" && categoryFilter !== "uncategorized" && cat !== categoryFilter) return false;
+
+      const productType = normalizeProductType(r.parsed?.productTypeSuggestion ?? "");
+      if (typeFilter === "untyped" && productType) return false;
+      if (typeFilter !== "all" && typeFilter !== "untyped" && productType !== typeFilter) return false;
 
       if (tokens.length === 0) return true;
       const p = r.parsed;
@@ -105,7 +162,7 @@ export default function ProductsPage() {
       ].join(" "));
       return tokens.every((tok) => haystack.includes(tok));
     });
-  }, [records, filter, search]);
+  }, [records, filter, search, categoryFilter, typeFilter]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = useMemo(() => {
@@ -131,6 +188,14 @@ export default function ProductsPage() {
   function openEdit(id: string) { setSelectedId(id); setDetailMode("edit"); }
 
   const selected = records.find((r) => r.id === selectedId) ?? null;
+  const selectedCategoryLabel =
+    categoryFilter === "all" ? t.allCategories :
+    categoryFilter === "uncategorized" ? t.uncategorized :
+    categoryFilter;
+  const selectedTypeLabel =
+    typeFilter === "all" ? t.allProductTypes :
+    typeFilter === "untyped" ? t.untyped :
+    typeFilter;
 
   if (loading) {
     return (
@@ -172,24 +237,133 @@ export default function ProductsPage() {
           </div>
 
           {/* Categories */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-thin -mx-4 px-4 sm:mx-0 sm:px-0">
-            <button type="button" onClick={() => setCategoryFilter("all")}
-              className={cn("shrink-0 rounded-full border px-4 py-1.5 text-xs font-bold transition whitespace-nowrap", 
-                categoryFilter === "all" ? "bg-violet-500 text-white border-violet-500" : cn("border-white/5", s.filterIdle))}>
-              {t.allCategories}
-            </button>
-            {uniqueCategories.map(c => (
-              <button key={c} type="button" onClick={() => setCategoryFilter(c)}
-                className={cn("shrink-0 rounded-full border px-4 py-1.5 text-xs font-bold transition whitespace-nowrap", 
-                  categoryFilter === c ? "bg-violet-500 text-white border-violet-500" : cn("border-white/5", s.filterIdle))}>
-                {c}
+          <div className="grid gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setCategoryMenuOpen((open) => !open); setTypeMenuOpen(false); }}
+                className={cn(
+                  "inline-flex min-h-10 max-w-full items-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition active:scale-95",
+                  categoryFilter !== "uncategorized" && categoryFilter !== "all" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
+                )}
+              >
+                <Layers3 className="size-4 shrink-0" />
+                <span className="shrink-0">{t.categoryFilterButton}</span>
+                <span className={cn("min-w-0 truncate rounded-lg px-2 py-0.5", categoryFilter !== "all" && categoryFilter !== "uncategorized" ? "bg-white/20" : "bg-white/5")}>
+                  {selectedCategoryLabel}
+                </span>
+                <ChevronDown className={cn("size-4 shrink-0 transition", categoryMenuOpen && "rotate-180")} />
               </button>
-            ))}
-            <button type="button" onClick={() => setCategoryFilter("uncategorized")}
-              className={cn("shrink-0 rounded-full border px-4 py-1.5 text-xs font-bold transition whitespace-nowrap", 
-                categoryFilter === "uncategorized" ? "bg-violet-500 text-white border-violet-500" : cn("border-white/5", s.filterIdle))}>
+              <button
+                type="button"
+                onClick={() => { setCategoryFilter("uncategorized"); setCategoryMenuOpen(false); }}
+                className={cn(
+                  "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition active:scale-95",
+                  categoryFilter === "uncategorized" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
+                )}
+              >
                 {t.uncategorized}
-            </button>
+                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-black">{categoryCounts.uncategorized}</span>
+              </button>
+            </div>
+
+            {categoryMenuOpen && (
+              <div className={cn("grid max-h-64 gap-1 overflow-y-auto rounded-xl border p-2", s.subPanel)}>
+                <div className={cn("px-2 py-1 text-[10px] font-black uppercase tracking-wide", s.muted)}>
+                  {t.categoryFilterList}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setCategoryFilter("all"); setCategoryMenuOpen(false); }}
+                  className={cn(
+                    "flex min-h-10 items-center justify-between gap-3 rounded-lg px-3 text-sm font-extrabold transition",
+                    categoryFilter === "all" ? s.filterActive : s.filterIdle,
+                  )}
+                >
+                  <span>{t.allCategories}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{recordsForCategoryCounts.length}</span>
+                </button>
+                {categoryCounts.categories.map(([category, count]) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => { setCategoryFilter(category); setCategoryMenuOpen(false); }}
+                    className={cn(
+                      "flex min-h-10 items-center justify-between gap-3 rounded-lg px-3 text-sm font-extrabold transition",
+                      categoryFilter === category ? s.filterActive : s.filterIdle,
+                    )}
+                  >
+                    <span className="min-w-0 truncate" dir="auto">{category}</span>
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Product types */}
+          <div className="grid gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setTypeMenuOpen((open) => !open); setCategoryMenuOpen(false); }}
+                className={cn(
+                  "inline-flex min-h-10 max-w-full items-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition active:scale-95",
+                  typeFilter !== "untyped" && typeFilter !== "all" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
+                )}
+              >
+                <Tag className="size-4 shrink-0" />
+                <span className="shrink-0">{t.productTypeFilterButton}</span>
+                <span className={cn("min-w-0 truncate rounded-lg px-2 py-0.5", typeFilter !== "all" && typeFilter !== "untyped" ? "bg-white/20" : "bg-white/5")}>
+                  {selectedTypeLabel}
+                </span>
+                <ChevronDown className={cn("size-4 shrink-0 transition", typeMenuOpen && "rotate-180")} />
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTypeFilter("untyped"); setTypeMenuOpen(false); }}
+                className={cn(
+                  "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition active:scale-95",
+                  typeFilter === "untyped" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
+                )}
+              >
+                {t.untyped}
+                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-black">{typeCounts.untyped}</span>
+              </button>
+            </div>
+
+            {typeMenuOpen && (
+              <div className={cn("grid max-h-64 gap-1 overflow-y-auto rounded-xl border p-2", s.subPanel)}>
+                <div className={cn("px-2 py-1 text-[10px] font-black uppercase tracking-wide", s.muted)}>
+                  {t.productTypeFilterList}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setTypeFilter("all"); setTypeMenuOpen(false); }}
+                  className={cn(
+                    "flex min-h-10 items-center justify-between gap-3 rounded-lg px-3 text-sm font-extrabold transition",
+                    typeFilter === "all" ? s.filterActive : s.filterIdle,
+                  )}
+                >
+                  <span>{t.allProductTypes}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{recordsForTypeCounts.length}</span>
+                </button>
+                {typeCounts.types.map(([productType, count]) => (
+                  <button
+                    key={productType}
+                    type="button"
+                    onClick={() => { setTypeFilter(productType); setTypeMenuOpen(false); }}
+                    className={cn(
+                      "flex min-h-10 items-center justify-between gap-3 rounded-lg px-3 text-sm font-extrabold transition",
+                      typeFilter === productType ? s.filterActive : s.filterIdle,
+                    )}
+                  >
+                    <span className="min-w-0 truncate" dir="auto">{productType}</span>
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

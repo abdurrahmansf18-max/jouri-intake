@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { createProduct, fetchProducts, updateRelatedProducts, parseProductText } from "../api";
 import { useApp } from "../context";
-import { COPY, cn } from "../i18n";
+import { COPY, cn, normalizeCategory, normalizeProductType } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord } from "../types";
 import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEditor";
@@ -70,6 +70,17 @@ export default function AddProductPage() {
   useEffect(() => {
     fetchProducts().then(setAllProducts).catch(() => {});
   }, []);
+
+  const existingCategories = Array.from(new Set(
+    allProducts
+      .map((p) => normalizeCategory(p.parsed.categorySuggestion || ""))
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b));
+  const existingProductTypes = Array.from(new Set(
+    allProducts
+      .map((p) => normalizeProductType(p.parsed.productTypeSuggestion || ""))
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b));
 
   function patch(key: keyof Draft, value: string) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -346,9 +357,23 @@ export default function AddProductPage() {
               <Field label={`${t.rawTitle} *`}       s={s} value={draft.titleRaw}              onChange={(v) => patch("titleRaw", v)} />
               <Field label={`${t.price} *`}           s={s} value={draft.priceAmount}           onChange={(v) => patch("priceAmount", v)} />
               <Field label={`${t.color} *`}           s={s} value={draft.colorRaw}              onChange={(v) => patch("colorRaw", v)} />
-              <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} />
-              <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} />
+              <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} listId="category-options" />
+              <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} listId="product-type-options" />
             </div>
+            {existingCategories.length > 0 && (
+              <datalist id="category-options">
+                {existingCategories.map((category) => (
+                  <option key={category} value={category} />
+                ))}
+              </datalist>
+            )}
+            {existingProductTypes.length > 0 && (
+              <datalist id="product-type-options">
+                {existingProductTypes.map((productType) => (
+                  <option key={productType} value={productType} />
+                ))}
+              </datalist>
+            )}
 
             {/* Beden + stok editörü */}
             <div className="mt-3 grid gap-1.5">
@@ -462,10 +487,10 @@ function getProviderNote(
 }
 
 function Field({
-  label, onChange, s, type = "text", value,
+  label, listId, onChange, s, type = "text", value,
 }: {
   label: string; onChange: (v: string) => void;
-  s: ThemeStyles; type?: "number" | "text"; value: string;
+  s: ThemeStyles; type?: "number" | "text"; value: string; listId?: string;
 }) {
   return (
     <label className="grid gap-1.5">
@@ -473,6 +498,7 @@ function Field({
       <input
         className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
         type={type}
+        list={listId}
         min={type === "number" ? 0 : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}

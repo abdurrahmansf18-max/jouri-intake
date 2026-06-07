@@ -155,9 +155,12 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
         category = ""
     if structured_parsed.get("categorySuggestion"):
         category = structured_parsed.get("categorySuggestion", "")
+    category = normalize_category(category)
 
     price_amount = structured_parsed.get("priceAmount", "") or _field(data.get("priceAmount", ""))
-    product_type = structured_parsed.get("productTypeSuggestion", "") or _field(data.get("productTypeSuggestion", ""))
+    product_type = normalize_product_type(
+        structured_parsed.get("productTypeSuggestion", "") or _field(data.get("productTypeSuggestion", ""))
+    )
 
     return {
         "parsed": ParsedProduct(
@@ -238,8 +241,10 @@ def parse_description_structured(description: str) -> dict:
         parsed.titleRaw = translated_title
     if not parsed.productTypeSuggestion:
         parsed.productTypeSuggestion = _guess_product_type(description)
+    parsed.productTypeSuggestion = normalize_product_type(parsed.productTypeSuggestion)
     if not parsed.categorySuggestion:
         parsed.categorySuggestion = _guess_category(parsed.sizesRaw, description)
+    parsed.categorySuggestion = normalize_category(parsed.categorySuggestion)
 
     return {
         "parsed": parsed.model_dump(),
@@ -264,6 +269,112 @@ def _field(value) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def normalize_category(value: str) -> str:
+    cleaned = _field(value)
+    cleaned = re.sub(r"^[`'\"‘’“”]+|[`'\"‘’“”]+$", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        return ""
+
+    key = _normalize_category_key(cleaned)
+    categories = {
+        "boy": "Boys",
+        "boys": "Boys",
+        "صبياني": "Boys",
+        "صبيان": "Boys",
+        "ولادي": "Boys",
+        "اولاد": "Boys",
+        "girl": "Girls",
+        "girls": "Girls",
+        "بناتي": "Girls",
+        "بنات": "Girls",
+        "kid": "Kids",
+        "kids": "Kids",
+        "child": "Kids",
+        "children": "Kids",
+        "اطفال": "Kids",
+        "women": "Women",
+        "woman": "Women",
+        "ladies": "Women",
+        "نسائي": "Women",
+        "حريمي": "Women",
+        "men": "Men",
+        "man": "Men",
+        "رجالي": "Men",
+        "baby": "Baby",
+        "babies": "Baby",
+        "newborn": "Baby",
+        "بيبي": "Baby",
+        "مواليد": "Baby",
+    }
+    return categories.get(key, cleaned)
+
+
+def normalize_product_type(value: str) -> str:
+    cleaned = _field(value)
+    cleaned = re.sub(r"^[`'\"‘’“”]+|[`'\"‘’“”]+$", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        return ""
+
+    key = _normalize_category_key(cleaned)
+    product_types = {
+        "pajama": "Pajamas",
+        "pajamas": "Pajamas",
+        "pyjama": "Pajamas",
+        "pyjamas": "Pajamas",
+        "بيجاما": "Pajamas",
+        "بجامه": "Pajamas",
+        "tshirt": "T-Shirt",
+        "tshirts": "T-Shirt",
+        "tee": "T-Shirt",
+        "tees": "T-Shirt",
+        "تيشيرت": "T-Shirt",
+        "تيشرت": "T-Shirt",
+        "tshirtset": "T-Shirt Set",
+        "dress": "Dress",
+        "dresses": "Dress",
+        "فستان": "Dress",
+        "فساطين": "Dress",
+        "set": "Set",
+        "طقم": "Set",
+        "short": "Shorts",
+        "shorts": "Shorts",
+        "شورت": "Shorts",
+        "pants": "Pants",
+        "trousers": "Pants",
+        "بنطلون": "Pants",
+        "jeans": "Jeans",
+        "جينز": "Jeans",
+        "shirt": "Shirt",
+        "shirts": "Shirt",
+        "قميص": "Shirt",
+        "blouse": "Blouse",
+        "بلوزه": "Blouse",
+        "jacket": "Jacket",
+        "جاكيت": "Jacket",
+        "coat": "Coat",
+        "معطف": "Coat",
+        "sweater": "Sweater",
+        "كنزه": "Sweater",
+        "hoodie": "Hoodie",
+        "هودي": "Hoodie",
+        "skirt": "Skirt",
+        "تنوره": "Skirt",
+        "romper": "Romper",
+        "bodysuit": "Bodysuit",
+    }
+    return product_types.get(key, cleaned)
+
+
+def _normalize_category_key(value: str) -> str:
+    key = value.strip().lower()
+    key = key.replace("إ", "ا").replace("أ", "ا").replace("آ", "ا").replace("ٱ", "ا")
+    key = key.replace("ى", "ي").replace("ئ", "ي").replace("ة", "ه")
+    key = re.sub(r"[^a-z\u0600-\u06ff]+", "", key)
+    return key
 
 
 def _brief_error(error: Exception) -> str:

@@ -14,6 +14,7 @@ from models import (
     SizeStock,
     SoldSizeEntry,
 )
+from parser import normalize_category, normalize_product_type
 
 
 def to_record(p: Product) -> ProductRecord:
@@ -28,8 +29,8 @@ def to_record(p: Product) -> ProductRecord:
         description=p.description,
         parsed=ParsedProduct(
             titleRaw=p.title_raw,
-            categorySuggestion=p.category,
-            productTypeSuggestion=p.product_type,
+            categorySuggestion=normalize_category(p.category),
+            productTypeSuggestion=normalize_product_type(p.product_type),
             priceAmount=p.price_amount,
             currency=p.currency,
             colorRaw=p.color_raw,

@@ -139,9 +139,15 @@ export const COPY = {
     color: "Renk",
     size: "Beden",
     category: "Kategori",
+    categoryFilterButton: "Kategoriler",
+    categoryFilterList: "Kayıtlı kategoriler",
     allCategories: "Tüm Kategoriler",
     uncategorized: "Kategorisiz",
     productType: "Ürün tipi",
+    productTypeFilterButton: "Ürün tipleri",
+    productTypeFilterList: "Kayıtlı ürün tipleri",
+    allProductTypes: "Tüm Ürün Tipleri",
+    untyped: "Tip belirtilmemiş",
     folders: "Klasörler",
     images: "Görseller",
     addImages: "Görsel ekle",
@@ -445,9 +451,15 @@ export const COPY = {
     color: "اللون",
     size: "المقاس",
     category: "الفئة",
+    categoryFilterButton: "الفئات",
+    categoryFilterList: "الفئات المسجلة",
     allCategories: "جميع الفئات",
     uncategorized: "بدون فئة",
     productType: "نوع المنتج",
+    productTypeFilterButton: "أنواع المنتجات",
+    productTypeFilterList: "أنواع المنتجات المسجلة",
+    allProductTypes: "جميع أنواع المنتجات",
+    untyped: "بدون نوع",
     folders: "المجلدات",
     images: "الصور",
     addImages: "إضافة صور",
@@ -632,6 +644,106 @@ export function statusLabel(status: ProductStatus, locale: Locale): string {
 export function filterLabel(filter: StatusFilter, locale: Locale): string {
   if (filter === "all") return COPY[locale].filterAll;
   return statusLabel(filter, locale);
+}
+
+export function normalizeCategory(value: string): string {
+  const cleaned = value
+    .trim()
+    .replace(/^[`'"‘’“”]+|[`'"‘’“”]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+
+  const key = normalizeText(cleaned).replace(/[^a-zا-ي]+/g, "");
+  const canonical: Record<string, string> = {
+    boy: "Boys",
+    boys: "Boys",
+    صبياني: "Boys",
+    صبيان: "Boys",
+    ولادي: "Boys",
+    اولاد: "Boys",
+    girl: "Girls",
+    girls: "Girls",
+    بناتي: "Girls",
+    بنات: "Girls",
+    kid: "Kids",
+    kids: "Kids",
+    children: "Kids",
+    child: "Kids",
+    اطفال: "Kids",
+    women: "Women",
+    woman: "Women",
+    ladies: "Women",
+    نسائي: "Women",
+    حريمي: "Women",
+    men: "Men",
+    man: "Men",
+    رجالي: "Men",
+    baby: "Baby",
+    babies: "Baby",
+    newborn: "Baby",
+    بيبي: "Baby",
+    مواليد: "Baby",
+  };
+  return canonical[key] ?? cleaned;
+}
+
+export function normalizeProductType(value: string): string {
+  const cleaned = value
+    .trim()
+    .replace(/^[`'"‘’“”]+|[`'"‘’“”]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+
+  const key = normalizeText(cleaned).replace(/[^a-zا-ي]+/g, "");
+  const canonical: Record<string, string> = {
+    pajama: "Pajamas",
+    pajamas: "Pajamas",
+    pyjama: "Pajamas",
+    pyjamas: "Pajamas",
+    بيجاما: "Pajamas",
+    بجامه: "Pajamas",
+    tshirt: "T-Shirt",
+    tshirts: "T-Shirt",
+    tee: "T-Shirt",
+    tees: "T-Shirt",
+    تيشيرت: "T-Shirt",
+    تيشرت: "T-Shirt",
+    tshirtset: "T-Shirt Set",
+    dress: "Dress",
+    dresses: "Dress",
+    فستان: "Dress",
+    فساطين: "Dress",
+    set: "Set",
+    طقم: "Set",
+    shorts: "Shorts",
+    short: "Shorts",
+    شورت: "Shorts",
+    pants: "Pants",
+    trousers: "Pants",
+    بنطلون: "Pants",
+    jeans: "Jeans",
+    جينز: "Jeans",
+    shirt: "Shirt",
+    shirts: "Shirt",
+    قميص: "Shirt",
+    blouse: "Blouse",
+    بلوزه: "Blouse",
+    jacket: "Jacket",
+    جاكيت: "Jacket",
+    coat: "Coat",
+    معطف: "Coat",
+    sweater: "Sweater",
+    كنزه: "Sweater",
+    hoodie: "Hoodie",
+    هودي: "Hoodie",
+    skirt: "Skirt",
+    تنوره: "Skirt",
+    romper: "Romper",
+    bodysuit: "Bodysuit",
+  };
+  return canonical[key] ?? cleaned;
 }
 
 export function apiError(err: unknown, locale: Locale): string {

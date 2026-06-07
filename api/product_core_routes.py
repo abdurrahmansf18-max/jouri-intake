@@ -19,7 +19,7 @@ from models import (
     StatusUpdateRequest,
     UpdateRelatedRequest,
 )
-from parser import parse_description
+from parser import normalize_category, normalize_product_type, parse_description
 from realtime import ws_manager
 
 
@@ -87,8 +87,8 @@ async def create_product(
     parsed = parse_description(description)
     overrides = {
         "titleRaw": titleRaw.strip() if titleRaw else parsed.titleRaw,
-        "categorySuggestion": categorySuggestion.strip() if categorySuggestion else parsed.categorySuggestion,
-        "productTypeSuggestion": productTypeSuggestion.strip() if productTypeSuggestion else parsed.productTypeSuggestion,
+        "categorySuggestion": normalize_category(categorySuggestion or parsed.categorySuggestion),
+        "productTypeSuggestion": normalize_product_type(productTypeSuggestion or parsed.productTypeSuggestion),
         "priceAmount": priceAmount.strip() if priceAmount else parsed.priceAmount,
         "currency": currency.strip() if currency else (parsed.currency or "EUR"),
         "colorRaw": colorRaw.strip() if colorRaw else parsed.colorRaw,
@@ -232,9 +232,11 @@ def update_product(
         if pd.titleRaw is not None:
             track("title", p.title_raw, pd.titleRaw); p.title_raw = pd.titleRaw
         if pd.categorySuggestion is not None:
-            track("category", p.category, pd.categorySuggestion); p.category = pd.categorySuggestion
+            category = normalize_category(pd.categorySuggestion)
+            track("category", p.category, category); p.category = category
         if pd.productTypeSuggestion is not None:
-            track("product_type", p.product_type, pd.productTypeSuggestion); p.product_type = pd.productTypeSuggestion
+            product_type = normalize_product_type(pd.productTypeSuggestion)
+            track("product_type", p.product_type, product_type); p.product_type = product_type
         if pd.priceAmount is not None:
             track("price", p.price_amount, pd.priceAmount); p.price_amount = pd.priceAmount
         if pd.currency is not None:
