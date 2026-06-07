@@ -1,6 +1,7 @@
 import base64
 import os
 import re
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -53,7 +54,6 @@ async def generate_product_images(
                     size=OPENAI_IMAGE_SIZE,
                     quality=OPENAI_IMAGE_QUALITY,
                     output_format="jpeg",
-                    response_format="b64_json",
                     input_fidelity="high",
                 )
         except HTTPException:
@@ -62,11 +62,27 @@ async def generate_product_images(
             print("[image_ai] OpenAI image generation failed:", _brief_error(exc))
             raise HTTPException(status_code=502, detail={"code": "ERR_AI_IMAGE_FAILED"})
 
-        if not response.data or not response.data[0].b64_json:
+        if not response.data:
             raise HTTPException(status_code=502, detail={"code": "ERR_AI_IMAGE_FAILED"})
-        generated.append(GeneratedAiImage(file_name=file_name, content=base64.b64decode(response.data[0].b64_json)))
+        content = _image_content(response.data[0])
+        if not content:
+            raise HTTPException(status_code=502, detail={"code": "ERR_AI_IMAGE_FAILED"})
+        generated.append(GeneratedAiImage(file_name=file_name, content=content))
 
     return generated
+
+
+def _image_content(item: Any) -> bytes:
+    b64_json = getattr(item, "b64_json", None)
+    if b64_json:
+        return base64.b64decode(b64_json)
+
+    url = getattr(item, "url", None)
+    if not url:
+        return b""
+
+    with urllib.request.urlopen(url, timeout=60) as response:
+        return response.read()
 
 
 def _product_context(product: Any, request: AiImageGenerateRequest) -> str:
