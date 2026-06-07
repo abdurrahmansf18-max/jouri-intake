@@ -56,6 +56,78 @@ function sizeStocksToRows(ss: SizeStock[]): SizeStockRow[] {
   return ss.map((s) => ({ size: s.size, qty: String(s.qty) }));
 }
 
+function aiImageSizeText(record: ProductRecord): string {
+  const sizes = record.sizeStocks.map((s) => s.size.trim()).filter(Boolean);
+  return sizes.length > 0 ? sizes.join(", ") : record.parsed.sizesRaw || "";
+}
+
+function inferAiAudience(record: ProductRecord): string {
+  const p = record.parsed;
+  const text = [
+    p.titleRaw,
+    p.categorySuggestion,
+    p.productTypeSuggestion,
+    p.colorRaw,
+    record.description,
+    record.notes,
+  ].join(" ").toLowerCase();
+
+  if (/\b(girls?|girl'?s)\b|بناتي|بنات|بنت|فتيات|kız/.test(text)) return "Girls";
+  if (/\b(boys?|boy'?s)\b|ولادي|اولادي|أولادي|ولد|صبيان|erkek/.test(text)) return "Boys";
+  if (/\b(baby|newborn|infant|toddler|mini baby|bebe)\b|بيبي|bebek|رضيع|مواليد/.test(text)) return "Baby";
+
+  const category = p.categorySuggestion.trim();
+  if (/^(boys?|girls?|baby|kids)$/i.test(category)) return category;
+  return category || "";
+}
+
+function inferAiAgeFromSizes(sizeText: string): string {
+  const range = extractAgeRangeInMonths(sizeText);
+  if (!range) return "";
+  if (range.min === range.max) return `About ${formatAge(range.min)}`;
+  return `About ${formatAge(range.min)} to ${formatAge(range.max)}`;
+}
+
+function extractAgeRangeInMonths(sizeText: string): { min: number; max: number } | null {
+  const text = sizeText.toLowerCase().replace(/–|—/g, "-");
+  const values: number[] = [];
+
+  for (const match of text.matchAll(/(\d{1,2})\s*-\s*(\d{1,2})\s*(m|mo|month|months|y|yr|year|years)\b/g)) {
+    const a = Number(match[1]);
+    const b = Number(match[2]);
+    const factor = match[3].startsWith("y") ? 12 : 1;
+    values.push(a * factor, b * factor);
+  }
+  for (const match of text.matchAll(/\b(\d{1,2})\s*(m|mo|month|months|y|yr|year|years)\b/g)) {
+    const n = Number(match[1]);
+    const factor = match[2].startsWith("y") ? 12 : 1;
+    values.push(n * factor);
+  }
+
+  const euSizeToMonths: Record<number, number> = {
+    50: 0, 56: 1, 62: 3, 68: 6, 74: 9, 80: 12, 86: 18, 92: 24,
+    98: 36, 104: 48, 110: 60, 116: 72, 122: 84, 128: 96, 134: 108,
+    140: 120, 146: 132, 152: 144, 158: 156, 164: 168,
+  };
+  for (const match of text.matchAll(/\b(50|56|62|68|74|80|86|92|98|104|110|116|122|128|134|140|146|152|158|164)\b/g)) {
+    values.push(euSizeToMonths[Number(match[1])]);
+  }
+
+  const cleaned = Array.from(new Set(values.filter((n) => Number.isFinite(n) && n >= 0 && n <= 216)));
+  if (cleaned.length === 0) return null;
+  return { min: Math.min(...cleaned), max: Math.max(...cleaned) };
+}
+
+function formatAge(months: number): string {
+  if (months === 0) return "newborn";
+  if (months < 24) return `${months} month${months === 1 ? "" : "s"}`;
+  if (months % 12 === 0) {
+    const years = months / 12;
+    return `${years} year${years === 1 ? "" : "s"}`;
+  }
+  return `${Math.floor(months / 12)} years ${months % 12} months`;
+}
+
 interface Props {
   record: ProductRecord;
   initialMode?: Mode;
@@ -263,11 +335,12 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   }
 
   function openAiImagePanel(img: SavedImage) {
+    const sizeText = aiImageSizeText(record);
     setAiImageSource(img);
     setAiImageForm({
-      gender: p.categorySuggestion || "",
-      age: "",
-      size: record.sizeStocks[0]?.size || p.sizesRaw || "",
+      gender: inferAiAudience(record),
+      age: inferAiAgeFromSizes(sizeText),
+      size: sizeText,
       instructions: "",
     });
   }
