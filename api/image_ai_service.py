@@ -86,6 +86,7 @@ def _product_context(product: Any, request: AiImageGenerateRequest) -> str:
 
 def _worn_prompt(product: Any, request: AiImageGenerateRequest) -> str:
     context = _product_context(product, request)
+    scene = _scene_guidance(product, request)
     return f"""
 Use the uploaded product photo as the source of truth for the clothing.
 Create a realistic ecommerce lifestyle mockup showing the same clothing worn by an age-appropriate child/person.
@@ -93,11 +94,14 @@ Create a realistic ecommerce lifestyle mockup showing the same clothing worn by 
 Product context:
 {context}
 
+Scene guidance:
+{scene}
+
 Strict rules:
 - Preserve the actual product: colors, fabric look, printed graphics, logo/text, patterns, buttons, trim, and number of visible clothing pieces.
 - Do not invent new colors, slogans, logos, accessories, or extra garments that are not in the source image.
 - The person must be fully clothed, natural, and appropriate for the provided age/size.
-- Use a clean, bright, realistic indoor setting suitable for a clothing store.
+- Choose the scene from the guidance above; keep the setting realistic, bright, clean, and suitable for ecommerce.
 - This is an AI mockup to show fit and use; keep it honest and close to the original product photo.
 - No watermark, no price text, no promotional text.
 """.strip()
@@ -129,6 +133,48 @@ def _size_stock_text(product: Any) -> str:
         str(item.get("size", "")).strip()
         for item in size_stocks
         if str(item.get("size", "")).strip()
+    )
+
+
+def _scene_guidance(product: Any, request: AiImageGenerateRequest) -> str:
+    text = " ".join(
+        str(value or "")
+        for value in [
+            _value(product, "title_raw"),
+            _value(product, "category"),
+            _value(product, "product_type"),
+            _value(product, "description"),
+            request.instructions,
+        ]
+    ).lower()
+
+    indoor_terms = [
+        "pajama", "pyjama", "sleep", "homewear", "nightwear",
+        "baby", "bodysuit", "onesie", "romper", "jumpsuit",
+        "knit", "cardigan", "sweater", "hoodie", "winter",
+        "بيجاما", "بجاما", "بيبي", "افرول", "اوفرول",
+    ]
+    outdoor_terms = [
+        "dress", "short", "t-shirt", "shirt", "set", "summer",
+        "casual", "pants", "jeans", "skirt",
+        "فستان", "شورت", "تيشيرت", "تيشرت", "بنطلون", "تنورة",
+    ]
+
+    if any(term in text for term in indoor_terms):
+        return (
+            "Prefer a bright indoor home or soft studio setting, such as a clean child room, "
+            "nursery, cozy bedroom, or simple natural-light studio. This is best for pajamas, "
+            "babywear, knitwear, jumpsuits, rompers, bodysuits, and homewear."
+        )
+    if any(term in text for term in outdoor_terms):
+        return (
+            "Prefer a clean outdoor or natural-light lifestyle setting, such as a garden, "
+            "sidewalk, simple storefront, or bright minimal patio. Use this for casual daywear, "
+            "t-shirts, shorts, dresses, skirts, pants, jeans, and summer sets."
+        )
+    return (
+        "If the clothing looks like sleepwear, babywear, knitwear, or homewear, use a bright indoor setting. "
+        "If it looks like casual daywear, summer clothing, dresses, t-shirts, shorts, or pants, use a clean outdoor or natural-light lifestyle setting."
     )
 
 
