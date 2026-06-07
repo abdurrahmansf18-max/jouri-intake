@@ -49,8 +49,8 @@ Return ONLY valid JSON. No markdown formatting like ```json.
 JSON Schema:
 {
     "titleRaw": "English Title",
-    "categorySuggestion": "A suggested category like 'Boys', 'Girls', 'Women', etc.",
-    "productTypeSuggestion": "e.g. 'Pajamas', 'Dress', 'T-Shirt'",
+    "categorySuggestion": "A suggested category like 'Boys', 'Girls', 'Baby', 'Women', etc.",
+    "productTypeSuggestion": "e.g. 'Pajamas', 'Dress', 'T-Shirt', 'Jumpsuit', 'Romper', 'Bodysuit'",
     "priceAmount": "numeric string, e.g. 25",
     "currency": "EUR",
     "variants": [
@@ -305,9 +305,19 @@ def normalize_category(value: str) -> str:
         "رجالي": "Men",
         "baby": "Baby",
         "babies": "Baby",
+        "bebe": "Baby",
+        "bebek": "Baby",
+        "minibebe": "Baby",
+        "minibebek": "Baby",
+        "minibaby": "Baby",
+        "infant": "Baby",
+        "infants": "Baby",
         "newborn": "Baby",
+        "newborns": "Baby",
         "بيبي": "Baby",
         "مواليد": "Baby",
+        "رضيع": "Baby",
+        "رضع": "Baby",
     }
     return categories.get(key, cleaned)
 
@@ -364,7 +374,27 @@ def normalize_product_type(value: str) -> str:
         "skirt": "Skirt",
         "تنوره": "Skirt",
         "romper": "Romper",
+        "rompers": "Romper",
+        "سالوبيت": "Romper",
+        "سلوبت": "Romper",
+        "سالوبت": "Romper",
         "bodysuit": "Bodysuit",
+        "bodysuits": "Bodysuit",
+        "body": "Bodysuit",
+        "onesie": "Bodysuit",
+        "onesies": "Bodysuit",
+        "بربتوز": "Bodysuit",
+        "بدي": "Bodysuit",
+        "jumpsuit": "Jumpsuit",
+        "jumpsuits": "Jumpsuit",
+        "overall": "Jumpsuit",
+        "overalls": "Jumpsuit",
+        "dungaree": "Jumpsuit",
+        "dungarees": "Jumpsuit",
+        "tulum": "Jumpsuit",
+        "salopet": "Jumpsuit",
+        "افرول": "Jumpsuit",
+        "اوفرول": "Jumpsuit",
     }
     return product_types.get(key, cleaned)
 
@@ -571,6 +601,12 @@ def _translate_title(value: str) -> str:
 
 def _guess_product_type(description: str) -> str:
     text = description.lower()
+    if re.search(r"(?:jumpsuit|dungaree|overalls?|tulum|salopet|افرول|اوفرول)", description, re.IGNORECASE):
+        return "Jumpsuit"
+    if re.search(r"(?:rompers?|سالوبيت|سلوبت|سالوبت)", description, re.IGNORECASE):
+        return "Romper"
+    if re.search(r"(?:bodysuits?|onesies?|بربتوز|بدي)", description, re.IGNORECASE):
+        return "Bodysuit"
     if re.search(r"(?:توينز|طقم|set)", description, re.IGNORECASE):
         return "Set"
     if "بيجاما" in description or "pajama" in text:
@@ -605,7 +641,7 @@ def _guess_category(sizes_raw: str, description: str) -> str:
         return "Women"
     if re.search(r"(?:رجالي|men|man)", description, re.IGNORECASE):
         return "Men"
-    if re.search(r"(?:بيبي|مواليد|رضع|baby|newborn)", description, re.IGNORECASE):
+    if re.search(r"(?:بيبي|مواليد|رضيع|رضع|baby|babies|bebe|bebek|mini\\s*bebe|mini\\s*bebek|mini\\s*baby|infant|newborn)", description, re.IGNORECASE):
         return "Baby"
     if _looks_like_kids_sizes(sizes_raw) or _looks_like_kids_sizes(description):
         return "Kids"
