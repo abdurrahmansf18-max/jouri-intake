@@ -5,6 +5,7 @@ import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord, ProductStatus } from "../types";
+import { formatPrice } from "../format";
 
 interface Props {
   record: ProductRecord;
@@ -100,7 +101,7 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
         <div className="mt-2 flex items-center justify-between gap-2">
           {p.priceAmount ? (
             <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-sm font-black text-emerald-300">
-              {p.priceAmount} {p.currency}
+              {formatPrice(p.priceAmount, p.currency)}
             </span>
           ) : <span />}
           <span className={cn("rounded-lg border px-2 py-0.5 text-[10px] font-black", statusBadge(record.status, s))}>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ArchiveRestore, Box, CalendarDays, Edit3,
+  ArchiveRestore, Box, CalendarDays, ChevronLeft, ChevronRight, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
   RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles
 } from "lucide-react";
@@ -15,6 +15,7 @@ import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord, ProductStatus, SavedImage, SizeStock } from "../types";
+import { formatPrice } from "../format";
 import { statusActiveBadge, statusBadge } from "./ProductCard";
 import ImageLightbox from "./ImageLightbox";
 import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
@@ -137,10 +138,11 @@ interface Props {
   onDelete: (id: string) => void;
   showRestoreSizes?: boolean;
   allProducts?: ProductRecord[];
+  navigationProducts?: ProductRecord[];
   onNavigate?: (product: ProductRecord) => void;
 }
 
-export default function ProductDetail({ record, initialMode = "view", onClose, onReplace, onDelete, showRestoreSizes = false, allProducts, onNavigate }: Props) {
+export default function ProductDetail({ record, initialMode = "view", onClose, onReplace, onDelete, showRestoreSizes = false, allProducts, navigationProducts, onNavigate }: Props) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
@@ -168,6 +170,10 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [aiImageSource, setAiImageSource] = useState<SavedImage | null>(null);
   const [aiImageBusy, setAiImageBusy] = useState(false);
   const [aiImageForm, setAiImageForm] = useState({ gender: "", age: "", size: "", instructions: "" });
+  const navList = navigationProducts ?? [];
+  const navIndex = navList.findIndex((product) => product.id === record.id);
+  const prevProduct = navIndex > 0 ? navList[navIndex - 1] : null;
+  const nextProduct = navIndex >= 0 && navIndex < navList.length - 1 ? navList[navIndex + 1] : null;
   
 
   useEffect(() => {
@@ -449,7 +455,34 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
               <h2 className={cn("line-clamp-1 text-sm font-black tracking-tight", s.title)} dir="auto">
                 {p.titleRaw || record.folderName}
               </h2>
+              {navIndex >= 0 && navList.length > 1 ? (
+                <div className={cn("mt-0.5 text-[11px] font-bold", s.muted)}>
+                  {t.productNavPosition(navIndex + 1, navList.length)}
+                </div>
+              ) : null}
             </div>
+            {onNavigate && navList.length > 1 ? (
+              <div className={cn("inline-flex shrink-0 items-center gap-1 rounded-lg border p-0.5", s.controlGroup)}>
+                <button
+                  type="button"
+                  onClick={() => prevProduct && onNavigate(prevProduct)}
+                  disabled={!prevProduct}
+                  title={t.prevProduct}
+                  className={cn("inline-flex size-8 items-center justify-center rounded-md transition disabled:opacity-35", s.controlIdle)}
+                >
+                  <ChevronLeft className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => nextProduct && onNavigate(nextProduct)}
+                  disabled={!nextProduct}
+                  title={t.nextProduct}
+                  className={cn("inline-flex size-8 items-center justify-center rounded-md transition disabled:opacity-35", s.controlIdle)}
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+            ) : null}
             {/* Masaüstü tab */}
             <div className={cn("hidden sm:inline-flex items-center gap-0.5 rounded-lg border p-0.5", s.controlGroup)}>
               <button type="button" onClick={() => setMode("view")}
@@ -524,7 +557,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
                     {/* Fiyat */}
                     {p.priceAmount && <InfoRow label={t.price} s={s}>
-                      <span className="font-black text-emerald-400">{p.priceAmount} {p.currency}</span>
+                      <span className="font-black text-emerald-400">{formatPrice(p.priceAmount, p.currency)}</span>
                     </InfoRow>}
 
                     {/* Orijinal ad */}
@@ -972,7 +1005,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </h3>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <DetailField label={t.rawTitle}            s={s} value={draft.titleRaw}              onChange={(v) => patch("titleRaw", v)} />
-                    <DetailField label={t.price}               s={s} value={draft.priceAmount}            onChange={(v) => patch("priceAmount", v)} />
+                    <DetailField label={t.price}               s={s} value={draft.priceAmount}            onChange={(v) => patch("priceAmount", v)} prefix="€" inputDir="ltr" />
                     <DetailField label={t.color}               s={s} value={draft.colorRaw}               onChange={(v) => patch("colorRaw", v)} />
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />
                     <DetailField label={t.productType}         s={s} value={draft.productTypeSuggestion}  onChange={(v) => patch("productTypeSuggestion", v)} />
@@ -1216,7 +1249,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 <span className={cn("font-bold", s.muted)}>{t.rawTitle}:</span> <span className={s.strong}>{p.titleRaw}</span>
               </div>
               <div className="text-sm">
-                <span className={cn("font-bold", s.muted)}>{t.price}:</span> <span className={s.strong}>{p.priceAmount} {p.currency || "EUR"}</span>
+                <span className={cn("font-bold", s.muted)}>{t.price}:</span> <span className={s.strong}>{formatPrice(p.priceAmount, p.currency)}</span>
               </div>
               <div className="text-sm">
                 <span className={cn("font-bold", s.muted)}>{t.originalDescription || "Açıklama"}:</span> 
@@ -1269,15 +1302,22 @@ function InfoRow({ label, s, children }: { label?: string; s?: ThemeStyles; chil
   );
 }
 
-function DetailField({ label, onChange, s, type = "text", value }: {
-  label: string; onChange: (v: string) => void; s: ThemeStyles; type?: "number" | "text"; value: string;
+function DetailField({ label, inputDir = "auto", onChange, prefix, s, type = "text", value }: {
+  label: string; onChange: (v: string) => void; s: ThemeStyles; type?: "number" | "text"; value: string; inputDir?: "auto" | "ltr" | "rtl"; prefix?: string;
 }) {
   return (
     <label className="grid gap-1.5">
       <span className={cn("text-xs font-black", s.strong)}>{label}</span>
-      <input className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
-        type={type} min={type === "number" ? 0 : undefined}
-        value={value} onChange={(e) => onChange(e.target.value)} dir="auto" />
+      <span className="relative block">
+        {prefix ? (
+          <span className={cn("pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black", s.muted)}>
+            {prefix}
+          </span>
+        ) : null}
+        <input className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", prefix && "pl-9", s.input)}
+          type={type} min={type === "number" ? 0 : undefined}
+          value={value} onChange={(e) => onChange(e.target.value)} dir={inputDir} />
+      </span>
     </label>
   );
 }

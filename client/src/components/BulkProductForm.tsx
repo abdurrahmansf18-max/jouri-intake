@@ -8,6 +8,7 @@ import { createProduct } from "../api";
 import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
+import { formatPrice } from "../format";
 import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
 
 // ── Tipler ───────────────────────────────────────────────────────────────────
@@ -156,7 +157,7 @@ export default function BulkProductForm({ initialCards }: { initialCards?: BulkD
           .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
 
         const description = card.description.trim() ||
-          [card.titleRaw, card.colorRaw, card.priceAmount && `${card.priceAmount} EUR`]
+          [card.titleRaw, card.colorRaw, card.priceAmount && formatPrice(card.priceAmount, "EUR")]
             .filter(Boolean).join(" · ");
 
         await createProduct(description, card.files, {
@@ -434,7 +435,7 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             label={`${t.price} *`}
             value={card.priceAmount}
             onChange={(v) => onPatch({ priceAmount: v })}
-            s={s} disabled={busy}
+            s={s} disabled={busy} prefix="€" inputDir="ltr"
           />
           <BulkField
             label={`${t.color} *`}
@@ -506,29 +507,39 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
 
 // ── Yardımcı alan bileşeni ────────────────────────────────────────────────────
 
-function BulkField({ label, value, onChange, s, disabled, placeholder, className }: {
+function BulkField({ label, value, onChange, s, disabled, inputDir = "auto", placeholder, prefix, className }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   s: ThemeStyles;
   disabled: boolean;
+  inputDir?: "auto" | "ltr" | "rtl";
   placeholder?: string;
+  prefix?: string;
   className?: string;
 }) {
   return (
     <label className={cn("grid gap-1", className)}>
       <span className={cn("text-[10px] font-black leading-none", s.strong)}>{label}</span>
-      <input
-        className={cn(
-          "min-h-9 w-full rounded-lg border px-2.5 text-xs font-semibold outline-none focus:ring-2",
-          s.input,
-        )}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        placeholder={placeholder}
-        dir="auto"
-      />
+      <span className="relative block">
+        {prefix ? (
+          <span className={cn("pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black", s.muted)}>
+            {prefix}
+          </span>
+        ) : null}
+        <input
+          className={cn(
+            "min-h-9 w-full rounded-lg border px-2.5 text-xs font-semibold outline-none focus:ring-2",
+            prefix && "pl-7",
+            s.input,
+          )}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          placeholder={placeholder}
+          dir={inputDir}
+        />
+      </span>
     </label>
   );
 }

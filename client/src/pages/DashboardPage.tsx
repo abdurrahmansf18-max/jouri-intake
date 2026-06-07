@@ -12,6 +12,7 @@ import { COPY, cn, logActionLabel, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import { statusBadge } from "../components/ProductCard";
 import type { ActivityLog, ProductRecord } from "../types";
+import { formatPrice } from "../format";
 
 type NamedCount = { label: string; count: number };
 
@@ -235,7 +236,7 @@ export default function DashboardPage() {
         <MetricCard
           icon={<DollarSign className="size-4 text-violet-400" />}
           label={t.dashStockValue}
-          value={`${stockValue.toFixed(0)} EUR`}
+          value={formatPrice(stockValue.toFixed(0), "EUR")}
           color="text-violet-400"
           bg="bg-violet-400/10 border-violet-400/20"
           small
@@ -431,7 +432,7 @@ export default function DashboardPage() {
                     <div className="mt-1 flex items-center justify-between gap-1">
                       {p.parsed.priceAmount && (
                         <span className="text-[10px] font-black text-emerald-400">
-                          {p.parsed.priceAmount} {p.parsed.currency}
+                          {formatPrice(p.parsed.priceAmount, p.parsed.currency)}
                         </span>
                       )}
                       <span className={cn("rounded-md border px-1.5 py-0.5 text-[9px] font-black", statusBadge(p.status, s))}>

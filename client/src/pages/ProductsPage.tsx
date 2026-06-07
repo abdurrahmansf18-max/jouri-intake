@@ -372,6 +372,7 @@ export default function ProductsPage() {
           onReplace={replaceRecord}
           onDelete={removeRecord}
           allProducts={allProducts}
+          navigationProducts={filtered}
           onNavigate={(product) => { setSelectedId(product.id); setDetailMode("view"); }}
         />
       )}

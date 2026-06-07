@@ -356,7 +356,7 @@ export default function AddProductPage() {
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label={`${t.rawTitle} *`}       s={s} value={draft.titleRaw}              onChange={(v) => patch("titleRaw", v)} />
-              <Field label={`${t.price} *`}           s={s} value={draft.priceAmount}           onChange={(v) => patch("priceAmount", v)} />
+              <Field label={`${t.price} *`}           s={s} value={draft.priceAmount}           onChange={(v) => patch("priceAmount", v)} prefix="€" inputDir="ltr" />
               <Field label={`${t.color} *`}           s={s} value={draft.colorRaw}              onChange={(v) => patch("colorRaw", v)} />
               <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} listId="category-options" />
               <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} listId="product-type-options" />
@@ -519,23 +519,30 @@ function getProviderNote(
 }
 
 function Field({
-  label, listId, onChange, s, type = "text", value,
+  label, inputDir = "auto", listId, onChange, prefix, s, type = "text", value,
 }: {
   label: string; onChange: (v: string) => void;
-  s: ThemeStyles; type?: "number" | "text"; value: string; listId?: string;
+  s: ThemeStyles; type?: "number" | "text"; value: string; inputDir?: "auto" | "ltr" | "rtl"; listId?: string; prefix?: string;
 }) {
   return (
     <label className="grid gap-1.5">
       <span className={cn("text-xs font-black", s.strong)}>{label}</span>
-      <input
-        className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
-        type={type}
-        list={listId}
-        min={type === "number" ? 0 : undefined}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        dir="auto"
-      />
+      <span className="relative block">
+        {prefix ? (
+          <span className={cn("pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black", s.muted)}>
+            {prefix}
+          </span>
+        ) : null}
+        <input
+          className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", prefix && "pl-9", s.input)}
+          type={type}
+          list={listId}
+          min={type === "number" ? 0 : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          dir={inputDir}
+        />
+      </span>
     </label>
   );
 }

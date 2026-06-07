@@ -128,6 +128,7 @@ export default function ArchivePage() {
           onDelete={removeRecord}
           showRestoreSizes
           allProducts={allProducts}
+          navigationProducts={filtered}
           onNavigate={(product) => { setSelectedId(product.id); setDetailMode("view"); }}
         />
       )}
