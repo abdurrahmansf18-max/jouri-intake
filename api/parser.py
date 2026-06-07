@@ -425,9 +425,17 @@ def _looks_like_kids_sizes(value: str) -> bool:
 
 def _extract_variants(description: str) -> list[dict[str, str]]:
     variants = []
+    current_variant: dict[str, str] | None = None
+    current_suffix = ""
     for raw_line in description.splitlines():
         line = raw_line.strip()
-        if not line or ":" not in line:
+        if not line:
+            continue
+        if ":" not in line:
+            if current_variant and _looks_like_size_line(line):
+                sizes = _normalize_sizes(line, default_suffix=current_suffix)
+                _append_variant_sizes(current_variant, sizes)
+                current_suffix = _detect_size_suffix(line) or current_suffix
             continue
         label, value = re.split(r"[:：]", line, maxsplit=1)
         label = _clean(label)
@@ -436,13 +444,17 @@ def _extract_variants(description: str) -> list[dict[str, str]]:
             continue
         if re.search(r"(?:السعر|price|قياس|مقاس|beden|size)", label, re.IGNORECASE):
             continue
-        sizes = _normalize_sizes(value)
+        sizes = _normalize_sizes(value, default_suffix=current_suffix)
         if not sizes:
+            current_variant = None
+            current_suffix = ""
             continue
-        variants.append({
+        current_variant = {
             "color": _translate_color(label),
             "sizes": ", ".join(sizes),
-        })
+        }
+        variants.append(current_variant)
+        current_suffix = _detect_size_suffix(value) or current_suffix
     return variants
 
 
@@ -460,12 +472,11 @@ def _normalize_variants(raw_variants) -> list[dict[str, str]]:
     return normalized
 
 
-def _normalize_sizes(value: str) -> list[str]:
+def _normalize_sizes(value: str, default_suffix: str = "") -> list[str]:
     if not value:
         return []
     compact = value.replace("،", ",").replace("／", "/")
-    suffix_match = re.search(r"\b([A-Za-z]+)\b\s*$", compact)
-    suffix = suffix_match.group(1).upper() if suffix_match else ""
+    suffix = _detect_size_suffix(compact) or default_suffix.upper()
     tokens = re.split(r"[/,]+", compact)
     sizes = []
     for token in tokens:
@@ -473,7 +484,13 @@ def _normalize_sizes(value: str) -> list[str]:
         cleaned = re.sub(r"[^0-9A-Za-z.+-]", "", cleaned)
         if not cleaned:
             continue
-        if suffix in {"Y", "M"} and re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
+        range_with_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)([YM])", cleaned, re.IGNORECASE)
+        range_without_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)", cleaned)
+        if range_with_suffix:
+            cleaned = _format_age_size_range(range_with_suffix.group(1), range_with_suffix.group(2), range_with_suffix.group(3).upper())
+        elif range_without_suffix and suffix in {"Y", "M"}:
+            cleaned = _format_age_size_range(range_without_suffix.group(1), range_without_suffix.group(2), suffix)
+        elif suffix in {"Y", "M"} and re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
             cleaned = _format_age_size(cleaned, suffix)
         elif suffix and re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
             cleaned = f"{cleaned}{suffix}"
@@ -482,6 +499,27 @@ def _normalize_sizes(value: str) -> list[str]:
         if cleaned not in sizes:
             sizes.append(cleaned)
     return sizes
+
+
+def _looks_like_size_line(value: str) -> bool:
+    compact = value.strip()
+    if not compact:
+        return False
+    return bool(re.fullmatch(r"[0-9\s.,/+\\-]+(?:[A-Za-z]+)?", compact))
+
+
+def _detect_size_suffix(value: str) -> str:
+    suffix_match = re.search(r"\b([A-Za-z]+)\b\s*$", value)
+    suffix = suffix_match.group(1).upper() if suffix_match else ""
+    return suffix if suffix in {"Y", "M"} else ""
+
+
+def _append_variant_sizes(variant: dict[str, str], sizes: list[str]) -> None:
+    existing = [s.strip() for s in variant.get("sizes", "").split(",") if s.strip()]
+    for size in sizes:
+        if size and size not in existing:
+            existing.append(size)
+    variant["sizes"] = ", ".join(existing)
 
 
 def _expand_age_suffix(value: str) -> str:
@@ -500,6 +538,15 @@ def _format_age_size(number: str, suffix: str) -> str:
         unit = "Month" if singular else "Months"
     display_number = cleaned_number[:-2] if cleaned_number.endswith(".0") else cleaned_number
     return f"{display_number} {unit}"
+
+
+def _format_age_size_range(start: str, end: str, suffix: str) -> str:
+    start_number = start.replace(",", ".")
+    end_number = end.replace(",", ".")
+    start_display = start_number[:-2] if start_number.endswith(".0") else start_number
+    end_display = end_number[:-2] if end_number.endswith(".0") else end_number
+    unit = "Years" if suffix == "Y" else "Months"
+    return f"{start_display}-{end_display} {unit}"
 
 
 def _extract_price(description: str) -> str:
@@ -541,6 +588,7 @@ def _translate_color(value: str) -> str:
         "فيروزى": "Turquoise",
         "وردي": "Pink",
         "زهري": "Pink",
+        "زهر": "Pink",
         "فوشي": "Fuchsia",
         "موف": "Mauve",
         "ليلكي": "Lilac",
@@ -584,6 +632,8 @@ def _translate_title(value: str) -> str:
         return f"{audience}{style}Short Pajama Set".strip()
     if has_pajama:
         return f"{audience}{style}Pajama Set".strip()
+    if re.search(r"(?:افرول|اوفرول|jumpsuit|dungaree|overalls?|tulum|salopet)", text, re.IGNORECASE):
+        return f"{audience}{style}{material}Jumpsuit".strip()
     if re.search(r"(?:فستان|dress)", text, re.IGNORECASE):
         return f"{audience}{style}{material}Dress".strip()
     if re.search(r"(?:توينز|طقم|set)", text, re.IGNORECASE):
