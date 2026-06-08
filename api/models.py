@@ -59,6 +59,13 @@ class ImageFolders(BaseModel):
     enhanced: ImageFolder
 
 
+class ShopifySyncInfo(BaseModel):
+    productId: Optional[str] = None
+    handle: Optional[str] = None
+    syncedAt: Optional[str] = None
+    lastError: Optional[str] = None
+
+
 class ProductRecord(BaseModel):
     id: str
     createdAt: str
@@ -77,6 +84,7 @@ class ProductRecord(BaseModel):
     sizeStocks: list[SizeStock] = Field(default_factory=list)
     soldSizes: list[SoldSizeEntry] = Field(default_factory=list)
     relatedProducts: list[str] = Field(default_factory=list)
+    shopify: ShopifySyncInfo = Field(default_factory=ShopifySyncInfo)
 
 
 class StatusUpdateRequest(BaseModel):

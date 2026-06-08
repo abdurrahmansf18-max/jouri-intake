@@ -85,6 +85,7 @@ export const COPY = {
     logStatusChange: "Durum değiştirildi",
     logAddImages: (n: number) => `${n} görsel eklendi`,
     logAiGenerateImages: (n: number) => `${n} AI görsel eklendi`,
+    logShopifyPush: "Shopify senkronu",
     logResetSales: "Satış sıfırlandı",
     logUnknown: "İşlem yapıldı",
     // Pages
@@ -242,6 +243,9 @@ export const COPY = {
       ERR_DESCRIPTION_REQUIRED: "Açıklama boş olamaz.",
       ERR_OUT_OF_STOCK: "Bu bedenin stoğu tükendi.",
       ERR_BACKUP_FAILED: "Yedekleme başarısız oldu.",
+      ERR_SHOPIFY_CONFIG: "Shopify ayarları eksik. Store URL ve access token kontrol edilmeli.",
+      ERR_SHOPIFY_FAILED: "Shopify gönderimi başarısız oldu.",
+      ERR_SHOPIFY_STATUS_REQUIRED: "Shopify'a göndermek için ürün önce Yayınlandı durumunda olmalı.",
       ERR_AI_IMAGE_NOT_CONFIGURED: "AI görsel sistemi henüz yapılandırılmamış. OPENAI_API_KEY eklenmeli.",
       ERR_AI_IMAGE_FAILED: "AI görsel üretimi başarısız oldu.",
       ERR_RATE_LIMITED: "Çok fazla deneme. Lütfen birkaç dakika bekle.",
@@ -341,9 +345,20 @@ export const COPY = {
     aiFailed: "AI Analizi başarısız oldu.",
     photoroomBtn: "Photoroom İle Arkaplanı Temizle",
     shopifyBtn: "Shopify'a Gönder",
+    shopifyUpdateBtn: "Shopify'da Güncelle",
     shopifyPreviewTitle: "Shopify Gönderim Önizlemesi",
-    shopifyPreviewWarning: "Not: 'Notlar' alanı Shopify'a GÖNDERİLMEZ.",
+    shopifyPreviewWarning: "Not: 'Notlar' alanı Shopify'a GÖNDERİLMEZ. Ürün Shopify'da taslak olarak oluşturulur veya güncellenir.",
     shopifyConfirm: "Gönder",
+    shopifyUpdateConfirm: "Güncelle",
+    shopifyCreateSuccess: "Shopify taslak ürünü oluşturuldu.",
+    shopifyUpdateSuccess: "Shopify ürünü güncellendi.",
+    shopifySynced: "Shopify eşleşmesi",
+    shopifyLastSync: "Son Shopify senkronu",
+    shopifyLastError: "Son Shopify hatası",
+    shopifyWillCreate: "Yeni taslak ürün oluşturulacak.",
+    shopifyWillUpdate: "Mevcut Shopify taslağı güncellenecek.",
+    shopifyImagesIncluded: (n: number) => `${n} görsel kontrol edilip eksikler yüklenecek`,
+    shopifyVariantsIncluded: (n: number) => `${n} beden/stok varyantı gönderilecek`,
     aiPromptMsg: "Yapay zekaya görsel için bir talimat verin (Örn: 'Kıyafetleri bir mankene giydir' veya boş bırakın):",
     // Sample
     sampleDesc: "",
@@ -432,6 +447,7 @@ export const COPY = {
     logStatusChange: "تم تغيير الحالة",
     logAddImages: (n: number) => `تمت إضافة ${n} صورة`,
     logAiGenerateImages: (n: number) => `تمت إضافة ${n} صورة بالذكاء الاصطناعي`,
+    logShopifyPush: "مزامنة Shopify",
     logResetSales: "تم تصفير المبيعات",
     logUnknown: "تمت العملية",
     // Pages
@@ -589,6 +605,9 @@ export const COPY = {
       ERR_DESCRIPTION_REQUIRED: "لا يمكن ترك الوصف فارغًا.",
       ERR_OUT_OF_STOCK: "نفذ مخزون هذا المقاس.",
       ERR_BACKUP_FAILED: "فشل النسخ الاحتياطي.",
+      ERR_SHOPIFY_CONFIG: "إعدادات Shopify ناقصة. تحقق من رابط المتجر ورمز الوصول.",
+      ERR_SHOPIFY_FAILED: "فشل الإرسال إلى Shopify.",
+      ERR_SHOPIFY_STATUS_REQUIRED: "يجب أن يكون المنتج في حالة منشور قبل إرساله إلى Shopify.",
       ERR_AI_IMAGE_NOT_CONFIGURED: "نظام صور الذكاء الاصطناعي غير مفعّل بعد. يجب إضافة OPENAI_API_KEY.",
       ERR_AI_IMAGE_FAILED: "فشل إنشاء صور الذكاء الاصطناعي.",
       ERR_RATE_LIMITED: "محاولات كثيرة جداً. يرجى الانتظار بضع دقائق.",
@@ -688,9 +707,20 @@ export const COPY = {
     aiFailed: "فشل تحليل الذكاء الاصطناعي.",
     photoroomBtn: "إزالة الخلفية باستخدام Photoroom",
     shopifyBtn: "إرسال إلى Shopify",
+    shopifyUpdateBtn: "تحديث في Shopify",
     shopifyPreviewTitle: "معاينة الإرسال إلى Shopify",
-    shopifyPreviewWarning: "ملاحظة: حقل 'الملاحظات' لن يتم إرساله إلى Shopify.",
+    shopifyPreviewWarning: "ملاحظة: حقل 'الملاحظات' لن يتم إرساله إلى Shopify. سيتم إنشاء المنتج أو تحديثه كمسودة في Shopify.",
     shopifyConfirm: "إرسال",
+    shopifyUpdateConfirm: "تحديث",
+    shopifyCreateSuccess: "تم إنشاء مسودة المنتج في Shopify.",
+    shopifyUpdateSuccess: "تم تحديث المنتج في Shopify.",
+    shopifySynced: "ربط Shopify",
+    shopifyLastSync: "آخر مزامنة Shopify",
+    shopifyLastError: "آخر خطأ Shopify",
+    shopifyWillCreate: "سيتم إنشاء مسودة منتج جديدة.",
+    shopifyWillUpdate: "سيتم تحديث مسودة Shopify الحالية.",
+    shopifyImagesIncluded: (n: number) => `سيتم فحص ${n} صورة ورفع الصور الناقصة`,
+    shopifyVariantsIncluded: (n: number) => `سيتم إرسال ${n} مقاس/مخزون كمتغيرات`,
     aiPromptMsg: "أعطي تعليمة للذكاء الاصطناعي للصورة (مثال: 'ألبس الملابس لعارضة أزياء' أو اتركيه فارغًا):",
     // Sample
     sampleDesc: "",
@@ -895,6 +925,7 @@ export function logActionLabel(action: string, locale: Locale, details?: Record<
       const count = typeof details?.count === "number" ? details.count : 1;
       return t.logAiGenerateImages(count);
     }
+    case "shopify_push": return t.logShopifyPush;
     case "reset_sales": return t.logResetSales;
     default: return t.logUnknown;
   }

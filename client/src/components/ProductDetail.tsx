@@ -394,11 +394,13 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   async function handlePushToShopify() {
     setBusy(true);
     try {
+      const wasSynced = Boolean(record.shopify?.productId);
       const updated = await pushToShopify(record.id);
       onReplace(updated);
-      showToast("Shopify'a başarıyla gönderildi!", "success");
+      showToast(wasSynced ? t.shopifyUpdateSuccess : t.shopifyCreateSuccess, "success");
     } catch (err) {
-      showToast("Shopify'a gönderim başarısız", "error");
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
     } finally {
       setBusy(false);
     }
@@ -426,6 +428,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const hasLockedStatusTargets = !isArchive && ACTIVE_STATUSES.some((st) =>
     st !== record.status && !statusCanMoveWithoutUnlock(record.status, st)
   );
+  const shopifySynced = Boolean(record.shopify?.productId);
 
   // Satış için geçerli bedenler (stok > 0)
   const availableSizes = record.sizeStocks.filter((ss) => ss.qty > 0);
@@ -649,6 +652,24 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     {p.productTypeSuggestion && <InfoRow label={t.productType} s={s}>
                       <span>{p.productTypeSuggestion}</span>
                     </InfoRow>}
+
+                    {shopifySynced && <InfoRow label={t.shopifySynced} s={s}>
+                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                        <ShoppingBag className="size-3 text-emerald-400" />
+                        <span dir="ltr">#{record.shopify?.productId}</span>
+                        {record.shopify?.handle && (
+                          <span className={cn("text-xs", s.muted)} dir="ltr">/{record.shopify.handle}</span>
+                        )}
+                      </span>
+                    </InfoRow>}
+
+                    {record.shopify?.syncedAt && <InfoRow label={t.shopifyLastSync} s={s}>
+                      <span>{new Date(record.shopify.syncedAt).toLocaleString(dateLocale)}</span>
+                    </InfoRow>}
+
+                    {record.shopify?.lastError && <InfoRow label={t.shopifyLastError} s={s}>
+                      <span className="text-red-400" dir="auto">{record.shopify.lastError}</span>
+                    </InfoRow>}
                   </div>
                 </section>
 
@@ -737,7 +758,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         )}
                         {record.status === "published" && (
                           <button type="button" onClick={() => setShowShopifyPreview(true)} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-md transition disabled:opacity-50 shadow-sm">
-                            <ShoppingBag className="size-3" /> {t.shopifyBtn}
+                            <ShoppingBag className="size-3" /> {shopifySynced ? t.shopifyUpdateBtn : t.shopifyBtn}
                           </button>
                         )}
                       </div>
@@ -1245,6 +1266,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
               </button>
             </div>
             <div className="p-4 flex flex-col gap-3">
+              <div className={cn("rounded-lg border px-3 py-2 text-xs font-extrabold", s.panelBorder, shopifySynced ? "text-blue-400" : "text-emerald-400")}>
+                {shopifySynced ? t.shopifyWillUpdate : t.shopifyWillCreate}
+              </div>
               <div className="text-sm">
                 <span className={cn("font-bold", s.muted)}>{t.rawTitle}:</span> <span className={s.strong}>{p.titleRaw}</span>
               </div>
@@ -1265,6 +1289,19 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   ))}
                 </ul>
               </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className={cn("rounded-lg border px-3 py-2 text-xs font-bold", s.panelBorder, s.muted)}>
+                  {t.shopifyImagesIncluded(record.images.length)}
+                </div>
+                <div className={cn("rounded-lg border px-3 py-2 text-xs font-bold", s.panelBorder, s.muted)}>
+                  {t.shopifyVariantsIncluded(record.sizeStocks.length || 1)}
+                </div>
+              </div>
+              {record.shopify?.lastError && (
+                <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-500" dir="auto">
+                  {record.shopify.lastError}
+                </div>
+              )}
               
               <div className="mt-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-xs font-bold text-red-500 flex items-start gap-2">
                 <ArchiveRestore className="size-4 shrink-0" />
@@ -1276,7 +1313,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   {t.close}
                 </button>
                 <button type="button" onClick={() => { setShowShopifyPreview(false); handlePushToShopify(); }} disabled={busy} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs font-bold rounded-lg transition disabled:opacity-50">
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : t.shopifyConfirm}
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : (shopifySynced ? t.shopifyUpdateConfirm : t.shopifyConfirm)}
                 </button>
               </div>
             </div>

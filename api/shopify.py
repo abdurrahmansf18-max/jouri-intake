@@ -1,49 +1,337 @@
+import base64
+import html
 import os
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
 import aiohttp
 from dotenv import load_dotenv
 
-load_dotenv()
+import file_manager
+from db_models import Product
 
-async def push_to_shopify(product_data: dict, images: list):
-    shop_url = os.getenv("SHOPIFY_STORE_URL")
-    access_token = os.getenv("SHOPIFY_ACCESS_TOKEN")
-    
-    if not shop_url or not access_token:
-        raise Exception("Shopify API credentials missing in .env")
-        
-    url = f"https://{shop_url}/admin/api/2024-01/products.json"
-    headers = {
-        "X-Shopify-Access-Token": access_token,
-        "Content-Type": "application/json"
-    }
-    
-    # Very basic Shopify Payload Construction
-    # A real integration would map variants properly
-    variants = []
-    for s in product_data.get("sizeStocks", []):
-        variants.append({
-            "option1": s.get("size"),
-            "price": product_data.get("parsed", {}).get("priceAmount", "0"),
-            "inventory_quantity": s.get("qty", 1),
-            "inventory_management": "shopify"
-        })
-        
-    payload = {
-        "product": {
-            "title": product_data.get("parsed", {}).get("titleRaw", "Draft Product"),
-            "body_html": product_data.get("description", ""),
-            "vendor": product_data.get("parsed", {}).get("categorySuggestion", ""),
-            "product_type": product_data.get("parsed", {}).get("productTypeSuggestion", ""),
-            "status": "draft",
-            "options": [{"name": "Size"}],
-            "variants": variants
+
+try:
+    load_dotenv()
+except Exception:
+    pass
+
+
+class ShopifyConfigError(Exception):
+    pass
+
+
+class ShopifyPushError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class ShopifyCredentials:
+    shop_url: str
+    access_token: str
+    api_version: str
+
+
+async def push_to_shopify(product: Product) -> dict[str, Any]:
+    credentials = _credentials()
+    timeout = aiohttp.ClientTimeout(total=600)
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        existing_id = _stored_product_id(product)
+        existing_product = None
+        created = False
+
+        if existing_id:
+            existing_product = await _request(
+                session, credentials, "GET", f"products/{existing_id}.json", allow_404=True
+            )
+
+        if existing_id and existing_product:
+            product_id = str(existing_product["product"]["id"])
+            await _request(
+                session,
+                credentials,
+                "PUT",
+                f"products/{product_id}.json",
+                {"product": _product_payload(product, include_create_only=False)},
+            )
+            variants_result = await _sync_variants(session, credentials, product_id, existing_product["product"], product)
+        else:
+            create_payload = _product_payload(product, include_create_only=True)
+            create_payload["variants"] = _local_variants(product)
+            create_payload["options"] = [{"name": "Size"}]
+            create_payload["status"] = "draft"
+
+            created_response = await _request(
+                session,
+                credentials,
+                "POST",
+                "products.json",
+                {"product": create_payload},
+            )
+            created = True
+            product_id = str(created_response["product"]["id"])
+            variants_result = {"created": len(create_payload["variants"]), "updated": 0, "disabled": 0}
+
+        refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
+        image_result = await _upload_missing_images(session, credentials, product_id, refreshed["product"], product)
+        final_product = await _request(session, credentials, "GET", f"products/{product_id}.json")
+
+        return {
+            "product": final_product["product"],
+            "created": created,
+            "variants": variants_result,
+            "images": image_result,
         }
+
+
+def _credentials() -> ShopifyCredentials:
+    shop_url = (os.getenv("SHOPIFY_STORE_URL") or "").strip()
+    access_token = (os.getenv("SHOPIFY_ACCESS_TOKEN") or "").strip()
+    api_version = (os.getenv("SHOPIFY_API_VERSION") or "2025-10").strip()
+
+    shop_url = re.sub(r"^https?://", "", shop_url).strip("/")
+    if not shop_url or not access_token:
+        raise ShopifyConfigError("Shopify bilgileri eksik. SHOPIFY_STORE_URL ve SHOPIFY_ACCESS_TOKEN ayarlanmalı.")
+    return ShopifyCredentials(shop_url=shop_url, access_token=access_token, api_version=api_version)
+
+
+async def _request(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    method: str,
+    path: str,
+    payload: dict[str, Any] | None = None,
+    *,
+    allow_404: bool = False,
+) -> dict[str, Any] | None:
+    url = f"https://{credentials.shop_url}/admin/api/{credentials.api_version}/{path}"
+    headers = {
+        "X-Shopify-Access-Token": credentials.access_token,
+        "Content-Type": "application/json",
     }
-    
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, json=payload) as response:
-            if response.status not in [200, 201]:
-                err = await response.text()
-                raise Exception(f"Shopify Error: {err}")
-            data = await response.json()
-            return data
+    async with session.request(method, url, headers=headers, json=payload) as response:
+        text = await response.text()
+        if allow_404 and response.status == 404:
+            return None
+        if response.status not in {200, 201}:
+            raise ShopifyPushError(_summarize_shopify_error(response.status, text))
+        if not text.strip():
+            return {}
+        return await response.json()
+
+
+def _product_payload(product: Product, *, include_create_only: bool) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "title": product.title_raw or "Jouri Product",
+        "body_html": _description_html(product.description),
+        "vendor": (os.getenv("SHOPIFY_VENDOR") or "Jouri").strip() or "Jouri",
+        "product_type": product.product_type or "",
+        "tags": _tags(product),
+    }
+    if include_create_only:
+        payload["handle"] = _handle(product)
+    return payload
+
+
+def _local_variants(product: Product) -> list[dict[str, Any]]:
+    price = _price(product.price_amount)
+    stocks = list(product.size_stocks or [])
+    if not stocks:
+        sizes = [s.strip() for s in (product.sizes_raw or "").split(",") if s.strip()]
+        qty = max(0, int(product.stock_quantity or 0))
+        stocks = [{"size": s, "qty": qty} for s in sizes] or [{"size": "One Size", "qty": qty}]
+
+    variants = []
+    seen: set[str] = set()
+    for stock in stocks:
+        size = str(stock.get("size") or "One Size").strip() or "One Size"
+        if size in seen:
+            continue
+        seen.add(size)
+        try:
+            qty = max(0, int(stock.get("qty", 0)))
+        except Exception:
+            qty = 0
+        variants.append({
+            "option1": size,
+            "price": price,
+            "inventory_management": "shopify",
+            "inventory_policy": "deny",
+            "inventory_quantity": qty,
+            "sku": _sku(product, size),
+        })
+    return variants or [{
+        "option1": "One Size",
+        "price": price,
+        "inventory_management": "shopify",
+        "inventory_policy": "deny",
+        "inventory_quantity": max(0, int(product.stock_quantity or 0)),
+        "sku": _sku(product, "One Size"),
+    }]
+
+
+async def _sync_variants(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    shopify_product_id: str,
+    shopify_product: dict[str, Any],
+    product: Product,
+) -> dict[str, int]:
+    existing = shopify_product.get("variants") or []
+    existing_by_size = {str(v.get("option1") or "").strip(): v for v in existing}
+    local_variants = _local_variants(product)
+    local_sizes = {v["option1"] for v in local_variants}
+    updated = created = disabled = 0
+
+    for variant in local_variants:
+        current = existing_by_size.get(variant["option1"])
+        if current:
+            payload = {"variant": {"id": current["id"], **variant}}
+            await _request(session, credentials, "PUT", f"variants/{current['id']}.json", payload)
+            updated += 1
+        else:
+            await _request(session, credentials, "POST", f"products/{shopify_product_id}/variants.json", {"variant": variant})
+            created += 1
+
+    for current in existing:
+        option = str(current.get("option1") or "").strip()
+        if option and option not in local_sizes and option != "Default Title":
+            payload = {
+                "variant": {
+                    "id": current["id"],
+                    "inventory_quantity": 0,
+                    "inventory_management": "shopify",
+                    "inventory_policy": "deny",
+                }
+            }
+            await _request(session, credentials, "PUT", f"variants/{current['id']}.json", payload)
+            disabled += 1
+
+    return {"created": created, "updated": updated, "disabled": disabled}
+
+
+async def _upload_missing_images(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    shopify_product_id: str,
+    shopify_product: dict[str, Any],
+    product: Product,
+) -> dict[str, int]:
+    existing_alts = {str(img.get("alt") or "") for img in shopify_product.get("images") or []}
+    limit = _image_limit()
+    uploaded = skipped = 0
+
+    for image in list(product.images or [])[:limit]:
+        file_name = str(image.get("fileName") or "")
+        folder = str(image.get("folder") or "originals")
+        if not file_name:
+            skipped += 1
+            continue
+        alt = _image_alt(product, folder, file_name)
+        if alt in existing_alts:
+            skipped += 1
+            continue
+        try:
+            path = file_manager.resolve_image_path(product.folder_path, folder, file_name)
+            attachment = base64.b64encode(Path(path).read_bytes()).decode("ascii")
+        except Exception:
+            skipped += 1
+            continue
+
+        await _request(
+            session,
+            credentials,
+            "POST",
+            f"products/{shopify_product_id}/images.json",
+            {"image": {"attachment": attachment, "filename": file_name, "alt": alt}},
+        )
+        existing_alts.add(alt)
+        uploaded += 1
+
+    return {"uploaded": uploaded, "skipped": skipped}
+
+
+def _stored_product_id(product: Product) -> str | None:
+    raw = (product.shopify_product_id or "").strip()
+    if not raw and product.notes:
+        match = re.search(r"\[Shopify\]\s*Product ID:\s*(\d+)", product.notes)
+        raw = match.group(1) if match else ""
+    match = re.search(r"(\d+)$", raw)
+    return match.group(1) if match else None
+
+
+def _description_html(description: str) -> str:
+    paragraphs = [p.strip() for p in (description or "").splitlines() if p.strip()]
+    if not paragraphs:
+        return ""
+    return "\n".join(f"<p>{html.escape(p)}</p>" for p in paragraphs)
+
+
+def _tags(product: Product) -> str:
+    raw = [
+        "Jouri",
+        f"jouri-id:{product.id}",
+        product.category,
+        product.product_type,
+        product.color_raw,
+        *(product.tags or []),
+    ]
+    seen: set[str] = set()
+    tags = []
+    for tag in raw:
+        value = str(tag or "").strip()
+        if not value or value.lower() in seen:
+            continue
+        seen.add(value.lower())
+        tags.append(value)
+    return ", ".join(tags)
+
+
+def _price(amount: str) -> str:
+    raw = (amount or "").strip()
+    cleaned = re.sub(r"[^\d,.-]", "", raw).replace(",", ".")
+    match = re.search(r"-?\d+(?:\.\d+)?", cleaned)
+    if not match:
+        return "0.00"
+    value = max(0.0, float(match.group(0)))
+    return f"{value:.2f}"
+
+
+def _handle(product: Product) -> str:
+    title = product.title_raw or product.folder_name or product.id
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    suffix = re.sub(r"[^a-z0-9]+", "", product.id.lower())[-8:]
+    return f"{slug[:50] or 'jouri-product'}-{suffix}"
+
+
+def _sku(product: Product, size: str) -> str:
+    base = re.sub(r"[^A-Za-z0-9]+", "-", product.id).strip("-").upper()[-18:]
+    size_part = re.sub(r"[^A-Za-z0-9]+", "-", size).strip("-").upper()[:10] or "ONE"
+    return f"JOURI-{base}-{size_part}"
+
+
+def _image_alt(product: Product, folder: str, file_name: str) -> str:
+    return f"Jouri:{product.id}:{folder}:{file_name}"
+
+
+def _image_limit() -> int:
+    try:
+        return max(1, int(os.getenv("SHOPIFY_IMAGE_LIMIT", "12")))
+    except Exception:
+        return 12
+
+
+def _summarize_shopify_error(status: int, text: str) -> str:
+    compact = " ".join((text or "").split())
+    if status in {401, 403}:
+        return "Shopify yetkisi reddedildi. Access token ve write_products yetkisini kontrol et."
+    if status == 404:
+        return "Shopify ürünü bulunamadı; yeniden oluşturma gerekebilir."
+    if status == 422:
+        return f"Shopify ürün verisini kabul etmedi: {compact[:240]}"
+    if status == 429:
+        return "Shopify API hız limiti aşıldı. Biraz bekleyip tekrar dene."
+    return f"Shopify hata verdi ({status}): {compact[:240]}"

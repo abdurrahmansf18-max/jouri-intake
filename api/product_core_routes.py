@@ -324,22 +324,51 @@ def update_related_products(
 @router.post("/api/products/{product_id}/shopify-push", response_model=ProductRecord)
 async def push_product_to_shopify(
     product_id: str,
+    background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)] = None,
     db: Session = Depends(get_db)
 ):
     p = product_service.get_or_404(db, product_id)
-    record = product_service.to_record(p)
+    if p.status != "published":
+        raise HTTPException(status_code=400, detail={"code": "ERR_SHOPIFY_STATUS_REQUIRED"})
 
     try:
-        res = await shopify.push_to_shopify(record.model_dump(), record.images)
-        p.notes = (p.notes or "") + f"\n[Shopify] Product ID: {res.get('product', {}).get('id')}"
+        res = await shopify.push_to_shopify(p)
+        shopify_product = res.get("product") or {}
+        p.shopify_product_id = str(shopify_product.get("id") or "")
+        p.shopify_product_handle = shopify_product.get("handle") or ""
+        p.shopify_synced_at = datetime.now(timezone.utc)
+        p.shopify_last_error = None
+        activity_logger.log(
+            db,
+            "shopify_push",
+            product_id=p.id,
+            product_title=p.title_raw,
+            details={
+                "mode": "create" if res.get("created") else "update",
+                "shopify_product_id": p.shopify_product_id,
+                "handle": p.shopify_product_handle,
+                "images": res.get("images"),
+                "variants": res.get("variants"),
+            },
+        )
         db.commit()
         db.refresh(p)
         record = product_service.to_record(p)
-        await ws_manager.broadcast({"type": "product_updated", "product": record.model_dump(mode="json")})
+        background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
         return record
+    except shopify.ShopifyConfigError as e:
+        p.shopify_last_error = str(e)
+        db.commit()
+        record = product_service.to_record(p)
+        background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+        raise HTTPException(status_code=500, detail={"code": "ERR_SHOPIFY_CONFIG", "message": str(e)})
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "ERR_GENERAL", "message": str(e)})
+        p.shopify_last_error = str(e)
+        db.commit()
+        record = product_service.to_record(p)
+        background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+        raise HTTPException(status_code=500, detail={"code": "ERR_SHOPIFY_FAILED", "message": str(e)})
 
 
 @router.delete("/api/products/{product_id}")

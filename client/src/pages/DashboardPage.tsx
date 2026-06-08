@@ -195,6 +195,7 @@ export default function DashboardPage() {
       case "status_change":return <CheckCircle2 className={cn(cls, "text-indigo-400")} />;
       case "add_images":   return <Images       className={cn(cls, "text-sky-400")} />;
       case "ai_generate_images": return <Sparkles className={cn(cls, "text-violet-400")} />;
+      case "shopify_push": return <ShoppingBag  className={cn(cls, "text-emerald-400")} />;
       case "reset_sales":  return <PackageX     className={cn(cls, "text-slate-400")} />;
       default:             return <Activity     className={cn(cls, s.muted)} />;
     }

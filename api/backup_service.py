@@ -105,6 +105,12 @@ def run_manual_backup(db: Session) -> dict:
                     "size_stocks": p.size_stocks,
                     "sold_sizes": p.sold_sizes,
                     "related_products": p.related_products,
+                    "shopify": {
+                        "productId": p.shopify_product_id,
+                        "handle": p.shopify_product_handle,
+                        "syncedAt": p.shopify_synced_at.isoformat() if p.shopify_synced_at else None,
+                        "lastError": p.shopify_last_error,
+                    },
                 }
                 for p in products
             ],

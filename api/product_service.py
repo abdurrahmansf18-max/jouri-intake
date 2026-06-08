@@ -13,6 +13,7 @@ from models import (
     SavedImage,
     SizeStock,
     SoldSizeEntry,
+    ShopifySyncInfo,
 )
 from parser import normalize_category, normalize_product_type
 
@@ -48,6 +49,12 @@ def to_record(p: Product) -> ProductRecord:
         sizeStocks=[SizeStock(**ss) for ss in (p.size_stocks or [])],
         soldSizes=[SoldSizeEntry(**ss) for ss in (p.sold_sizes or [])],
         relatedProducts=list(p.related_products or []),
+        shopify=ShopifySyncInfo(
+            productId=p.shopify_product_id,
+            handle=p.shopify_product_handle,
+            syncedAt=p.shopify_synced_at.isoformat() if p.shopify_synced_at else None,
+            lastError=p.shopify_last_error,
+        ),
     )
 
 

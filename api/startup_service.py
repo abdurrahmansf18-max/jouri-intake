@@ -59,6 +59,13 @@ def _import_from_filesystem(db: Session) -> int:
                         last_sold = datetime.fromisoformat(last_sold_raw)
                     except ValueError:
                         pass
+                shopify_raw = (data.get("shopify") or {}).get("syncedAt")
+                shopify_synced = None
+                if shopify_raw:
+                    try:
+                        shopify_synced = datetime.fromisoformat(shopify_raw)
+                    except ValueError:
+                        pass
                 created_raw = data.get("createdAt", "")
                 try:
                     created_at = datetime.fromisoformat(created_raw)
@@ -87,6 +94,10 @@ def _import_from_filesystem(db: Session) -> int:
                     tags=parsed.get("tags", []),
                     images=data.get("images", []),
                     sale_history=data.get("saleHistory", []),
+                    shopify_product_id=(data.get("shopify") or {}).get("productId"),
+                    shopify_product_handle=(data.get("shopify") or {}).get("handle"),
+                    shopify_synced_at=shopify_synced,
+                    shopify_last_error=(data.get("shopify") or {}).get("lastError"),
                 )
                 db.add(product)
                 imported += 1
@@ -103,6 +114,10 @@ def _migrate_size_stocks() -> None:
         db.execute(text("ALTER TABLE products DROP COLUMN IF EXISTS german_title"))
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_sizes JSON"))
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS related_products JSON"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_product_id VARCHAR"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_product_handle VARCHAR"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_synced_at TIMESTAMP WITH TIME ZONE"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_last_error TEXT"))
         db.commit()
 
         products = db.query(Product).filter(Product.size_stocks == None).all()  # noqa: E711

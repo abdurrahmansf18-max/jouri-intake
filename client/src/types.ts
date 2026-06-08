@@ -51,6 +51,13 @@ export interface SaleRecord {
   note: string;
 }
 
+export interface ShopifySyncInfo {
+  productId?: string | null;
+  handle?: string | null;
+  syncedAt?: string | null;
+  lastError?: string | null;
+}
+
 export interface ProductRecord {
   id: string;
   createdAt: string;
@@ -69,6 +76,7 @@ export interface ProductRecord {
   sizeStocks: SizeStock[];
   soldSizes: SoldSizeEntry[];
   relatedProducts: string[];
+  shopify?: ShopifySyncInfo;
 }
 
 export interface ActivityLog {
