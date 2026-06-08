@@ -23,6 +23,7 @@ export const queryClient = new QueryClient({
 
 export const queryKeys = {
   products: ["products"] as const,
+  logsRoot: ["logs"] as const,
   logs: (limit: number) => ["logs", limit] as const,
   backups: ["backups"] as const,
 };
@@ -72,10 +73,23 @@ export function useProductCacheActions() {
 
 export function useProductCacheSync() {
   const actions = useProductCacheActions();
+  const client = useQueryClient();
+  const refreshLogs = () => {
+    client.invalidateQueries({ queryKey: queryKeys.logsRoot });
+  };
   useProductSync({
-    onProductUpdated: actions.upsertProduct,
-    onProductCreated: actions.upsertProduct,
-    onProductDeleted: actions.removeProduct,
+    onProductUpdated(product) {
+      actions.upsertProduct(product);
+      refreshLogs();
+    },
+    onProductCreated(product) {
+      actions.upsertProduct(product);
+      refreshLogs();
+    },
+    onProductDeleted(id) {
+      actions.removeProduct(id);
+      refreshLogs();
+    },
   });
 }
 

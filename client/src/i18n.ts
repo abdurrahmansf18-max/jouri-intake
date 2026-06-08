@@ -73,6 +73,7 @@ export const COPY = {
     logFieldProductType: "Ürün tipi",
     logFieldNotes: "Notlar",
     logFieldCurrency: "Para birimi",
+    logFieldImageDeleted: "Silinen görsel",
     // Log actions
     logLogin: (user: string) => `Giriş yapıldı · ${user}`,
     logCreate: "Ürün oluşturuldu",
@@ -419,6 +420,7 @@ export const COPY = {
     logFieldProductType: "نوع المنتج",
     logFieldNotes: "الملاحظات",
     logFieldCurrency: "العملة",
+    logFieldImageDeleted: "الصورة المحذوفة",
     // Log actions
     logLogin: (user: string) => `تم تسجيل الدخول · ${user}`,
     logCreate: "تم إنشاء المنتج",

@@ -3,26 +3,39 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity, AlertTriangle, ArchiveIcon, Box,
   CheckCircle2, Clock, DollarSign, Images, Loader2,
-  LogIn, PackageCheck, PackageX, ShoppingBag, Tag, Trash2,
+  LogIn, PackageCheck, PackageX, ShoppingBag, Sparkles, Tag, Trash2,
 } from "lucide-react";
 import { deleteLog, productImageUrl } from "../api";
 import { queryKeys, useLogsQuery, useProductCacheSync, useProductsQuery } from "../queries";
 import { useApp } from "../context";
-import { COPY, cn, logActionLabel, statusLabel } from "../i18n";
+import { COPY, cn, logActionLabel, normalizeCategory, normalizeProductType, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import { statusBadge } from "../components/ProductCard";
 import type { ActivityLog, ProductRecord } from "../types";
-import { formatPrice } from "../format";
+import { formatPrice, parsePriceAmount } from "../format";
 
 type NamedCount = { label: string; count: number };
 
-function hasEnhancedImage(product: ProductRecord): boolean {
-  return product.images.some((img) => img.folder === "enhanced");
+function isEnhancedImage(image: ProductRecord["images"][number]): boolean {
+  const fileName = image.fileName.toLowerCase();
+  return image.folder === "enhanced" || fileName.startsWith("ai_") || fileName.startsWith("ai-");
 }
 
-function isMissingValue(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  return !normalized || normalized === "-" || normalized === "—" || normalized === "unknown";
+function hasEnhancedImage(product: ProductRecord): boolean {
+  return product.images.some(isEnhancedImage);
+}
+
+function isMissingValue(value?: string | null): boolean {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return !normalized
+    || normalized === "-"
+    || normalized === "—"
+    || normalized === "unknown"
+    || normalized === "null"
+    || normalized === "undefined"
+    || normalized === "none"
+    || normalized === "n/a"
+    || normalized === "na";
 }
 
 function topCounts(
@@ -47,7 +60,7 @@ function percent(part: number, total: number): number {
 }
 
 export default function DashboardPage() {
-  const { locale, theme } = useApp();
+  const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
   const queryClient = useQueryClient();
@@ -81,7 +94,7 @@ export default function DashboardPage() {
   const imageStats = active.reduce(
     (stats, product) => {
       for (const image of product.images) {
-        if (image.folder === "enhanced") stats.ai += 1;
+        if (isEnhancedImage(image)) stats.ai += 1;
         else stats.original += 1;
       }
       return stats;
@@ -102,19 +115,19 @@ export default function DashboardPage() {
   const aiImagePct = percent(imageStats.ai, counts.totalImages);
   const originalImagePct = percent(imageStats.original, counts.totalImages);
   const aiProductPct = percent(smart.aiImageProducts, active.length);
-  const topCategories = topCounts(active, (p) => p.parsed.categorySuggestion);
-  const topProductTypes = topCounts(active, (p) => p.parsed.productTypeSuggestion);
+  const topCategories = topCounts(active, (p) => normalizeCategory(p.parsed.categorySuggestion));
+  const topProductTypes = topCounts(active, (p) => normalizeProductType(p.parsed.productTypeSuggestion));
 
   // Stok değeri: sadece fiyatı girilmiş ve stoku olan aktif ürünler
   const stockValue = active.reduce((sum, p) => {
-    const price = parseFloat(p.parsed.priceAmount);
-    if (!isNaN(price) && p.stockQuantity > 0) return sum + price * p.stockQuantity;
+    const price = parsePriceAmount(p.parsed.priceAmount);
+    if (price !== null && p.stockQuantity > 0) return sum + price * p.stockQuantity;
     return sum;
   }, 0);
 
   // İnceleme gerektiren ürünler
   const attention = {
-    noPrice:  active.filter((p) => !p.parsed.priceAmount).length,
+    noPrice:  active.filter((p) => isMissingValue(p.parsed.priceAmount)).length,
     noImages: active.filter((p) => p.images.length === 0).length,
   };
   const hasAttention = attention.noPrice > 0 || attention.noImages > 0
@@ -138,7 +151,9 @@ export default function DashboardPage() {
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
 
   function timeAgo(iso: string): string {
-    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    const time = new Date(iso).getTime();
+    if (!Number.isFinite(time)) return "";
+    const diff = (Date.now() - time) / 1000;
     if (diff < 60)    return locale === "ar" ? "الآن" : "az önce";
     if (diff < 3600)  { const m = Math.floor(diff / 60);   return locale === "ar" ? `منذ ${m} دقيقة` : `${m} dk önce`; }
     if (diff < 86400) { const h = Math.floor(diff / 3600); return locale === "ar" ? `منذ ${h} ساعة`  : `${h} sa önce`; }
@@ -151,7 +166,9 @@ export default function DashboardPage() {
       await deleteLog(id);
       queryClient.setQueryData<ActivityLog[]>(queryKeys.logs(50), (current = []) => current.filter((l) => l.id !== id));
     }
-    catch { /* ignore */ } finally { setDeletingId(null); }
+    catch {
+      showToast(t.errors.ERR_GENERAL, "error");
+    } finally { setDeletingId(null); }
   }
 
   function fieldLabel(field: string): string {
@@ -161,6 +178,7 @@ export default function DashboardPage() {
       stock: t.logFieldStock, category: t.logFieldCategory,
       product_type: t.logFieldProductType, notes: t.logFieldNotes,
       currency: t.logFieldCurrency, description: t.logFieldDescription,
+      image_deleted: t.logFieldImageDeleted,
     };
     return map[field] || field;
   }
@@ -176,6 +194,7 @@ export default function DashboardPage() {
       case "restore":      return <ArchiveIcon  className={cn(cls, "text-violet-400")} />;
       case "status_change":return <CheckCircle2 className={cn(cls, "text-indigo-400")} />;
       case "add_images":   return <Images       className={cn(cls, "text-sky-400")} />;
+      case "ai_generate_images": return <Sparkles className={cn(cls, "text-violet-400")} />;
       case "reset_sales":  return <PackageX     className={cn(cls, "text-slate-400")} />;
       default:             return <Activity     className={cn(cls, s.muted)} />;
     }
