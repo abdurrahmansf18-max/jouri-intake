@@ -40,6 +40,7 @@ async def generate_product_images(
     prompts = [
         ("ai-model-worn.jpg", _worn_prompt(product, request)),
         ("ai-studio-hanger.jpg", _studio_prompt(product, request)),
+        ("ai-original-clean.jpg", _clean_original_prompt(product, request)),
     ]
 
     generated: list[GeneratedAiImage] = []
@@ -142,6 +143,24 @@ Strict rules:
 - Do not invent new colors, slogans, logos, accessories, or extra garments.
 - Use a simple neutral studio background with good lighting.
 - No person, no mannequin body, no watermark, no price text, no promotional text.
+""".strip()
+
+
+def _clean_original_prompt(product: Any, request: AiImageGenerateRequest) -> str:
+    context = _product_context(product, request)
+    return f"""
+Use the uploaded product photo as the source of truth and create a cleaner, more trustworthy ecommerce version of the same photo.
+Keep the original product arrangement and camera viewpoint recognizable.
+
+Product context:
+{context}
+
+Strict rules:
+- Preserve the actual product exactly: colors, fabric texture, printed graphics, logo/text, patterns, buttons, trim, seams, and number of visible clothing pieces.
+- Do not turn the clothing into a different product, do not change style, fit, color, graphics, or included pieces.
+- Do not add a model/person, hanger, mannequin, accessories, labels, text, watermark, or price.
+- Improve only presentation quality: cleaner lighting, sharper product details, more balanced crop, tidier background, and natural ecommerce color accuracy.
+- The result must feel honest and confidence-building for customers, not like a different or exaggerated product.
 """.strip()
 
 

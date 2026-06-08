@@ -224,9 +224,14 @@ async def _upload_missing_images(
     limit = _image_limit()
     uploaded = skipped = 0
 
-    for image in list(product.images or [])[:limit]:
+    shopify_images = [
+        image for image in list(product.images or [])
+        if str(image.get("folder") or "originals") == "enhanced"
+    ][:limit]
+
+    for image in shopify_images:
         file_name = str(image.get("fileName") or "")
-        folder = str(image.get("folder") or "originals")
+        folder = str(image.get("folder") or "enhanced")
         if not file_name:
             skipped += 1
             continue

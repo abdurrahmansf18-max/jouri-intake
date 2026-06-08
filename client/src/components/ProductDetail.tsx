@@ -429,6 +429,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     st !== record.status && !statusCanMoveWithoutUnlock(record.status, st)
   );
   const shopifySynced = Boolean(record.shopify?.productId);
+  const shopifyImageCount = record.images.filter((img) => img.folder === "enhanced").length;
 
   // Satış için geçerli bedenler (stok > 0)
   const availableSizes = record.sizeStocks.filter((ss) => ss.qty > 0);
@@ -1291,7 +1292,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className={cn("rounded-lg border px-3 py-2 text-xs font-bold", s.panelBorder, s.muted)}>
-                  {t.shopifyImagesIncluded(record.images.length)}
+                  {t.shopifyImagesIncluded(shopifyImageCount)}
                 </div>
                 <div className={cn("rounded-lg border px-3 py-2 text-xs font-bold", s.panelBorder, s.muted)}>
                   {t.shopifyVariantsIncluded(record.sizeStocks.length || 1)}
