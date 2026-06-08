@@ -2,6 +2,7 @@ import base64
 import html
 import os
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,11 +35,24 @@ class ShopifyCredentials:
     api_version: str
 
 
+@dataclass(frozen=True)
+class ShopifyConfig:
+    shop_url: str
+    api_version: str
+    access_token: str
+    client_id: str
+    client_secret: str
+
+
+_TOKEN_CACHE: dict[str, dict[str, Any]] = {}
+
+
 async def push_to_shopify(product: Product) -> dict[str, Any]:
-    credentials = _credentials()
+    config = _config()
     timeout = aiohttp.ClientTimeout(total=600)
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
+        credentials = await _credentials(session, config)
         existing_id = _stored_product_id(product)
         existing_product = None
         created = False
@@ -87,15 +101,75 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
         }
 
 
-def _credentials() -> ShopifyCredentials:
+def _config() -> ShopifyConfig:
     shop_url = (os.getenv("SHOPIFY_STORE_URL") or "").strip()
-    access_token = (os.getenv("SHOPIFY_ACCESS_TOKEN") or "").strip()
-    api_version = (os.getenv("SHOPIFY_API_VERSION") or "2025-10").strip()
+    raw_access_token = (os.getenv("SHOPIFY_ACCESS_TOKEN") or "").strip()
+    client_id = (os.getenv("SHOPIFY_CLIENT_ID") or "").strip()
+    client_secret = (os.getenv("SHOPIFY_CLIENT_SECRET") or "").strip()
+    api_version = (os.getenv("SHOPIFY_API_VERSION") or "2026-04").strip()
 
     shop_url = re.sub(r"^https?://", "", shop_url).strip("/")
-    if not shop_url or not access_token:
-        raise ShopifyConfigError("Shopify bilgileri eksik. SHOPIFY_STORE_URL ve SHOPIFY_ACCESS_TOKEN ayarlanmalı.")
-    return ShopifyCredentials(shop_url=shop_url, access_token=access_token, api_version=api_version)
+    access_token = raw_access_token
+
+    # A Dev Dashboard client secret commonly starts with shpss_. If it was put
+    # into SHOPIFY_ACCESS_TOKEN by mistake, use it as the client secret instead.
+    if raw_access_token.startswith("shpss_"):
+        access_token = ""
+        client_secret = client_secret or raw_access_token
+
+    has_static_token = bool(access_token)
+    has_client_credentials = bool(client_id and client_secret)
+    if not shop_url or not (has_static_token or has_client_credentials):
+        raise ShopifyConfigError(
+            "Shopify bilgileri eksik. SHOPIFY_STORE_URL ile birlikte SHOPIFY_CLIENT_ID + "
+            "SHOPIFY_CLIENT_SECRET veya eski SHOPIFY_ACCESS_TOKEN ayarlanmalı."
+        )
+    return ShopifyConfig(
+        shop_url=shop_url,
+        api_version=api_version,
+        access_token=access_token,
+        client_id=client_id,
+        client_secret=client_secret,
+    )
+
+
+async def _credentials(session: aiohttp.ClientSession, config: ShopifyConfig) -> ShopifyCredentials:
+    access_token = config.access_token or await _client_credentials_token(session, config)
+    return ShopifyCredentials(shop_url=config.shop_url, access_token=access_token, api_version=config.api_version)
+
+
+async def _client_credentials_token(session: aiohttp.ClientSession, config: ShopifyConfig) -> str:
+    cache_key = f"{config.shop_url}:{config.client_id}"
+    cached = _TOKEN_CACHE.get(cache_key)
+    now = time.time()
+    if cached and cached.get("expires_at", 0) > now:
+        return str(cached["access_token"])
+
+    url = f"https://{config.shop_url}/admin/oauth/access_token"
+    payload = {
+        "grant_type": "client_credentials",
+        "client_id": config.client_id,
+        "client_secret": config.client_secret,
+    }
+    async with session.post(url, data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"}) as response:
+        text = await response.text()
+        if response.status != 200:
+            raise ShopifyConfigError(_summarize_token_error(response.status, text))
+        data = await response.json()
+
+    access_token = str(data.get("access_token") or "").strip()
+    if not access_token:
+        raise ShopifyConfigError("Shopify access token alınamadı. Client ID ve secret kontrol edilmeli.")
+
+    try:
+        expires_in = max(300, int(data.get("expires_in", 86400)))
+    except Exception:
+        expires_in = 86400
+    _TOKEN_CACHE[cache_key] = {
+        "access_token": access_token,
+        "expires_at": now + max(60, expires_in - 300),
+    }
+    return access_token
 
 
 async def _request(
@@ -332,7 +406,7 @@ def _image_limit() -> int:
 def _summarize_shopify_error(status: int, text: str) -> str:
     compact = " ".join((text or "").split())
     if status in {401, 403}:
-        return "Shopify yetkisi reddedildi. Access token ve write_products yetkisini kontrol et."
+        return "Shopify yetkisi reddedildi. Client ID/secret veya ürün yazma izinlerini kontrol et."
     if status == 404:
         return "Shopify ürünü bulunamadı; yeniden oluşturma gerekebilir."
     if status == 422:
@@ -340,3 +414,13 @@ def _summarize_shopify_error(status: int, text: str) -> str:
     if status == 429:
         return "Shopify API hız limiti aşıldı. Biraz bekleyip tekrar dene."
     return f"Shopify hata verdi ({status}): {compact[:240]}"
+
+
+def _summarize_token_error(status: int, text: str) -> str:
+    compact = " ".join((text or "").split())
+    if status in {400, 401, 403}:
+        return (
+            "Shopify token alınamadı. SHOPIFY_STORE_URL, SHOPIFY_CLIENT_ID, "
+            "SHOPIFY_CLIENT_SECRET ve uygulama kurulum/izinlerini kontrol et."
+        )
+    return f"Shopify token endpoint hata verdi ({status}): {compact[:240]}"
