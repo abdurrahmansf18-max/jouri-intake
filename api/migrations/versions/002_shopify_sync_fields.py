@@ -8,6 +8,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 revision: str = "002"
@@ -17,10 +18,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("products", sa.Column("shopify_product_id", sa.String(), nullable=True))
-    op.add_column("products", sa.Column("shopify_product_handle", sa.String(), nullable=True))
-    op.add_column("products", sa.Column("shopify_synced_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("products", sa.Column("shopify_last_error", sa.Text(), nullable=True))
+    existing = {column["name"] for column in inspect(op.get_bind()).get_columns("products")}
+    if "shopify_product_id" not in existing:
+        op.add_column("products", sa.Column("shopify_product_id", sa.String(), nullable=True))
+    if "shopify_product_handle" not in existing:
+        op.add_column("products", sa.Column("shopify_product_handle", sa.String(), nullable=True))
+    if "shopify_synced_at" not in existing:
+        op.add_column("products", sa.Column("shopify_synced_at", sa.DateTime(timezone=True), nullable=True))
+    if "shopify_last_error" not in existing:
+        op.add_column("products", sa.Column("shopify_last_error", sa.Text(), nullable=True))
 
 
 def downgrade() -> None:
