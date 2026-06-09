@@ -164,7 +164,11 @@ export default function DashboardPage() {
     setDeletingId(id);
     try {
       await deleteLog(id);
-      queryClient.setQueryData<ActivityLog[]>(queryKeys.logs(50), (current = []) => current.filter((l) => l.id !== id));
+      queryClient.setQueriesData<ActivityLog[]>(
+        { queryKey: queryKeys.logsRoot },
+        (current = []) => current.filter((l) => l.id !== id),
+      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.logsRoot });
     }
     catch {
       showToast(t.errors.ERR_GENERAL, "error");

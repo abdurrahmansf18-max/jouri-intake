@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from db_models import ActivityLog
@@ -33,7 +32,7 @@ def list_logs(db: Session, limit: int) -> list[dict]:
 def delete_log(db: Session, log_id: int) -> dict:
     log = db.query(ActivityLog).filter(ActivityLog.id == log_id).first()
     if not log:
-        raise HTTPException(status_code=404, detail={"code": "ERR_PRODUCT_NOT_FOUND"})
+        return {"ok": True}
     db.delete(log)
     db.commit()
     return {"ok": True}

@@ -90,6 +90,7 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
             variants_result = {"created": len(create_payload["variants"]), "updated": 0, "disabled": 0}
 
         refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
+        category_result = await _sync_standard_category(session, credentials, product_id, product)
         image_result = await _upload_missing_images(session, credentials, product_id, refreshed["product"], product)
         final_product = await _request(session, credentials, "GET", f"products/{product_id}.json")
 
@@ -97,6 +98,7 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
             "product": final_product["product"],
             "created": created,
             "variants": variants_result,
+            "category": category_result,
             "images": image_result,
         }
 
@@ -197,6 +199,28 @@ async def _request(
         return await response.json()
 
 
+async def _graphql_request(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    query: str,
+    variables: dict[str, Any],
+) -> dict[str, Any]:
+    url = f"https://{credentials.shop_url}/admin/api/{credentials.api_version}/graphql.json"
+    headers = {
+        "X-Shopify-Access-Token": credentials.access_token,
+        "Content-Type": "application/json",
+    }
+    async with session.post(url, headers=headers, json={"query": query, "variables": variables}) as response:
+        text = await response.text()
+        if response.status not in {200, 201}:
+            raise ShopifyPushError(_summarize_shopify_error(response.status, text))
+        data = await response.json()
+
+    if data.get("errors"):
+        raise ShopifyPushError(_summarize_graphql_errors(data.get("errors")))
+    return data
+
+
 def _product_payload(product: Product, *, include_create_only: bool) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "title": product.title_raw or "Jouri Product",
@@ -208,6 +232,149 @@ def _product_payload(product: Product, *, include_create_only: bool) -> dict[str
     if include_create_only:
         payload["handle"] = _handle(product)
     return payload
+
+
+async def _sync_standard_category(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    shopify_product_id: str,
+    product: Product,
+) -> dict[str, Any]:
+    category_id = _standard_category_id(product)
+    if not category_id:
+        return {"set": False, "reason": "no_mapping"}
+
+    mutation = """
+    mutation ProductCategoryUpdate($product: ProductUpdateInput!) {
+      productUpdate(product: $product) {
+        product {
+          id
+          category {
+            id
+            fullName
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+    """
+    data = await _graphql_request(
+        session,
+        credentials,
+        mutation,
+        {
+            "product": {
+                "id": _shopify_product_gid(shopify_product_id),
+                "category": category_id,
+            }
+        },
+    )
+    payload = (data.get("data") or {}).get("productUpdate") or {}
+    errors = payload.get("userErrors") or []
+    if errors:
+        message = "; ".join(
+            f"{'.'.join(map(str, err.get('field') or []))}: {err.get('message')}"
+            for err in errors
+        )
+        raise ShopifyPushError(f"Shopify standart kategori kabul edilmedi: {message[:240]}")
+
+    category = ((payload.get("product") or {}).get("category") or {})
+    return {
+        "set": True,
+        "id": category.get("id") or category_id,
+        "fullName": category.get("fullName") or "",
+    }
+
+
+def _standard_category_id(product: Product) -> str:
+    override = _category_override(product)
+    if override:
+        return override
+
+    product_type = _category_key(product.product_type)
+    text = _category_key(" ".join([
+        product.title_raw or "",
+        product.product_type or "",
+        product.category or "",
+        product.description or "",
+    ]))
+    child = _is_child_product(product)
+
+    if "pajama" in product_type or "pyjama" in product_type or "pajama" in text or "pyjama" in text:
+        return "gid://shopify/TaxonomyCategory/aa-1-17-4"
+    if "tshirt" in product_type or "tee" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-9-7" if child else "gid://shopify/TaxonomyCategory/aa-1-13-8"
+    if "shirt" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-9-6" if child else "gid://shopify/TaxonomyCategory/aa-1-13"
+    if "dress" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-3" if child else "gid://shopify/TaxonomyCategory/aa-1-4"
+    if "bodysuit" in product_type or "onesie" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-9-2" if child else "gid://shopify/TaxonomyCategory/aa-1-13-2"
+    if "jumpsuit" in product_type or "romper" in product_type or "overall" in product_type:
+        if "set" in text or child:
+            return "gid://shopify/TaxonomyCategory/aa-1-25-5"
+        return "gid://shopify/TaxonomyCategory/aa-1-9"
+    if "set" in product_type or "outfit" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-5" if child else "gid://shopify/TaxonomyCategory/aa-1-11"
+    if "jeans" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-1-4" if child else "gid://shopify/TaxonomyCategory/aa-1-12"
+    if "pants" in product_type or "trouser" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-1-14" if child else "gid://shopify/TaxonomyCategory/aa-1-12"
+    if "short" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-1" if child else "gid://shopify/TaxonomyCategory/aa-1-14"
+    if "skirt" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-1-11" if child else "gid://shopify/TaxonomyCategory/aa-1-15"
+    if "jacket" in product_type or "coat" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-4-17" if child else "gid://shopify/TaxonomyCategory/aa-1-10"
+    if "sweater" in product_type or "hoodie" in product_type or "sweatshirt" in product_type:
+        return "gid://shopify/TaxonomyCategory/aa-1-25-9-12" if child else "gid://shopify/TaxonomyCategory/aa-1-13-12"
+    if child:
+        return "gid://shopify/TaxonomyCategory/aa-1-25"
+    return ""
+
+
+def _category_override(product: Product) -> str:
+    raw = (os.getenv("SHOPIFY_CATEGORY_MAP") or "").strip()
+    if not raw:
+        return ""
+    keys = {
+        _category_key(product.product_type),
+        _category_key(product.title_raw),
+        _category_key(product.category),
+    }
+    for part in re.split(r"[;\n]+", raw):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        if _category_key(key) in keys:
+            mapped = value.strip()
+            if mapped.startswith("gid://shopify/TaxonomyCategory/"):
+                return mapped
+    return ""
+
+
+def _is_child_product(product: Product) -> bool:
+    text = _category_key(" ".join([
+        product.category or "",
+        product.title_raw or "",
+        product.sizes_raw or "",
+        product.description or "",
+    ]))
+    return bool(re.search(r"(baby|boys|girls|kids|children|child|infant|toddler|bebek|bebe|بيبي|رضيع|اطفال|بناتي|ولادي)", text))
+
+
+def _category_key(value: str | None) -> str:
+    raw = (value or "").strip().lower()
+    raw = raw.replace("إ", "ا").replace("أ", "ا").replace("آ", "ا").replace("ٱ", "ا")
+    raw = raw.replace("ى", "ي").replace("ئ", "ي").replace("ة", "ه")
+    return re.sub(r"[^a-z0-9\u0600-\u06ff]+", "", raw)
+
+
+def _shopify_product_gid(shopify_product_id: str) -> str:
+    return f"gid://shopify/Product/{shopify_product_id}"
 
 
 def _local_variants(product: Product) -> list[dict[str, Any]]:
@@ -414,6 +581,18 @@ def _summarize_shopify_error(status: int, text: str) -> str:
     if status == 429:
         return "Shopify API hız limiti aşıldı. Biraz bekleyip tekrar dene."
     return f"Shopify hata verdi ({status}): {compact[:240]}"
+
+
+def _summarize_graphql_errors(errors: Any) -> str:
+    if not isinstance(errors, list):
+        return "Shopify GraphQL hata verdi."
+    parts = []
+    for err in errors:
+        if isinstance(err, dict):
+            parts.append(str(err.get("message") or err))
+        else:
+            parts.append(str(err))
+    return f"Shopify GraphQL hata verdi: {'; '.join(parts)[:240]}"
 
 
 def _summarize_token_error(status: int, text: str) -> str:
