@@ -32,6 +32,13 @@ Your job is to extract and translate the information into a JSON object matching
 Translate the title and description to English.
 
 IMPORTANT for Description: Write a rich, appealing, and well-structured product description. It should not be too short nor too long. Describe the style, comfort, and occasions it fits. DO NOT just repeat the title. Use 2-3 sentences.
+CRITICAL FOR SHOPIFY: You MUST weave standard clothing features into the description text so Shopify's AI can automatically extract them.
+- Target Gender: Explicitly mention who it is for (e.g., "for boys", "for girls", "unisex").
+- Age Group: Explicitly mention the age group based on sizes (e.g., "for babies", "for toddlers", "for kids", "for adults").
+- Fabric/Material: Mention the fabric if stated (e.g., "soft cotton", "linen").
+- Neckline & Sleeves: Mention the neckline (e.g., "crew neck", "V-neck") and sleeve length (e.g., "short sleeves", "long sleeves", "sleeveless") if it can be logically inferred from the product type.
+- Features: Mention features like "elastic waistband" or "button closure" if present.
+Example: "Crafted from soft breathable cotton, this boys' pajama set features a comfortable crew neck and short sleeves. Perfect for toddlers..."
 
 SOURCE-GROUNDING RULES:
 - Do not invent colors, product pieces, materials, themes, or category.
