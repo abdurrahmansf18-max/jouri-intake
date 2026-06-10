@@ -191,11 +191,22 @@ def _size_context(product: Any, request: AiImageGenerateRequest) -> str:
 
 
 def _infer_audience(product: Any) -> str:
+    category = str(_value(product, "category") or "").strip()
+    # Explicit category has the highest priority to avoid overriding "Boys" with "Baby" just because the word "toddler" is in the description
+    if category.lower() in {"boys", "boy"}:
+        return "Boys"
+    if category.lower() in {"girls", "girl"}:
+        return "Girls"
+    if category.lower() in {"baby", "newborn", "infant"}:
+        return "Baby"
+    if category.lower() in {"kids", "kid"}:
+        return "Kids"
+
+    # Fallback to regex search on text if category is empty
     text = " ".join(
         str(value or "")
         for value in [
             _value(product, "title_raw"),
-            _value(product, "category"),
             _value(product, "product_type"),
             _value(product, "color_raw"),
             _value(product, "sizes_raw"),
@@ -204,16 +215,13 @@ def _infer_audience(product: Any) -> str:
         ]
     ).lower()
 
-    category = str(_value(product, "category") or "").strip()
-    if category.lower() == "baby" or re.search(r"\b(baby|newborn|infant|toddler|mini baby|bebe|bebek)\b|b\.?\s*b\.?|بيبي|رضيع|مواليد", text):
+    if re.search(r"\b(baby|newborn|infant|toddler|mini baby|bebe|bebek)\b|b\.?\s*b\.?|بيبي|رضيع|مواليد", text):
         return "Baby"
     if re.search(r"\b(girls?|girl'?s)\b|بناتي|بنات|بنت|فتيات|kız", text):
         return "Girls"
     if re.search(r"\b(boys?|boy'?s)\b|ولادي|اولادي|أولادي|ولد|صبيان|erkek", text):
         return "Boys"
 
-    if category.lower() in {"boys", "boy", "girls", "girl", "baby", "kids"}:
-        return category
     return ""
 
 
