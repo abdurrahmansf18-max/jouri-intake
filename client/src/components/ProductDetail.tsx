@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, ChevronLeft, ChevronRight, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
-  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles, Bot
+  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles, Bot, ClipboardList, Check, Copy
 } from "lucide-react";
 import {
   addProductImages, deleteProduct, deleteProductImage,
   generateAiProductImages, markProductImageAsAi,
   productImageUrl, resetSales, restoreProduct, restoreSize,
   sellProduct, updateProduct, updateRelatedProducts, updateStatus, verifyEditLock,
-  pushToShopify
+  pushToShopify, getAiPrompts
 } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -171,6 +171,8 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [aiImageSource, setAiImageSource] = useState<SavedImage | null>(null);
   const [aiImageBusy, setAiImageBusy] = useState(false);
   const [aiImageForm, setAiImageForm] = useState({ gender: "", age: "", size: "", instructions: "" });
+  const [manualAiBusy, setManualAiBusy] = useState(false);
+  const [manualAiPrompts, setManualAiPrompts] = useState<Record<string, string> | null>(null);
   const navList = navigationProducts ?? [];
   const navIndex = navList.findIndex((product) => product.id === record.id);
   const prevProduct = navIndex > 0 ? navList[navIndex - 1] : null;
@@ -374,6 +376,32 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     } finally {
       setAiImageBusy(false);
     }
+  }
+
+  async function handleFetchAiPrompts() {
+    if (!aiImageSource) return;
+    setManualAiBusy(true);
+    try {
+      const prompts = await getAiPrompts(
+        record.id,
+        aiImageSource.fileName,
+        aiImageForm.instructions,
+        aiImageForm.gender,
+        aiImageForm.age,
+        aiImageForm.size
+      );
+      setManualAiPrompts(prompts);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
+    } finally {
+      setManualAiBusy(false);
+    }
+  }
+
+  function handleCopy(text: string) {
+    navigator.clipboard.writeText(text);
+    showToast((t as any).copied || "Kopyalandı!", "success");
   }
 
   async function handleDeleteImage(imageOrFileName: SavedImage | string, folder?: "originals" | "enhanced") {
@@ -1165,7 +1193,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           </h4>
                           <p className={cn("mt-1 text-xs leading-5", s.muted)}>{t.aiImageHelp}</p>
                         </div>
-                        <button type="button" onClick={() => setAiImageSource(null)}
+                        <button type="button" onClick={() => { setAiImageSource(null); setManualAiPrompts(null); }}
                           className={cn("inline-flex size-8 shrink-0 items-center justify-center rounded-lg border", s.controlGroup, s.controlIdle)}>
                           <X className="size-3.5" />
                         </button>
@@ -1197,11 +1225,79 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         className={cn("min-h-20 rounded-xl border px-3 py-2 text-sm leading-6 outline-none focus:ring-4", s.input)}
                         dir="auto"
                       />
-                      <button type="button" onClick={handleGenerateAiImages} disabled={aiImageBusy}
-                        className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-60", s.primary)}>
-                        {aiImageBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                        {aiImageBusy ? t.aiImageGenerating : t.aiImageGenerate}
-                      </button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button type="button" onClick={handleFetchAiPrompts} disabled={manualAiBusy || aiImageBusy}
+                          className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-60", "border bg-slate-800/80 text-sky-300 hover:bg-slate-700 active:scale-95")}>
+                          {manualAiBusy ? <Loader2 className="size-4 animate-spin" /> : <ClipboardList className="size-4" />}
+                          {(t as any).aiManualPromptsBtn || "Promptları Gör"}
+                        </button>
+                        <button type="button" onClick={handleGenerateAiImages} disabled={aiImageBusy || manualAiBusy}
+                          className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-60", s.primary)}>
+                          {aiImageBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                          {aiImageBusy ? t.aiImageGenerating : t.aiImageGenerate}
+                        </button>
+                      </div>
+
+                      {manualAiPrompts && (
+                        <div className="mt-2 grid gap-3 border-t pt-3">
+                          <div>
+                            <h5 className={cn("text-xs font-bold", s.title)}>{(t as any).aiManualPromptsTitle}</h5>
+                            <p className={cn("mt-0.5 text-[10px]", s.muted)}>{(t as any).aiManualPromptsDesc}</p>
+                          </div>
+                          
+                          <div className="grid gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className={cn("text-[10px] font-bold", s.muted)}>{(t as any).aiManualContext}</span>
+                              <button type="button" onClick={() => handleCopy(manualAiPrompts.productContext)}
+                                className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
+                                <Copy className="size-3" /> {(t as any).btnCopy}
+                              </button>
+                            </div>
+                            <div className="max-h-24 overflow-y-auto rounded bg-black/10 p-2 text-[10px] font-mono whitespace-pre-wrap select-all">
+                              {manualAiPrompts.productContext}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className={cn("text-[10px] font-bold", s.muted)}>{(t as any).aiManualWorn}</span>
+                              <button type="button" onClick={() => handleCopy(manualAiPrompts.wornPrompt)}
+                                className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
+                                <Copy className="size-3" /> {(t as any).btnCopy}
+                              </button>
+                            </div>
+                            <div className="max-h-24 overflow-y-auto rounded bg-black/10 p-2 text-[10px] font-mono whitespace-pre-wrap select-all">
+                              {manualAiPrompts.wornPrompt}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className={cn("text-[10px] font-bold", s.muted)}>{(t as any).aiManualStudio}</span>
+                              <button type="button" onClick={() => handleCopy(manualAiPrompts.studioPrompt)}
+                                className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
+                                <Copy className="size-3" /> {(t as any).btnCopy}
+                              </button>
+                            </div>
+                            <div className="max-h-24 overflow-y-auto rounded bg-black/10 p-2 text-[10px] font-mono whitespace-pre-wrap select-all">
+                              {manualAiPrompts.studioPrompt}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className={cn("text-[10px] font-bold", s.muted)}>{(t as any).aiManualClean}</span>
+                              <button type="button" onClick={() => handleCopy(manualAiPrompts.cleanOriginalPrompt)}
+                                className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
+                                <Copy className="size-3" /> {(t as any).btnCopy}
+                              </button>
+                            </div>
+                            <div className="max-h-24 overflow-y-auto rounded bg-black/10 p-2 text-[10px] font-mono whitespace-pre-wrap select-all">
+                              {manualAiPrompts.cleanOriginalPrompt}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

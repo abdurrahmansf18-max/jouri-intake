@@ -94,6 +94,19 @@ async def generate_ai_product_images(
     return record
 
 
+@router.post("/api/products/{product_id}/ai-prompts")
+def preview_ai_prompts(
+    product_id: str,
+    body: AiImageGenerateRequest,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    p = product_service.get_or_404(db, product_id)
+    prompts = image_ai_service.get_prompt_previews(p, body)
+    return prompts
+
+
+
 @router.get("/api/products/{product_id}/images/{kind}/{file_name}")
 def product_image(
     product_id: str,

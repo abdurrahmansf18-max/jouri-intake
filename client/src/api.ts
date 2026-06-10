@@ -159,6 +159,23 @@ export async function updateRelatedProducts(productId: string, relatedIds: strin
   return handleResponse<ProductRecord>(res);
 }
 
+export async function getAiPrompts(
+  productId: string,
+  sourceFileName: string,
+  instructions = "",
+  gender = "",
+  age = "",
+  size = ""
+): Promise<Record<string, string>> {
+  const res = await fetch(`/api/products/${productId}/ai-prompts`, {
+    method: "POST",
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ sourceFileName, instructions, gender, age, size }),
+  });
+  return handleResponse<Record<string, string>>(res);
+}
+
+
 export async function restoreSize(productId: string, size: string): Promise<ProductRecord> {
   const res = await fetch(`/api/products/${productId}/restore-size`, {
     method: "POST",
