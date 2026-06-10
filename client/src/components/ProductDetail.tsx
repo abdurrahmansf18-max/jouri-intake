@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, ChevronLeft, ChevronRight, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
-  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles, Bot, ClipboardList, Check, Copy
+  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles, Bot, ClipboardList, Check, Copy, Wand2
 } from "lucide-react";
 import {
   addProductImages, deleteProduct, deleteProductImage,
