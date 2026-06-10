@@ -70,6 +70,58 @@ JSON Schema:
 }
 """
 
+_REWRITE_SYSTEM_PROMPT = """
+You are an AI assistant for a clothing store. Your job is to rewrite an existing product description to be rich, appealing, and well-structured in English.
+It should not be too short nor too long. Describe the style, comfort, and occasions it fits. Use 2-3 sentences.
+CRITICAL FOR SHOPIFY: You MUST weave standard clothing features into the description text so Shopify's AI can automatically extract them based on the context provided.
+- Target Gender: Explicitly mention who it is for (e.g., "for boys", "for girls", "unisex").
+- Age Group: Explicitly mention the age group based on sizes or context (e.g., "for babies", "for toddlers", "for kids", "for adults").
+- Fabric/Material: Mention the fabric if stated or implied (e.g., "soft cotton", "linen").
+- Neckline & Sleeves: Mention the neckline (e.g., "crew neck", "V-neck") and sleeve length (e.g., "short sleeves", "long sleeves", "sleeveless") if it can be logically inferred.
+- Features: Mention features like "elastic waistband" or "button closure" if present.
+
+Return ONLY the rewritten description as plain text (no JSON, no markdown formatting). Do not include any prefix or suffix.
+"""
+
+async def rewrite_description_ai(title: str, description: str, context: str) -> str:
+    user_prompt = f"Product Title: {title}\nContext/Details: {context}\nOriginal Description: {description}"
+    
+    if _gemini_client:
+        try:
+            return await _request_ai_text(_gemini_client, _gemini_model_name, user_prompt)
+        except Exception as e:
+            print("Gemini rewrite failed:", _brief_error(e))
+
+    if _ollama_client:
+        try:
+            return await _request_ai_text(_ollama_client, _ollama_model_name, user_prompt)
+        except Exception as e:
+            print("Ollama rewrite failed:", _brief_error(e))
+
+    return description
+
+async def _request_ai_text(client: AsyncOpenAI, model_name: str, text: str) -> str:
+    try:
+        response = await client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": _REWRITE_SYSTEM_PROMPT},
+                {"role": "user", "content": text}
+            ]
+        )
+    except Exception as e:
+        if "Unsupported value: 'system'" in str(e) or "response_format" not in str(e).lower():
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "user", "content": f"{_REWRITE_SYSTEM_PROMPT}\n\nTask:\n{text}"}
+                ]
+            )
+        else:
+            raise
+    content = response.choices[0].message.content or ""
+    return content.strip().strip('"').strip()
+
 async def parse_description_ai(description: str) -> ParsedProduct:
     if _gemini_client:
         try:

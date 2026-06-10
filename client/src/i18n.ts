@@ -62,6 +62,8 @@ export const COPY = {
     statusLockHint: "Geri durumlara dönmek için kilidi kaldırmalısın; ileri akış serbesttir.",
     statusUnlocked: "Durum kilidi açık",
     logFieldDescription: "Açıklama",
+    rewriteDescriptionAi: "✨ Açıklamayı Yenile (AI)",
+    rewriteDescriptionSuccess: "Açıklama AI ile yenilendi!",
     editBtn: "Düzenle",
     viewDetails: "Detaylar",
     logFieldTitle: "Ürün adı",

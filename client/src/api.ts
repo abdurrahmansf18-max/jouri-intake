@@ -234,6 +234,14 @@ export async function pushToShopify(productId: string): Promise<ProductRecord> {
   return handleResponse<ProductRecord>(res);
 }
 
+export async function rewriteDescription(productId: string): Promise<{ description: string }> {
+  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/rewrite-description`, {
+    method: "POST",
+    headers: headers(),
+  });
+  return handleResponse<{ description: string }>(res);
+}
+
 export async function deleteProductImage(
   productId: string,
   kind: "originals" | "enhanced",

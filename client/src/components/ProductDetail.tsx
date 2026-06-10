@@ -172,6 +172,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [aiImageBusy, setAiImageBusy] = useState(false);
   const [aiImageForm, setAiImageForm] = useState({ gender: "", age: "", size: "", instructions: "" });
   const [manualAiBusy, setManualAiBusy] = useState(false);
+  const [rewriteBusy, setRewriteBusy] = useState(false);
   const [manualAiPrompts, setManualAiPrompts] = useState<Record<string, string> | null>(null);
   const navList = navigationProducts ?? [];
   const navIndex = navList.findIndex((product) => product.id === record.id);
@@ -398,6 +399,22 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       setManualAiBusy(false);
     }
   }
+
+  async function handleRewriteDescription() {
+    setRewriteBusy(true);
+    try {
+      const { rewriteDescription } = await import("../api");
+      const res = await rewriteDescription(record.id);
+      patch("description", res.description);
+      showToast((t as any).rewriteDescriptionSuccess || "Açıklama yenilendi!", "success");
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
+    } finally {
+      setRewriteBusy(false);
+    }
+  }
+
 
   function handleCopy(text: string) {
     navigator.clipboard.writeText(text);
@@ -1093,7 +1110,14 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   </div>
 
                   <label className="mt-3 grid gap-1.5">
-                    <span className={cn("text-xs font-black", s.strong)}>{t.description}</span>
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-xs font-black", s.strong)}>{t.description}</span>
+                      <button type="button" onClick={handleRewriteDescription} disabled={rewriteBusy}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] font-black text-violet-500 transition hover:bg-violet-500/20 disabled:opacity-50">
+                        {rewriteBusy ? <Loader2 className="size-3 animate-spin" /> : <Wand2 className="size-3" />}
+                        {(t as any).rewriteDescriptionAi || "✨ Açıklamayı Yenile (AI)"}
+                      </button>
+                    </div>
                     <textarea className={cn("min-h-24 w-full rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4", s.input)}
                       value={draft.description} onChange={(e) => patch("description", e.target.value)} dir="auto" />
                   </label>

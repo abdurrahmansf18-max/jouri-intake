@@ -263,6 +263,37 @@ def update_product(
     return record
 
 
+class RewriteDescriptionResponse(BaseModel):
+    description: str
+
+
+@router.post("/api/products/{product_id}/rewrite-description", response_model=RewriteDescriptionResponse)
+async def rewrite_product_description(
+    product_id: str,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    from parser import rewrite_description_ai
+    p = product_service.get_or_404(db, product_id)
+    
+    context_parts = []
+    if p.sizes_raw: context_parts.append(f"Sizes: {p.sizes_raw}")
+    if p.color_german or p.color_raw: context_parts.append(f"Color: {p.color_german or p.color_raw}")
+    if p.category: context_parts.append(f"Category: {p.category}")
+    if p.product_type: context_parts.append(f"Product Type: {p.product_type}")
+    
+    context = ", ".join(context_parts)
+    
+    new_desc = await rewrite_description_ai(
+        title=p.title_raw or "",
+        description=p.description or "",
+        context=context
+    )
+    
+    return RewriteDescriptionResponse(description=new_desc)
+
+
+
 @router.patch("/api/products/{product_id}/related", response_model=ProductRecord)
 def update_related_products(
     product_id: str,
