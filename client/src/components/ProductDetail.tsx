@@ -64,9 +64,18 @@ function aiImageSizeText(record: ProductRecord): string {
 
 function inferAiAudience(record: ProductRecord): string {
   const p = record.parsed;
+  const category = (p.categorySuggestion || "").trim();
+
+  // Priority to explicit category
+  const lowerCat = category.toLowerCase();
+  if (lowerCat === "boys" || lowerCat === "boy") return "Boys";
+  if (lowerCat === "girls" || lowerCat === "girl") return "Girls";
+  if (lowerCat === "baby" || lowerCat === "newborn" || lowerCat === "infant") return "Baby";
+  if (lowerCat === "kids" || lowerCat === "kid") return "Kids";
+
+  // Fallback to text search
   const text = [
     p.titleRaw,
-    p.categorySuggestion,
     p.productTypeSuggestion,
     p.colorRaw,
     p.sizesRaw,
@@ -74,12 +83,10 @@ function inferAiAudience(record: ProductRecord): string {
     record.notes,
   ].join(" ").toLowerCase();
 
-  const category = p.categorySuggestion.trim();
-  if (/^baby$/i.test(category) || /\b(baby|newborn|infant|toddler|mini baby|bebe|bebek)\b|b\.?\s*b\.?|بيبي|رضيع|مواليد/.test(text)) return "Baby";
+  if (/\b(baby|newborn|infant|toddler|mini baby|bebe|bebek)\b|b\.?\s*b\.?|بيبي|رضيع|مواليد/.test(text)) return "Baby";
   if (/\b(girls?|girl'?s)\b|بناتي|بنات|بنت|فتيات|kız/.test(text)) return "Girls";
   if (/\b(boys?|boy'?s)\b|ولادي|اولادي|أولادي|ولد|صبيان|erkek/.test(text)) return "Boys";
 
-  if (/^(boys?|girls?|baby|kids)$/i.test(category)) return category;
   return category || "";
 }
 
