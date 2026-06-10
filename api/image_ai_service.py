@@ -315,3 +315,12 @@ def _value(product: Any, field: str) -> Any:
 def _brief_error(exc: Exception) -> str:
     text = str(exc).replace("\n", " ").strip()
     return text[:300] or exc.__class__.__name__
+
+def get_prompt_previews(product: Any, request: AiImageGenerateRequest) -> dict[str, str]:
+    """Returns the generated prompts that would be sent to the AI service."""
+    return {
+        "productContext": _product_context(product, request),
+        "wornPrompt": _worn_prompt(product, request),
+        "studioPrompt": _studio_prompt(product, request),
+        "cleanOriginalPrompt": _clean_original_prompt(product, request),
+    }
