@@ -88,38 +88,53 @@ STRICT RULE: DO NOT guess, assume, or hallucinate any features (like "short slee
 Return ONLY the rewritten description as plain text (no JSON, no markdown formatting). Do not include any prefix or suffix.
 """
 
-async def rewrite_description_ai(title: str, description: str, context: str) -> str:
+async def rewrite_description_ai(title: str, description: str, context: str, image_base64: str = None) -> str:
     user_prompt = f"Product Title: {title}\nContext/Details: {context}\nOriginal Description: {description}"
-    
+    if image_base64:
+        user_prompt += "\n\n(An image of the product is also provided. Use it to accurately determine features like sleeve length, neckline, pattern, etc. ONLY if they are clearly visible. DO NOT guess.)"
+
     if _gemini_client:
         try:
-            return await _request_ai_text(_gemini_client, _gemini_model_name, user_prompt)
+            return await _request_ai_text(_gemini_client, _gemini_model_name, user_prompt, image_base64)
         except Exception as e:
             print("Gemini rewrite failed:", _brief_error(e))
 
     if _ollama_client:
         try:
-            return await _request_ai_text(_ollama_client, _ollama_model_name, user_prompt)
+            return await _request_ai_text(_ollama_client, _ollama_model_name, user_prompt, image_base64)
         except Exception as e:
             print("Ollama rewrite failed:", _brief_error(e))
 
     return description
 
-async def _request_ai_text(client: AsyncOpenAI, model_name: str, text: str) -> str:
+async def _request_ai_text(client: AsyncOpenAI, model_name: str, text: str, image_base64: str = None) -> str:
+    user_content = text
+    if image_base64:
+        user_content = [
+            {"type": "text", "text": text},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+        ]
+
     try:
         response = await client.chat.completions.create(
             model=model_name,
             messages=[
                 {"role": "system", "content": _REWRITE_SYSTEM_PROMPT},
-                {"role": "user", "content": text}
+                {"role": "user", "content": user_content}
             ]
         )
     except Exception as e:
         if "Unsupported value: 'system'" in str(e) or "response_format" not in str(e).lower():
+            fallback_content = user_content
+            if isinstance(fallback_content, list):
+                fallback_content[0]["text"] = f"{_REWRITE_SYSTEM_PROMPT}\n\nTask:\n{text}"
+            else:
+                fallback_content = f"{_REWRITE_SYSTEM_PROMPT}\n\nTask:\n{text}"
+            
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=[
-                    {"role": "user", "content": f"{_REWRITE_SYSTEM_PROMPT}\n\nTask:\n{text}"}
+                    {"role": "user", "content": fallback_content}
                 ]
             )
         else:
@@ -416,6 +431,8 @@ def normalize_product_type(value: str) -> str:
         "فساطين": "Dress",
         "set": "Set",
         "طقم": "Set",
+        "suit": "Suit",
+        "بدلة": "Suit",
         "short": "Shorts",
         "shorts": "Shorts",
         "شورت": "Shorts",

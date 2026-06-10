@@ -285,10 +285,24 @@ async def rewrite_product_description(
     
     context = ", ".join(context_parts)
     
+    import file_manager
+    import base64
+    
+    image_base64 = None
+    if p.images:
+        img = p.images[0]
+        try:
+            img_path = file_manager.resolve_image_path(p.folder_path, img.get("folder", "originals"), img.get("fileName"))
+            if img_path.exists():
+                image_base64 = base64.b64encode(img_path.read_bytes()).decode("utf-8")
+        except Exception as e:
+            print("Failed to load image for AI rewrite:", str(e))
+            
     new_desc = await rewrite_description_ai(
         title=p.title_raw or "",
         description=p.description or "",
-        context=context
+        context=context,
+        image_base64=image_base64
     )
     
     return RewriteDescriptionResponse(description=new_desc)
