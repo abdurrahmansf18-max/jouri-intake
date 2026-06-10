@@ -206,6 +206,43 @@ def get_next_enhanced_image_index(images: list[dict]) -> int:
     return highest + 1
 
 
+def mark_image_as_ai(folder_path: Path, file_name: str, images: list[dict]) -> tuple[list[dict], dict]:
+    target = None
+    for img in images:
+        if img.get("fileName") == file_name and img.get("folder", "originals") != "enhanced":
+            target = dict(img)
+            break
+            
+    if not target:
+        raise FileNotFoundError("Image not found in originals")
+        
+    old_path = folder_path / "originals" / file_name
+    if not old_path.exists():
+        raise FileNotFoundError("Physical image file not found")
+        
+    enhanced_path = folder_path / "enhanced"
+    enhanced_path.mkdir(parents=True, exist_ok=True)
+    
+    next_idx = get_next_enhanced_image_index(images)
+    new_file_name = f"ai-{str(next_idx).zfill(2)}.jpg"
+    
+    new_path = enhanced_path / new_file_name
+    shutil.move(str(old_path), str(new_path))
+    
+    old_thumb = folder_path / "thumbnails" / file_name
+    if old_thumb.exists():
+        new_thumb = folder_path / "thumbnails" / new_file_name
+        shutil.move(str(old_thumb), str(new_thumb))
+        
+    target["fileName"] = new_file_name
+    target["folder"] = "enhanced"
+    status_dir = _detect_status_dir(folder_path)
+    target["relativePath"] = f"products_photo/{status_dir}/{folder_path.name}/enhanced/{new_file_name}"
+    
+    new_images = [target if img.get("fileName") == file_name else img for img in images]
+    return new_images, target
+
+
 def _detect_status_dir(folder_path: Path) -> str:
     parent = folder_path.parent.name
     for dir_name in _STATUS_DIR_NAMES.values():

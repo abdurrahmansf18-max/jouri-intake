@@ -1,30 +1,54 @@
 import { useMemo, useState } from "react";
+// React Query, uygulamadaki veri çekme, önbelleğe alma (caching) ve güncellemeleri yönetmek için kullanılır.
 import { useQueryClient } from "@tanstack/react-query";
+// Lucide-react, ikonları kullanabilmemiz için gerekli kütüphanedir. Her bir import edilen kelime bir ikonu temsil eder.
 import {
   Activity, AlertTriangle, ArchiveIcon, Box,
   CheckCircle2, Clock, DollarSign, Images, Loader2,
   LogIn, PackageCheck, PackageX, ShoppingBag, Sparkles, Tag, Trash2,
 } from "lucide-react";
+
+// API (Backend) ile iletişim kurmak için tanımladığımız fonksiyonları içeri aktarıyoruz.
 import { deleteLog, productImageUrl } from "../api";
+// Veritabanı sorgularını daha kolay yönetmek için React Query hook'larını içeri aktarıyoruz.
 import { queryKeys, useLogsQuery, useProductCacheSync, useProductsQuery } from "../queries";
+// Uygulamanın genel ayarlarını (dil, tema, bildirimler) almak için kullandığımız özel context.
 import { useApp } from "../context";
+// Çeviriler, class isimlerini birleştirme (cn) ve metin düzenleme (normalize) gibi yardımcı araçlar.
 import { COPY, cn, logActionLabel, normalizeCategory, normalizeProductType, statusLabel } from "../i18n";
+// Karanlık ve aydınlık tema için önceden hazırladığımız renk ve tasarım ayarları.
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
+// Ürünlerin durumuna göre (Örn: satıldı, beklemede) renkli etiket (badge) döndüren yardımcı fonksiyon.
 import { statusBadge } from "../components/ProductCard";
+// TypeScript için veri tiplerini (Ürünlerin ve Logların nasıl bir yapıya sahip olduğunu) içeri aktarıyoruz.
 import type { ActivityLog, ProductRecord } from "../types";
+// Fiyatları formatlamak (Örn: 100 EUR şeklinde göstermek) için gerekli yardımcı fonksiyonlar.
 import { formatPrice, parsePriceAmount } from "../format";
 
+// İsimlendirilmiş bir sayım tutmak için oluşturduğumuz bir veri tipi. (Örn: "Elbise": 5 adet)
 type NamedCount = { label: string; count: number };
 
+/**
+ * Bir ürün görselinin "Yapay Zeka (AI) tarafından işlenmiş" olup olmadığını kontrol eder.
+ * Görselin bulunduğu klasör "enhanced" ise veya dosya adı "ai_" ile başlıyorsa true döner.
+ */
 function isEnhancedImage(image: ProductRecord["images"][number]): boolean {
   const fileName = image.fileName.toLowerCase();
   return image.folder === "enhanced" || fileName.startsWith("ai_") || fileName.startsWith("ai-");
 }
 
+/**
+ * Bir ürünün içinde "Yapay Zeka (AI) ile işlenmiş" GÖRSEL olup olmadığını kontrol eder.
+ * Yukarıdaki isEnhancedImage fonksiyonunu tüm görseller için çalıştırır.
+ */
 function hasEnhancedImage(product: ProductRecord): boolean {
   return product.images.some(isEnhancedImage);
 }
 
+/**
+ * Bir değerin boş, eksik veya anlamsız (Örn: "-", "unknown", "n/a") olup olmadığını kontrol eder.
+ * Kullanıcının veya sistemin eksik bilgi girip girmediğini anlamak için kullanılır.
+ */
 function isMissingValue(value?: string | null): boolean {
   const normalized = (value ?? "").trim().toLowerCase();
   return !normalized
@@ -38,59 +62,89 @@ function isMissingValue(value?: string | null): boolean {
     || normalized === "na";
 }
 
+/**
+ * Verilen ürün listesinden belirli bir özelliğe göre (Örn: Kategori) "En çok tekrar edenleri" bulur.
+ * Örneğin: 10 Tişört, 5 Pantolon varsa bunları sayar ve en çoktan en aza sıralayıp döndürür.
+ * limit parametresi ile kaç tane sonuç döndüreceğini belirleriz (varsayılan: 5).
+ */
 function topCounts(
   products: ProductRecord[],
-  read: (product: ProductRecord) => string,
+  read: (product: ProductRecord) => string, // Hangi özelliğin sayılacağını belirten fonksiyon
   limit = 5,
 ): NamedCount[] {
-  const counts = new Map<string, number>();
+  const counts = new Map<string, number>(); // Sayımları tutacağımız geçici hafıza (Sözlük/Map)
   for (const product of products) {
-    const label = read(product).trim();
-    if (isMissingValue(label)) continue;
+    const label = read(product).trim(); // Ürünün ilgili özelliğini (Örn: Kategorisini) oku
+    if (isMissingValue(label)) continue; // Eğer boşsa veya bilinmiyorsa atla
+    // Eğer daha önce sayıldıysa sayısını 1 artır, yoksa 1 olarak kaydet
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
+  // Elde edilen sayımları diziye çevir, büyükten küçüğe sırala ve sadece istenen sayı kadarını (limit) al
   return [...counts.entries()]
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
     .slice(0, limit);
 }
 
+/**
+ * Basit bir yüzde hesaplama fonksiyonu.
+ * Örneğin: 20 ürünün 5'i satıldıysa -> (5 / 20) * 100 = %25 döner.
+ */
 function percent(part: number, total: number): number {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ANA BİLEŞEN: KONTROL PANELİ SAYFASI (DashboardPage)
+// ─────────────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  // Uygulamanın anlık ayarlarını alıyoruz (dil, tema ve bildirim gösterme fonksiyonu)
   const { locale, theme, showToast } = useApp();
+  // Geçerli dile göre çevirileri içeren sözlüğü seçiyoruz (t = translations)
   const t = COPY[locale];
+  // Temaya göre kullanılacak CSS sınıflarını (renkleri) seçiyoruz
   const s = theme === "dark" ? DARK : LIGHT;
+  // React Query'nin cache (önbellek) yöneticisini alıyoruz
   const queryClient = useQueryClient();
 
+  // Silinmekte olan bir log kaydı varsa, silinen kaydın ID'sini tutuyoruz (Yükleniyor animasyonu için)
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  
+  // API'den tüm ürünleri çekiyoruz (Arka planda otomatik önbelleklenir)
   const productsQuery = useProductsQuery();
+  // API'den son 50 işlem kaydını (log) çekiyoruz
   const logsQuery = useLogsQuery(50);
 
+  // Başka sekmede veya cihazda ürün değişirse burayı otomatik güncellemek için arka plan senkronizasyonu
   useProductCacheSync();
 
+  // Çekilen verileri değişkene atıyoruz (Eğer henüz yükleniyorsa boş dizi [] atıyoruz)
   const products = productsQuery.data ?? [];
   const logs = logsQuery.data ?? [];
+  // Hem ürünler hem de loglar yükleniyor mu diye kontrol ediyoruz
   const loading = productsQuery.isLoading || logsQuery.isLoading;
 
   // ── Hesaplamalar ──────────────────────────────────────────────────────────
 
+  // Satılıp arşive gitmemiş olan tüm "aktif" ürünleri filtreliyoruz.
+  // useMemo sayesinde sadece "products" değiştiğinde bu işlem tekrar yapılır, performansı artırır.
   const active = useMemo(() => products.filter((p) => p.status !== "sold_archive"), [products]);
 
+  // Ürünlerin durumlarına göre toplam sayılarını hesaplıyoruz
   const counts = {
-    pending:      products.filter((p) => p.status === "pending").length,
-    ai_enhanced:  products.filter((p) => p.status === "ai_enhanced").length,
-    published:    products.filter((p) => p.status === "published").length,
-    sold_archive: products.filter((p) => p.status === "sold_archive").length,
-    // Sadece aktif ürünlerin stok toplamı (satıldı-arşiv = 0 zaten ama tutarlılık için)
+    pending:      products.filter((p) => p.status === "pending").length, // Beklemede olanlar
+    ai_enhanced:  products.filter((p) => p.status === "ai_enhanced").length, // Yapay Zeka işlemi bitenler
+    published:    products.filter((p) => p.status === "published").length, // Yayınlananlar
+    sold_archive: products.filter((p) => p.status === "sold_archive").length, // Satılıp arşivlenenler
+    // Sadece aktif ürünlerin stok miktarlarını topluyoruz (stok sıfırın altındaysa 0 kabul edilir)
     activeStock: active.reduce((n, p) => n + Math.max(0, p.stockQuantity), 0),
+    // Aktif ürünlerin toplam fotoğraf sayısı
     totalImages: active.reduce((n, p) => n + p.images.length, 0),
-    // Toplam satış adedi
+    // Bugüne kadar satılmış olan toplam ürün adedi (Tüm ürünlerdeki "soldQuantity" toplamı)
     totalSold: products.reduce((n, p) => n + Math.max(0, p.soldQuantity), 0),
   };
 
+  // Aktif ürünlerin fotoğraflarının kaç tanesi orijinal, kaç tanesi Yapay Zeka tarafından işlenmiş sayıyoruz
   const imageStats = active.reduce(
     (stats, product) => {
       for (const image of product.images) {
@@ -102,45 +156,61 @@ export default function DashboardPage() {
     { original: 0, ai: 0 },
   );
 
+  // Panelin uyarı/tavsiye bölümünde gösterilecek "Akıllı Metrikler" (Eksikler, azalan stoklar vb.)
   const smart = {
+    // Fotoğrafları yapay zekadan çıkmış ama kendisi hala "Bekliyor (Pending)" statüsünde kalan ürünler (Yani yayımlanmaya hazır)
     aiReadyPending: active.filter((p) => p.status === "pending" && hasEnhancedImage(p)).length,
+    // İçinde yapay zeka fotoğrafı bulunan toplam ürün sayısı
     aiImageProducts: active.filter(hasEnhancedImage).length,
+    // Kategorisi girilmemiş ürünler
     noCategory: active.filter((p) => isMissingValue(p.parsed.categorySuggestion)).length,
+    // Ürün türü girilmemiş ürünler
     noProductType: active.filter((p) => isMissingValue(p.parsed.productTypeSuggestion)).length,
+    // Stok miktarı 1 veya 2 kalmış ürünler
     lowStock: active.filter((p) => p.stockQuantity > 0 && p.stockQuantity <= 2).length,
+    // Stoku tamamen tükenmiş olan aktif ürünler
     outOfStock: active.filter((p) => p.stockQuantity === 0).length,
   };
 
+  // Ürün başına ortalama düşen fotoğraf sayısı (1 ondalık haneye kadar, Örn: 3.2)
   const avgImages = active.length > 0 ? (counts.totalImages / active.length).toFixed(1) : "0";
+  // Fotoğrafların yüzde kaçı yapay zeka?
   const aiImagePct = percent(imageStats.ai, counts.totalImages);
+  // Fotoğrafların yüzde kaçı orijinal?
   const originalImagePct = percent(imageStats.original, counts.totalImages);
+  // Ürünlerin yüzde kaçı yapay zekaya girmiş?
   const aiProductPct = percent(smart.aiImageProducts, active.length);
+  // Sistemdeki en popüler ilk 5 kategori
   const topCategories = topCounts(active, (p) => normalizeCategory(p.parsed.categorySuggestion));
+  // Sistemdeki en popüler ilk 5 ürün türü
   const topProductTypes = topCounts(active, (p) => normalizeProductType(p.parsed.productTypeSuggestion));
 
-  // Stok değeri: sadece fiyatı girilmiş ve stoku olan aktif ürünler
+  // Toplam Stok Değeri Hesaplaması: Sadece fiyatı girilmiş ve stoku olan aktif ürünlerin (Fiyat x Stok) toplamı
   const stockValue = active.reduce((sum, p) => {
     const price = parsePriceAmount(p.parsed.priceAmount);
     if (price !== null && p.stockQuantity > 0) return sum + price * p.stockQuantity;
     return sum;
   }, 0);
 
-  // İnceleme gerektiren ürünler
+  // "İnceleme Gerektirenler" metrikleri
   const attention = {
+    // Fiyatı girilmemiş ürünler
     noPrice:  active.filter((p) => isMissingValue(p.parsed.priceAmount)).length,
+    // Hiç fotoğrafı olmayan ürünler
     noImages: active.filter((p) => p.images.length === 0).length,
   };
+  // Eğer yukarıdaki eksiklerden herhangi biri 0'dan büyükse, uyarı panelini ekranda göstermek için bir değişken oluşturuyoruz
   const hasAttention = attention.noPrice > 0 || attention.noImages > 0
     || smart.noCategory > 0 || smart.noProductType > 0
     || smart.lowStock > 0 || smart.outOfStock > 0
     || smart.aiReadyPending > 0;
 
-  // Son eklenen ürünler (arşiv hariç, en yeni 6)
+  // Sisteme en son eklenen 6 ürünü tarihlerine göre azalan şekilde (en yeniler en başta) sıralayıp alıyoruz. (Arşivdekiler hariç)
   const recentProducts = [...active]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 6);
 
-  // İş akışı ilerlemesi
+  // İş Akışı Boru Hattı (Workflow Pipeline) için ürün durumlarının sayıları ve renk tasarımları
   const activeTotal = counts.pending + counts.ai_enhanced + counts.published;
   const workflowSteps = [
     { label: t.dashPending,    count: counts.pending,     color: "bg-amber-400",   border: "border-amber-400/40",  text: "text-amber-400" },
@@ -148,8 +218,13 @@ export default function DashboardPage() {
     { label: t.dashPublished,  count: counts.published,   color: "bg-emerald-400", border: "border-emerald-400/40",text: "text-emerald-400" },
   ];
 
+  // Tarihleri yerelleştirmek için dil kontrolü (Arapça veya Türkçe ayarlanıyor)
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
 
+  /**
+   * Verilen bir tarihi "3 dakika önce", "5 saat önce" gibi okunabilir metinlere çevirir.
+   * 24 saati geçmişse tam tarihi gösterir.
+   */
   function timeAgo(iso: string): string {
     const time = new Date(iso).getTime();
     if (!Number.isFinite(time)) return "";
@@ -160,21 +235,32 @@ export default function DashboardPage() {
     return new Date(iso).toLocaleDateString(dateLocale);
   }
 
+  /**
+   * Kullanıcı panelden bir kayıt (log) sildiğinde çalışacak fonksiyon.
+   * Silme işlemi başarılı olursa API'yi arar ve sonrasında arayüzdeki "logs" önbelleğinden (cache) bu kaydı silerek arayüzü anında günceller.
+   */
   async function handleDeleteLog(id: number) {
-    setDeletingId(id);
+    setDeletingId(id); // Butonda dönen "loading" ikonu için ID'yi kaydet
     try {
-      await deleteLog(id);
+      await deleteLog(id); // API'ye silme isteği at
+      // React Query önbelleğini güncelle: Silinen ID'yi listeden çıkart
       queryClient.setQueriesData<ActivityLog[]>(
         { queryKey: queryKeys.logsRoot },
         (current = []) => current.filter((l) => l.id !== id),
       );
+      // Diğer sayfaların da bu durumdan haberdar olması için tüm log sorgularını iptal edip yeniden çekilmelerini işaretle
       await queryClient.invalidateQueries({ queryKey: queryKeys.logsRoot });
     }
     catch {
+      // Hata çıkarsa kırmızı bildirim (Toast) göster
       showToast(t.errors.ERR_GENERAL, "error");
-    } finally { setDeletingId(null); }
+    } finally { setDeletingId(null); } // İşlem bittiğinde yükleniyor ikonunu durdur
   }
 
+  /**
+   * Loglardaki (geçmişteki) değişikliklerin ne anlama geldiğini çevirmek için yardımcı fonksiyon.
+   * Örn: Sistemde "title" değiştiyse ekranda "Ürün Adı" olarak görünmesini sağlar.
+   */
   function fieldLabel(field: string): string {
     const map: Record<string, string> = {
       title: t.logFieldTitle,
@@ -184,11 +270,15 @@ export default function DashboardPage() {
       currency: t.logFieldCurrency, description: t.logFieldDescription,
       image_deleted: t.logFieldImageDeleted,
     };
-    return map[field] || field;
+    return map[field] || field; // Karşılığı yoksa kelimenin ham halini göster
   }
 
+  /**
+   * Her bir işlem türü (log action) için uygun bir ikon (resim/şekil) ve renk döndürür.
+   * Örn: "sell" (Satış) eylemi için alışveriş çantası (ShoppingBag) ikonunu döndürür.
+   */
   function actionIcon(action: string) {
-    const cls = "size-4";
+    const cls = "size-4"; // İkon boyutu
     switch (action) {
       case "login":        return <LogIn        className={cn(cls, "text-violet-400")} />;
       case "create":       return <PackageCheck className={cn(cls, "text-emerald-400")} />;
@@ -205,6 +295,7 @@ export default function DashboardPage() {
     }
   }
 
+  // Veriler henüz yükleniyorsa ekranda sadece dönen (Loader2) ikonunu göster.
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -213,30 +304,40 @@ export default function DashboardPage() {
     );
   }
 
+  // Yükleme bitti, asıl gösterge panelini (Dashboard) ekrana çiziyoruz.
   return (
     <div className="grid gap-6">
+      {/* Sayfa Başlığı */}
       <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.dashTitle}</h1>
 
-      {/* ── 1. İş Akışı Boru Hattı ── */}
+      {/* ── 1. İŞ AKIŞI BORU HATTI (Workflow Pipeline) ── */}
+      {/* Ürünlerin üretim veya yayımlanma aşamalarındaki dağılımını gösterir */}
       <div className={cn("rounded-xl border p-3 sm:p-4", s.panel)}>
         <div className={cn("mb-3 flex items-center gap-2", s.muted)}>
           <Tag className="size-4" />
           <span className="text-xs font-black uppercase tracking-wide">{t.dashWorkflow}</span>
         </div>
+        {/* Üç aşamalı gösterge grid'i */}
         <div className="grid grid-cols-3 gap-2">
           {workflowSteps.map((step, i) => {
+            // Bu aşamadaki ürünlerin toplam ürünlere olan yüzdesi
             const pct = activeTotal > 0 ? Math.round((step.count / activeTotal) * 100) : 0;
             return (
               <div key={step.label} className={cn("rounded-xl border p-2.5 sm:p-4", step.border, "bg-white/2")}>
+                {/* Sayı */}
                 <div className={cn("text-xl sm:text-3xl font-black", step.text)}>{step.count}</div>
+                {/* Aşama Başlığı (Örn: Beklemede) */}
                 <div className={cn("mt-0.5 truncate text-[10px] sm:text-xs font-bold", s.muted)}>{step.label}</div>
+                {/* Yüzde Barı Göstergesi */}
                 <div className="mt-2 h-1 w-full rounded-full bg-white/5">
                   <div
                     className={cn("h-1 rounded-full transition-all", step.color)}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
+                {/* Yüzde Metni */}
                 <div className={cn("mt-1 text-[10px] font-bold", s.muted)}>{pct}%</div>
+                {/* Son kutu hariç, aralara "ok işareti (→)" koy (Akışı simgelemek için) */}
                 {i < workflowSteps.length - 1 && (
                   <div className={cn("mt-1.5 text-[10px] font-bold", s.muted)}>
                     {locale === "ar" ? "←" : "→"}
@@ -248,18 +349,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── 2. Metrikler ── */}
+      {/* ── 2. METRİKLER (Kısa İstatistik Kartları) ── */}
+      {/* Ekrandaki ufak kutucuklarda Toplam Stok, Toplam Satış gibi özet bilgileri listeler */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <MetricCard
           icon={<Box className="size-4 text-emerald-400" />}
-          label={t.dashActiveStock}
+          label={t.dashActiveStock} // Aktif Stok
           value={counts.activeStock}
           color="text-emerald-400"
           bg="bg-emerald-400/10 border-emerald-400/20"
         />
         <MetricCard
           icon={<DollarSign className="size-4 text-violet-400" />}
-          label={t.dashStockValue}
+          label={t.dashStockValue} // Stok Değeri
           value={formatPrice(stockValue.toFixed(0), "EUR")}
           color="text-violet-400"
           bg="bg-violet-400/10 border-violet-400/20"
@@ -267,63 +369,47 @@ export default function DashboardPage() {
         />
         <MetricCard
           icon={<Images className="size-4 text-sky-400" />}
-          label={t.dashTotalImages}
+          label={t.dashTotalImages} // Toplam Görsel
           value={counts.totalImages}
           color="text-sky-400"
           bg="bg-sky-400/10 border-sky-400/20"
         />
         <MetricCard
           icon={<ShoppingBag className="size-4 text-amber-400" />}
-          label={t.dashTotalSold}
+          label={t.dashTotalSold} // Toplam Satış
           value={counts.totalSold}
           color="text-amber-400"
           bg="bg-amber-400/10 border-amber-400/20"
         />
         <MetricCard
           icon={<Images className="size-4 text-blue-400" />}
-          label={t.dashAiImages}
+          label={t.dashAiImages} // AI Tarafından İşlenen Görseller
           value={imageStats.ai}
           color="text-blue-400"
           bg="bg-blue-400/10 border-blue-400/20"
         />
         <MetricCard
           icon={<Activity className="size-4 text-fuchsia-400" />}
-          label={t.dashAvgImages}
+          label={t.dashAvgImages} // Ürün Başına Ortalama Görsel
           value={avgImages}
           color="text-fuchsia-400"
           bg="bg-fuchsia-400/10 border-fuchsia-400/20"
         />
       </div>
 
-      {/* ── 3. Akıllı özet ── */}
+      {/* ── 3. AKILLI ÖZET (Görsel Sağlığı & Akıllı Kontroller) ── */}
       <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+        {/* Görsel Sağlığı Paneli */}
         <div className={cn("rounded-xl border", s.panel)}>
           <PanelHeader icon={<Images className="size-5 text-sky-400" />} title={t.dashImageHealth} s={s} />
           <div className="grid gap-4 p-4 sm:grid-cols-3">
-            <ImageStat
-              label={t.dashOriginalImages}
-              value={imageStats.original}
-              pct={originalImagePct}
-              color="bg-sky-400"
-              s={s}
-            />
-            <ImageStat
-              label={t.dashAiImages}
-              value={imageStats.ai}
-              pct={aiImagePct}
-              color="bg-blue-400"
-              s={s}
-            />
-            <ImageStat
-              label={t.dashAiCoverage}
-              value={`${smart.aiImageProducts}/${active.length}`}
-              pct={aiProductPct}
-              color="bg-violet-400"
-              s={s}
-            />
+            <ImageStat label={t.dashOriginalImages} value={imageStats.original} pct={originalImagePct} color="bg-sky-400" s={s} />
+            <ImageStat label={t.dashAiImages} value={imageStats.ai} pct={aiImagePct} color="bg-blue-400" s={s} />
+            <ImageStat label={t.dashAiCoverage} value={`${smart.aiImageProducts}/${active.length}`} pct={aiProductPct} color="bg-violet-400" s={s} />
           </div>
         </div>
 
+        {/* Akıllı Kontroller Paneli */}
         <div className={cn("rounded-xl border", s.panel)}>
           <PanelHeader icon={<AlertTriangle className="size-5 text-amber-400" />} title={t.dashSmartCheck} s={s} />
           <div className="grid divide-y" style={{ borderColor: "inherit" }}>
@@ -334,7 +420,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── 4. Arşiv sayacı ── */}
+      {/* ── 4. ARŞİV SAYACI ── */}
+      {/* Sadece sistemde arşivlenmiş ürün varsa bu bölümü gösterir */}
       {counts.sold_archive > 0 && (
         <div className={cn("flex items-center gap-3 rounded-xl border px-4 py-3", "bg-slate-400/5 border-slate-400/20")}>
           <ArchiveIcon className="size-4 text-slate-400 shrink-0" />
@@ -346,7 +433,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── 5. İnceleme Gerekiyor — sadece sorun varsa göster ── */}
+      {/* ── 5. İNCELEME GEREKENLER (Uyarılar ve Eksikler) ── */}
+      {/* Sadece eksiklik (Örn: Fiyatı girilmemiş ürün) varsa bu koca paneli gösterir */}
       {hasAttention && (
       <div className={cn("rounded-xl border", s.panel)}>
         <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
@@ -354,60 +442,20 @@ export default function DashboardPage() {
           <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashNeedsAttention}</h2>
         </div>
         <div className="grid divide-y" style={{ borderColor: "inherit" }}>
-          {attention.noPrice > 0 && (
-            <AttentionRow
-              icon={<DollarSign className="size-4 text-amber-400" />}
-              text={t.dashNoPrice(attention.noPrice)}
-              s={s}
-            />
-          )}
-          {attention.noImages > 0 && (
-            <AttentionRow
-              icon={<Images className="size-4 text-red-400" />}
-              text={t.dashNoImages(attention.noImages)}
-              s={s}
-            />
-          )}
-          {smart.noCategory > 0 && (
-            <AttentionRow
-              icon={<Tag className="size-4 text-violet-400" />}
-              text={t.dashNoCategory(smart.noCategory)}
-              s={s}
-            />
-          )}
-          {smart.noProductType > 0 && (
-            <AttentionRow
-              icon={<Box className="size-4 text-sky-400" />}
-              text={t.dashNoProductType(smart.noProductType)}
-              s={s}
-            />
-          )}
-          {smart.aiReadyPending > 0 && (
-            <AttentionRow
-              icon={<PackageCheck className="size-4 text-blue-400" />}
-              text={t.dashAiReadyPendingText(smart.aiReadyPending)}
-              s={s}
-            />
-          )}
-          {smart.lowStock > 0 && (
-            <AttentionRow
-              icon={<Box className="size-4 text-amber-400" />}
-              text={t.dashLowStockText(smart.lowStock)}
-              s={s}
-            />
-          )}
-          {smart.outOfStock > 0 && (
-            <AttentionRow
-              icon={<PackageX className="size-4 text-red-400" />}
-              text={t.dashOutOfStockText(smart.outOfStock)}
-              s={s}
-            />
-          )}
+          {/* Her bir hata satırını sadece o hata sayısı 0'dan büyükse ekrana çizer */}
+          {attention.noPrice > 0 && <AttentionRow icon={<DollarSign className="size-4 text-amber-400" />} text={t.dashNoPrice(attention.noPrice)} s={s} />}
+          {attention.noImages > 0 && <AttentionRow icon={<Images className="size-4 text-red-400" />} text={t.dashNoImages(attention.noImages)} s={s} />}
+          {smart.noCategory > 0 && <AttentionRow icon={<Tag className="size-4 text-violet-400" />} text={t.dashNoCategory(smart.noCategory)} s={s} />}
+          {smart.noProductType > 0 && <AttentionRow icon={<Box className="size-4 text-sky-400" />} text={t.dashNoProductType(smart.noProductType)} s={s} />}
+          {smart.aiReadyPending > 0 && <AttentionRow icon={<PackageCheck className="size-4 text-blue-400" />} text={t.dashAiReadyPendingText(smart.aiReadyPending)} s={s} />}
+          {smart.lowStock > 0 && <AttentionRow icon={<Box className="size-4 text-amber-400" />} text={t.dashLowStockText(smart.lowStock)} s={s} />}
+          {smart.outOfStock > 0 && <AttentionRow icon={<PackageX className="size-4 text-red-400" />} text={t.dashOutOfStockText(smart.outOfStock)} s={s} />}
         </div>
       </div>
       )}
 
-      {/* ── 6. Kategori ve tip özeti ── */}
+      {/* ── 6. KATEGORİ VE ÜRÜN TİPİ ÖZETİ (İlk 5 Liste) ── */}
+      {/* En çok eklenen kategorileri ve ürün tiplerini sıralar */}
       <div className="grid gap-3 lg:grid-cols-2">
         <TopListPanel
           title={t.dashTopCategories}
@@ -425,7 +473,8 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ── 7. Son Eklenen Ürünler ── */}
+      {/* ── 7. SON EKLENEN ÜRÜNLER KARTLARI ── */}
+      {/* Sisteme en son dahil edilen 6 ürünü görseli, fiyatı ve durumuyla beraber küçük kartlar halinde dizer */}
       {recentProducts.length > 0 && (
         <div className={cn("rounded-xl border", s.panel)}>
           <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
@@ -434,10 +483,11 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
             {recentProducts.map((p) => {
-              const firstImg = p.images[0];
+              const firstImg = p.images[0]; // Ürünün ilk görselini al
               return (
                 <div key={p.id} className={cn("overflow-hidden rounded-xl border", s.subPanel)}>
                   {firstImg ? (
+                    // Görseli göster
                     <img
                       src={productImageUrl(p.id, firstImg.fileName, undefined, firstImg.folder)}
                       alt={firstImg.originalName}
@@ -445,20 +495,24 @@ export default function DashboardPage() {
                       loading="lazy"
                     />
                   ) : (
+                    // Görsel yoksa boş bir alan göster
                     <div className="flex aspect-video items-center justify-center bg-black/10">
                       <Images className="size-6 opacity-20" />
                     </div>
                   )}
                   <div className="p-2.5">
+                    {/* Ürün İsmi (veya klasör ismi) */}
                     <p className={cn("line-clamp-1 text-xs font-extrabold", s.title)} dir="auto">
                       {p.parsed.titleRaw || p.folderName}
                     </p>
                     <div className="mt-1 flex items-center justify-between gap-1">
+                      {/* Ürün Fiyatı */}
                       {p.parsed.priceAmount && (
                         <span className="text-[10px] font-black text-emerald-400">
                           {formatPrice(p.parsed.priceAmount, p.parsed.currency)}
                         </span>
                       )}
+                      {/* Ürünün Mevcut Durumu (Bekliyor, Yayınlandı vb.) */}
                       <span className={cn("rounded-md border px-1.5 py-0.5 text-[9px] font-black", statusBadge(p.status, s))}>
                         {statusLabel(p.status, locale)}
                       </span>
@@ -471,7 +525,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── 8. Son İşlemler ── */}
+      {/* ── 8. SON İŞLEMLER (LOGS) ── */}
+      {/* Sistemdeki her hareketin (Ekleme, Silme, Güncelleme) listelendiği aktivite günlüğü */}
       <div className={cn("rounded-xl border", s.panel)}>
         <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
           <Activity className="size-5 text-violet-400" />
@@ -479,6 +534,7 @@ export default function DashboardPage() {
         </div>
 
         {logs.length === 0 ? (
+          // Hiç log yoksa boş olduğunu belirten ikon ve metin göster
           <div className="flex flex-col items-center gap-3 py-12">
             <Clock className={cn("size-10", s.emptyIcon)} />
             <p className={cn("text-sm font-semibold", s.muted)}>{t.dashNoActivity}</p>
@@ -486,26 +542,33 @@ export default function DashboardPage() {
         ) : (
           <div className="max-h-[28rem] overflow-y-auto">
             {logs.map((log) => {
+              // Log içinde "değişen şeyler" (Örn: fiyattı 100'dü, 200 oldu) verisini çözümle
               const changed = log.action === "update" && log.details?.changed
                 ? log.details.changed as Record<string, { from: string; to: string }>
                 : null;
+              
               return (
                 <div
                   key={log.id}
                   className={cn("flex items-start gap-2 sm:gap-3 border-b px-3 sm:px-5 py-3 last:border-b-0", s.panelBorder)}
                 >
+                  {/* Log İkonu */}
                   <div className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg", s.subPanel)}>
                     {actionIcon(log.action)}
                   </div>
+                  
+                  {/* Log Metni ve İçeriği */}
                   <div className="min-w-0 flex-1">
                     <div className={cn("text-sm font-bold", s.title)}>
                       {logActionLabel(log.action, locale, log.details)}
                     </div>
+                    {/* Hangi ürün üzerinde işlem yapıldıysa ismi */}
                     {log.product_title && (
                       <div className={cn("mt-0.5 truncate text-xs font-semibold", s.muted)}>
                         {log.product_title}
                       </div>
                     )}
+                    {/* Değişen Alanlar Varsa Nelerin Değiştiğini Listele */}
                     {changed && Object.keys(changed).length > 0 && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         <span className={cn("text-[10px] font-bold", s.muted)}>{t.logChanged}:</span>
@@ -515,14 +578,18 @@ export default function DashboardPage() {
                             className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-400/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-300 ring-1 ring-blue-400/20"
                           >
                             <span className="shrink-0">{fieldLabel(field)}:</span>
+                            {/* Eski Değer (Üstü Çizili) */}
                             <span className="truncate max-w-[60px] opacity-60 line-through">{ch.from}</span>
                             <span className="shrink-0">→</span>
+                            {/* Yeni Değer */}
                             <span className="truncate max-w-[60px]">{ch.to}</span>
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
+                  
+                  {/* Tarih ve Silme Butonu */}
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     <span className={cn("text-xs font-semibold", s.muted)}>{timeAgo(log.created_at)}</span>
                     <button
@@ -550,8 +617,14 @@ export default function DashboardPage() {
   );
 }
 
-// ── Yardımcı bileşenler ───────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// ALT BİLEŞENLER (Yardımcı UI Bileşenleri)
+// Yukarıdaki DashboardPage bileşeninin içinde tekrara düşmemek için oluşturulan küçük parçalar.
+// ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Toplam Stok, Toplam Satış gibi üst kısımdaki "Basit Metrik Kartları"nı oluşturan bileşen.
+ */
 function MetricCard({
   icon, label, value, color, bg, small = false,
 }: {
@@ -567,6 +640,9 @@ function MetricCard({
   );
 }
 
+/**
+ * Kutuların tepesindeki Başlık Kısmını (Örn: İkon ve Yazı) oluşturan ufak bileşen.
+ */
 function PanelHeader({ icon, title, s }: {
   icon: React.ReactNode; title: string; s: ThemeStyles;
 }) {
@@ -578,6 +654,9 @@ function PanelHeader({ icon, title, s }: {
   );
 }
 
+/**
+ * Orijinal ve Yapay Zeka Görsel Yüzdelerini (Progress Bar) Gösteren Bileşen.
+ */
 function ImageStat({ label, value, pct, color, s }: {
   label: string; value: string | number; pct: number; color: string; s: ThemeStyles;
 }) {
@@ -595,6 +674,9 @@ function ImageStat({ label, value, pct, color, s }: {
   );
 }
 
+/**
+ * "Eksik Fiyat" veya "Stok Azalıyor" gibi uyarı satırlarını (Sağdaki ufak kutucuk ile) gösteren bileşen.
+ */
 function SmartRow({ label, value, tone, s }: {
   label: string; value: number; tone: "blue" | "amber" | "red"; s: ThemeStyles;
 }) {
@@ -608,9 +690,13 @@ function SmartRow({ label, value, tone, s }: {
   );
 }
 
+/**
+ * En popüler Kategoriler ve Ürün Tiplerini Listeleyen (Bar tablosu) Bileşen.
+ */
 function TopListPanel({ title, items, emptyText, icon, s }: {
   title: string; items: NamedCount[]; emptyText: string; icon: React.ReactNode; s: ThemeStyles;
 }) {
+  // Liste içindeki en yüksek sayıyı bulur (Bunu %100 kabul edip bar uzunluğunu ona göre çizeriz)
   const max = Math.max(1, ...items.map((item) => item.count));
   return (
     <div className={cn("rounded-xl border", s.panel)}>
@@ -639,6 +725,9 @@ function TopListPanel({ title, items, emptyText, icon, s }: {
   );
 }
 
+/**
+ * İnceleme Gerektiren Kırmızı ve Sarı uyarı satırlarını basitleştirilmiş bir listeye çizen bileşen.
+ */
 function AttentionRow({ icon, text, s }: {
   icon: React.ReactNode; text: string; s: ThemeStyles;
 }) {

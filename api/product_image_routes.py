@@ -142,3 +142,35 @@ def delete_product_image(
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     return record
+
+
+@router.patch("/api/products/{product_id}/images/originals/{file_name}/mark-ai", response_model=ProductRecord)
+def mark_product_image_as_ai(
+    product_id: str,
+    file_name: str,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    jouri_edit_unlock: Annotated[str | None, Cookie()] = None,
+    db: Session = Depends(get_db),
+):
+    p = product_service.get_or_404(db, product_id)
+    if p.status in _IMAGE_LOCKED_STATUSES and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
+        raise HTTPException(status_code=403, detail={"code": "ERR_EDIT_LOCK_REQUIRED"})
+
+    try:
+        new_images, target = file_manager.mark_image_as_ai(Path(p.folder_path), file_name, list(p.images or []))
+        p.images = new_images
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "ERR_IMAGE_NOT_FOUND"})
+
+    activity_logger.log(
+        db, "mark_ai_image",
+        product_id=p.id,
+        product_title=p.title_raw,
+        details={"source": file_name, "new_name": target.get("fileName")},
+    )
+    db.commit()
+    db.refresh(p)
+    record = product_service.to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    return record

@@ -269,6 +269,8 @@ export const COPY = {
     aiImageGenerate: "3 AI görsel üret",
     aiImageGenerating: "AI görseller üretiliyor...",
     aiImageGenerated: "AI görseller eklendi. Orijinal görseller korundu.",
+    aiImageMarkAsAi: "Yapay Zeka Olarak İşaretle",
+    logMarkAiImage: "Manuel AI görseli işaretlendi",
     // Backup page
     archiveCount: (n: number) => `${n} ürün arşivde`,
     navBackup: "Yedekler",
@@ -631,6 +633,8 @@ export const COPY = {
     aiImageGenerate: "إنشاء 3 صور",
     aiImageGenerating: "جارٍ إنشاء الصور...",
     aiImageGenerated: "تمت إضافة صور الذكاء الاصطناعي. الصور الأصلية محفوظة.",
+    aiImageMarkAsAi: "تحديد كصورة ذكاء اصطناعي",
+    logMarkAiImage: "تم تحديد الصورة كذكاء اصطناعي يدوياً",
     // Backup page
     archiveCount: (n: number) => `${n} منتج في الأرشيف`,
     navBackup: "النسخ الاحتياطية",
@@ -925,6 +929,7 @@ export function logActionLabel(action: string, locale: Locale, details?: Record<
       const count = typeof details?.count === "number" ? details.count : 1;
       return t.logAiGenerateImages(count);
     }
+    case "mark_ai_image": return (t as any).logMarkAiImage || "AI Marked";
     case "shopify_push": return t.logShopifyPush;
     case "reset_sales": return t.logResetSales;
     default: return t.logUnknown;

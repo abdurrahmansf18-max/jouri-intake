@@ -229,6 +229,15 @@ export async function deleteProductImage(
   return handleResponse<ProductRecord>(res);
 }
 
+export async function markProductImageAsAi(productId: string, fileName: string): Promise<ProductRecord> {
+  const res = await fetch(
+    `/api/products/${encodeURIComponent(productId)}/images/originals/${encodeURIComponent(fileName)}/mark-ai`,
+    { method: "PATCH", headers: headers() },
+  );
+  return handleResponse<ProductRecord>(res);
+}
+
+
 export async function deleteProduct(productId: string): Promise<void> {
   const res = await fetch(`/api/products/${productId}`, {
     method: "DELETE",

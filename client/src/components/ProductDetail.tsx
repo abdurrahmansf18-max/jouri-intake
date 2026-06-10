@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, ChevronLeft, ChevronRight, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
-  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles
+  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles, Bot
 } from "lucide-react";
 import {
   addProductImages, deleteProduct, deleteProductImage,
-  generateAiProductImages,
+  generateAiProductImages, markProductImageAsAi,
   productImageUrl, resetSales, restoreProduct, restoreSize,
   sellProduct, updateProduct, updateRelatedProducts, updateStatus, verifyEditLock,
   pushToShopify
@@ -156,6 +156,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [restoringSize, setRestoringSize] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [deletingImage, setDeletingImage] = useState<string | null>(null);
+  const [markingAiImage, setMarkingAiImage] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<{ name: string; url: string }[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -389,6 +390,20 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       }
     } catch { showToast(t.errors.ERR_GENERAL, "error"); }
     finally { setDeletingImage(null); }
+  }
+
+  async function handleMarkAsAi(img: SavedImage) {
+    if (img.folder === "enhanced") return;
+    setMarkingAiImage(img.fileName);
+    try {
+      const updated = await markProductImageAsAi(record.id, img.fileName);
+      onReplace(updated);
+      showToast((t as any).logMarkAiImage || "Marked as AI", "success");
+    } catch {
+      showToast(t.errors.ERR_GENERAL, "error");
+    } finally {
+      setMarkingAiImage(null);
+    }
   }
 
   async function handlePushToShopify() {
@@ -1108,6 +1123,14 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           )}
                           {!isImageLocked && (
                             <>
+                              {img.folder !== "enhanced" && (
+                                <button type="button" disabled={markingAiImage === img.fileName}
+                                  onClick={() => handleMarkAsAi(img)}
+                                  className={cn("absolute top-1 end-1 flex size-7 items-center justify-center rounded-full bg-slate-800/80 text-sky-300 transition hover:bg-slate-700 active:scale-95", markingAiImage === img.fileName && "opacity-50")}
+                                  title={(t as any).aiImageMarkAsAi || "Mark as AI"}>
+                                  {markingAiImage === img.fileName ? <Loader2 className="size-3.5 animate-spin" /> : <Bot className="size-3.5" />}
+                                </button>
+                              )}
                               {img.folder !== "enhanced" && (
                                 <button type="button"
                                   onClick={() => openAiImagePanel(img)}
