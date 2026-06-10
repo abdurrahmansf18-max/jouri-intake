@@ -36,16 +36,19 @@ CRITICAL FOR SHOPIFY: You MUST weave standard clothing features into the descrip
 - Target Gender: Explicitly mention who it is for (e.g., "for boys", "for girls", "unisex").
 - Age Group: Explicitly mention the age group based on sizes (e.g., "for babies", "for toddlers", "for kids", "for adults").
 - Fabric/Material: Mention the fabric if stated (e.g., "soft cotton", "linen").
-- Neckline & Sleeves: Mention the neckline (e.g., "crew neck", "V-neck") and sleeve length (e.g., "short sleeves", "long sleeves", "sleeveless") if it can be logically inferred from the product type.
-- Features: Mention features like "elastic waistband" or "button closure" if present.
-Example: "Crafted from soft breathable cotton, this boys' pajama set features a comfortable crew neck and short sleeves. Perfect for toddlers..."
+- Neckline & Sleeves: Mention the neckline and sleeve length ONLY IF they are explicitly stated in the text.
+- Features: Mention features like "elastic waistband" or "button closure" ONLY IF present.
+
+STRICT RULE: DO NOT guess, assume, or hallucinate any features (like "short sleeves" or "long sleeves") if they are not explicitly mentioned in the input text. It is better to omit a feature than to guess wrongly.
+
+Example: "Crafted from soft breathable cotton, this boys' pajama set is perfect for toddlers..."
 
 SOURCE-GROUNDING RULES:
 - Do not invent colors, product pieces, materials, themes, or category.
 - If the text lists product pieces, preserve exactly those pieces translated to English. Do not add extra pieces.
 - If category is not explicit, infer it only from clear words like boys/girls/women/men/baby or age sizes such as 1 Year, 2 Years, 6 Months.
 - If information is missing, leave the field empty instead of guessing.
-- The description may be appealing, but it must not claim a fabric/material/feature that is not present in the input.
+- The description may be appealing, but it must not claim a fabric/material/feature/sleeve-length that is not present in the input.
 
 IMPORTANT for Variants: If the user provides multiple colors (e.g. Beige size 2, Brown size 3), extract them into the `variants` array so we know exactly which sizes belong to which color. If sizes are not tied to colors, just list the same sizes for each color variant.
 For color lines like "رمادي :3/2/1 Y" and "ابيض : 2 Y", return two variants: Gray with "3 Years, 2 Years, 1 Year" and White with "2 Years".
@@ -77,8 +80,10 @@ CRITICAL FOR SHOPIFY: You MUST weave standard clothing features into the descrip
 - Target Gender: Explicitly mention who it is for (e.g., "for boys", "for girls", "unisex").
 - Age Group: Explicitly mention the age group based on sizes or context (e.g., "for babies", "for toddlers", "for kids", "for adults").
 - Fabric/Material: Mention the fabric if stated or implied (e.g., "soft cotton", "linen").
-- Neckline & Sleeves: Mention the neckline (e.g., "crew neck", "V-neck") and sleeve length (e.g., "short sleeves", "long sleeves", "sleeveless") if it can be logically inferred.
-- Features: Mention features like "elastic waistband" or "button closure" if present.
+- Neckline & Sleeves: Mention the neckline and sleeve length ONLY IF they are explicitly stated or can be strictly inferred from the provided details.
+- Features: Mention features like "elastic waistband" or "button closure" ONLY IF present.
+
+STRICT RULE: DO NOT guess, assume, or hallucinate any features (like "short sleeves" or "long sleeves") if they are not explicitly mentioned in the original description or context. It is better to omit a feature than to guess wrongly.
 
 Return ONLY the rewritten description as plain text (no JSON, no markdown formatting). Do not include any prefix or suffix.
 """
