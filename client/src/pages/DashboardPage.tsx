@@ -527,7 +527,7 @@ export default function DashboardPage() {
 
       {/* ── 8. SON İŞLEMLER (LOGS) ── */}
       {/* Sistemdeki her hareketin (Ekleme, Silme, Güncelleme) listelendiği aktivite günlüğü */}
-      <div className={cn("rounded-xl border", s.panel)}>
+      <div className={cn("rounded-xl border min-w-0 overflow-hidden", s.panel)}>
         <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
           <Activity className="size-5 text-violet-400" />
           <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashRecentActivity}</h2>
@@ -559,7 +559,7 @@ export default function DashboardPage() {
                   
                   {/* Log Metni ve İçeriği */}
                   <div className="min-w-0 flex-1">
-                    <div className={cn("text-sm font-bold", s.title)}>
+                    <div className={cn("text-sm font-bold break-words whitespace-normal", s.title)}>
                       {logActionLabel(log.action, locale, log.details)}
                     </div>
                     {/* Hangi ürün üzerinde işlem yapıldıysa ismi */}
