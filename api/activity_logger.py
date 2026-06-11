@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from db_models import ActivityLog
 
@@ -10,6 +10,13 @@ def log(
     product_title: str | None = None,
     details: dict | None = None,
 ) -> None:
+    # Otomatik 48 saat temizliği
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+        db.query(ActivityLog).filter(ActivityLog.created_at < cutoff).delete()
+    except Exception:
+        pass
+
     entry = ActivityLog(
         created_at=datetime.now(timezone.utc),
         action=action,

@@ -76,7 +76,6 @@ def run_manual_backup(db: Session) -> dict:
         db_sql_error = _write_pg_dump(db_sql_file)
 
         products = db.query(Product).all()
-        logs = db.query(ActivityLog).all()
         db_data = {
             "exported_at": started_str,
             "products": [
@@ -113,18 +112,7 @@ def run_manual_backup(db: Session) -> dict:
                     },
                 }
                 for p in products
-            ],
-            "activity_logs": [
-                {
-                    "id": log.id,
-                    "created_at": log.created_at.isoformat() if log.created_at else None,
-                    "action": log.action,
-                    "product_id": log.product_id,
-                    "product_title": log.product_title,
-                    "details": log.details,
-                }
-                for log in logs
-            ],
+            ]
         }
         db_json_file = today_dir / "db.json"
         db_json_tmp = today_dir / "db.json.tmp"
@@ -347,6 +335,7 @@ def _write_pg_dump(target: Path) -> str | None:
                 "-p", db_port,
                 "-U", db_user,
                 "-d", db_name,
+                "-T", "activity_logs",
                 "-f", str(tmp_target),
             ],
             capture_output=True,
