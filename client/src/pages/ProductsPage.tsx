@@ -482,7 +482,7 @@ export default function ProductsPage() {
                   type="button"
                   className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-black text-white hover:bg-violet-500"
                   onClick={async () => {
-                    const newSeason = prompt(`Seçili ${selectedIds.length} ürün için mevsim girin (Yazlık, Kışlık, Mevsimlik):`);
+                    const newSeason = prompt(`Seçili ${selectedIds.length} ürün için mevsim girin (Summer, Winter, Mid-season):`);
                     if (newSeason !== null) {
                       try {
                         await bulkUpdateProducts(selectedIds, { season: newSeason });

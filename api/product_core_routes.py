@@ -17,6 +17,7 @@ from dependencies import verify_access
 from models import (
     BulkUpdateRequest,
     BulkShopifyPushRequest,
+    BulkAISeasonRequest,
     ProductRecord,
     ProductUpdateRequest,
     StatusUpdateRequest,

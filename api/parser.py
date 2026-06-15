@@ -50,10 +50,10 @@ SOURCE-GROUNDING RULES:
 - If information is missing, leave the field empty instead of guessing.
 - The description may be appealing, but it must not claim a fabric/material/feature/sleeve-length that is not present in the input.
 
-CRITICAL: Determine the 'season' (Mevsim) based on the image and text. It MUST be exactly one of these three words (in Turkish): "Yazlık", "Kışlık", or "Mevsimlik".
-- Yazlık: For summer/hot weather (e.g., short sleeves, shorts, thin fabric).
-- Kışlık: For winter/cold weather (e.g., jackets, thick coats, sweaters, fleece).
-- Mevsimlik: For mid-season/transitional weather (e.g., long-sleeve thin shirts, light trousers, spring/autumn wear).
+CRITICAL: Determine the 'season' based on the image and text. It MUST be exactly one of these three words (in English): "Summer", "Winter", or "Mid-season".
+- Summer: For hot weather (e.g., short sleeves, shorts, thin fabric).
+- Winter: For cold weather (e.g., jackets, thick coats, sweaters, fleece).
+- Mid-season: For transitional weather (e.g., long-sleeve thin shirts, light trousers, spring/autumn wear).
 
 IMPORTANT for Variants: If the user provides multiple colors (e.g. Beige size 2, Brown size 3), extract them into the `variants` array so we know exactly which sizes belong to which color. If sizes are not tied to colors, just list the same sizes for each color variant.
 For color lines like "رمادي :3/2/1 Y" and "ابيض : 2 Y", return two variants: Gray with "3 Years, 2 Years, 1 Year" and White with "2 Years".
@@ -68,7 +68,7 @@ JSON Schema:
     "productTypeSuggestion": "e.g. 'Pajamas', 'Dress', 'T-Shirt', 'Jumpsuit', 'Romper', 'Bodysuit'",
     "priceAmount": "numeric string, e.g. 25",
     "currency": "EUR",
-    "season": "Must be exactly 'Yazlık', 'Kışlık', or 'Mevsimlik'",
+    "season": "Must be exactly 'Summer', 'Winter', or 'Mid-season'",
     "variants": [
         {
             "color": "Color in English (e.g. Beige)",
