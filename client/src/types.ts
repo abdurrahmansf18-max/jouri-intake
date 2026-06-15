@@ -7,6 +7,7 @@ export interface ParsedProduct {
   priceAmount: string;
   currency: string;
   colorRaw: string;
+  season: string;
   colorGermanSuggestion: string;
   sizesRaw: string;
   tags: string[];

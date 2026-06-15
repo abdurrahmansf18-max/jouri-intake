@@ -8,6 +8,7 @@ import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
 import { useProductCacheActions, useProductCacheSync, useProductsQuery } from "../queries";
+import { bulkUpdateProducts, bulkPushToShopify } from "../api";
 
 const PAGE_SIZE = 30;
 
@@ -24,6 +25,10 @@ export default function ProductsPage() {
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+  const [seasonFilter, setSeasonFilter] = useState<string>("all");
+  const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
@@ -104,8 +109,35 @@ export default function ProductsPage() {
     };
   }, [recordsForTypeCounts]);
 
+  const recordsForSeasonCounts = useMemo(
+    () => statusRecords.filter((r) => {
+      const season = r.parsed?.season ?? "";
+      if (seasonFilter === "unspecified") return !season;
+      if (seasonFilter !== "all") return season === seasonFilter;
+      return true;
+    }),
+    [statusRecords, seasonFilter],
+  );
+
+  const seasonCounts = useMemo(() => {
+    const countsBySeason = new Map<string, number>();
+    let unspecified = 0;
+    recordsForSeasonCounts.forEach((r) => {
+      const season = r.parsed?.season ?? "";
+      if (!season) {
+        unspecified += 1;
+        return;
+      }
+      countsBySeason.set(season, (countsBySeason.get(season) ?? 0) + 1);
+    });
+    return {
+      seasons: Array.from(countsBySeason.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      unspecified,
+    };
+  }, [recordsForSeasonCounts]);
+
   // Filtre veya arama değişince sayfa 1'e dön
-  useEffect(() => { setPage(1); }, [filter, search, categoryFilter, typeFilter]);
+  useEffect(() => { setPage(1); }, [filter, search, categoryFilter, typeFilter, seasonFilter]);
 
   const filtered = useMemo(() => {
     const tokens = searchTokens(search);
@@ -120,11 +152,15 @@ export default function ProductsPage() {
       if (typeFilter === "untyped" && productType) return false;
       if (typeFilter !== "all" && typeFilter !== "untyped" && productType !== typeFilter) return false;
 
+      const season = r.parsed?.season ?? "";
+      if (seasonFilter === "unspecified" && season) return false;
+      if (seasonFilter !== "all" && seasonFilter !== "unspecified" && season !== seasonFilter) return false;
+
       if (tokens.length === 0) return true;
       const p = r.parsed;
       const haystack = normalizeText([
         p.titleRaw, p.categorySuggestion,
-        p.colorRaw, p.sizesRaw, p.priceAmount, p.productTypeSuggestion,
+        p.colorRaw, p.sizesRaw, p.priceAmount, p.productTypeSuggestion, p.season,
         r.notes, r.folderName, r.description,
       ].join(" "));
       return tokens.every((tok) => haystack.includes(tok));
@@ -330,6 +366,119 @@ export default function ProductsPage() {
               </div>
             )}
           </div>
+
+          {/* Mevsim */}
+          <div className="grid gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setSeasonMenuOpen((open) => !open); setCategoryMenuOpen(false); setTypeMenuOpen(false); }}
+                className={cn(
+                  "inline-flex min-h-10 max-w-full items-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition active:scale-95",
+                  seasonFilter !== "unspecified" && seasonFilter !== "all" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
+                )}
+              >
+                <Tag className="size-4 shrink-0 text-orange-400" />
+                <span className="shrink-0">{(t as any).season || "Mevsim"}</span>
+                <span className={cn("min-w-0 truncate rounded-lg px-2 py-0.5", seasonFilter !== "all" && seasonFilter !== "unspecified" ? "bg-white/20" : "bg-white/5")}>
+                  {seasonFilter === "all" ? "Tüm Mevsimler" : seasonFilter === "unspecified" ? "Belirtilmedi" : seasonFilter}
+                </span>
+                <ChevronDown className={cn("size-4 shrink-0 transition", seasonMenuOpen && "rotate-180")} />
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSeasonFilter("unspecified"); setSeasonMenuOpen(false); }}
+                className={cn(
+                  "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition active:scale-95",
+                  seasonFilter === "unspecified" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
+                )}
+              >
+                Belirtilmedi
+                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-black">{seasonCounts.unspecified}</span>
+              </button>
+            </div>
+
+            {seasonMenuOpen && (
+              <div className={cn("grid max-h-64 gap-1 overflow-y-auto rounded-xl border p-2", s.subPanel)}>
+                <div className={cn("px-2 py-1 text-[10px] font-black uppercase tracking-wide", s.muted)}>
+                  Mevsimler
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSeasonFilter("all"); setSeasonMenuOpen(false); }}
+                  className={cn(
+                    "flex min-h-10 items-center justify-between gap-3 rounded-lg px-3 text-sm font-extrabold transition",
+                    seasonFilter === "all" ? s.filterActive : s.filterIdle,
+                  )}
+                >
+                  <span>Tüm Mevsimler</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{recordsForSeasonCounts.length}</span>
+                </button>
+                {seasonCounts.seasons.map(([season, count]) => (
+                  <button
+                    key={season}
+                    type="button"
+                    onClick={() => { setSeasonFilter(season); setSeasonMenuOpen(false); }}
+                    className={cn(
+                      "flex min-h-10 items-center justify-between gap-3 rounded-lg px-3 text-sm font-extrabold transition",
+                      seasonFilter === season ? s.filterActive : s.filterIdle,
+                    )}
+                  >
+                    <span className="min-w-0 truncate" dir="auto">{season}</span>
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between border-t pt-4 border-white/10">
+            <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+              <input type="checkbox" checked={bulkMode} onChange={(e) => {
+                setBulkMode(e.target.checked);
+                if (!e.target.checked) setSelectedIds([]);
+              }} className="size-4 rounded" />
+              Çoklu Düzenleme Modu
+            </label>
+            {bulkMode && selectedIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-black text-white hover:bg-green-500"
+                  onClick={async () => {
+                    if (confirm(`Seçili ${selectedIds.length} ürünü Shopify'a göndermek istediğinize emin misiniz?`)) {
+                      try {
+                        await bulkPushToShopify(selectedIds);
+                        alert("Shopify senkronizasyonu tamamlandı.");
+                        window.location.reload();
+                      } catch (e) {
+                        alert("Hata oluştu.");
+                      }
+                    }
+                  }}
+                >
+                  Shopify'a Gönder
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-black text-white hover:bg-violet-500"
+                  onClick={async () => {
+                    const newSeason = prompt(`Seçili ${selectedIds.length} ürün için mevsim girin (Yazlık, Kışlık, Mevsimlik):`);
+                    if (newSeason !== null) {
+                      try {
+                        await bulkUpdateProducts(selectedIds, { season: newSeason });
+                        window.location.reload();
+                      } catch (e) {
+                        alert("Hata oluştu.");
+                      }
+                    }
+                  }}
+                >
+                  {selectedIds.length} Ürünü Düzenle
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -350,6 +499,13 @@ export default function ProductsPage() {
                 onEdit={() => openEdit(record.id)}
                 onReplace={replaceRecord}
                 searchQuery={search}
+                selectable={bulkMode}
+                selected={selectedIds.includes(record.id)}
+                onToggleSelect={(id, isSelected) => {
+                  setSelectedIds((prev) => 
+                    isSelected ? [...prev, id] : prev.filter((i) => i !== id)
+                  );
+                }}
               />
             ))}
           </div>

@@ -9,6 +9,7 @@ import {
   Ruler,
   Save,
   UploadCloud,
+  ImagePlus,
   X,
 } from "lucide-react";
 import { createProduct, updateRelatedProducts, parseProductText } from "../api";
@@ -26,6 +27,7 @@ type Draft = {
   productTypeSuggestion: string;
   priceAmount: string;
   colorRaw: string;
+  season: string;
   notes: string;
 };
 
@@ -41,6 +43,7 @@ function emptyDraft(): Draft {
     productTypeSuggestion: "",
     priceAmount: "",
     colorRaw: "",
+    season: "",
     notes: "",
   };
 }
@@ -66,6 +69,7 @@ export default function AddProductPage() {
 
   // AI Parsing State
   const [aiText, setAiText] = useState("");
+  const [aiImage, setAiImage] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
 
   const allProducts = productsQuery.data ?? [];
@@ -100,59 +104,56 @@ export default function AddProductPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const err = validate();
-    if (err) { setFieldError(err); return; }
+    if (err) {
+      setFieldError(err);
+      return;
+    }
     setFieldError(null);
     setSubmitting(true);
     try {
-      const validSizes = sizeRows
-        .filter((r) => r.size.trim())
-        .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
-
-      const newProduct = await createProduct(description, files, {
+      await createProduct(description, files, {
         notes: draft.notes,
-        sizeStocks: validSizes,
+        sizeStocks: sizeRows.filter((r) => r.size.trim() && parseInt(r.qty, 10) >= 1).map((r) => ({ size: r.size.trim(), qty: parseInt(r.qty, 10) })),
         parsed: {
           titleRaw: draft.titleRaw,
           categorySuggestion: draft.categorySuggestion,
           productTypeSuggestion: draft.productTypeSuggestion,
           priceAmount: draft.priceAmount,
-          currency: "EUR",
           colorRaw: draft.colorRaw,
+          season: draft.season,
         },
       });
-      cacheActions.upsertProduct(newProduct);
-
-      if (selectedVariantIds.length > 0) {
-        await updateRelatedProducts(newProduct.id, selectedVariantIds);
-        cacheActions.invalidateProducts();
-      }
-
       showToast(t.toastCreated, "success");
-      setDescription("");
       setDraft(emptyDraft());
-      setFiles([]);
+      setDescription("");
       setSizeRows([{ size: "", qty: "1" }]);
-      setSelectedVariantIds([]);
-      setPreviews((curr) => { curr.forEach((p) => URL.revokeObjectURL(p.url)); return []; });
-      formRef.current?.reset();
+      setFiles([]);
+      setPreviews([]);
+      setAiText("");
+      setAiImage(null);
+      cacheActions.invalidateProducts();
       navigate("/products");
-    } catch (err: unknown) {
-      const code = err instanceof Error ? err.message : "ERR_GENERAL";
-      const msg = t.errors[code] ?? t.errors.ERR_GENERAL;
-      showToast(msg, "error");
+    } catch (error) {
+      showToast(t.errors.ERR_GENERAL, "error");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function splitAiSizes(sizesVal: string | string[] | undefined): string[] {
+    if (!sizesVal) return [];
+    if (Array.isArray(sizesVal)) return sizesVal;
+    return sizesVal.split(",").map((s) => s.trim()).filter(Boolean);
   }
 
   // Bulk Mode state from AI
   const [bulkCards, setBulkCards] = useState<any[] | undefined>(undefined);
 
   async function handleAIParsing() {
-    if (!aiText.trim()) return;
+    if (!aiText.trim() && !aiImage) return;
     setIsParsing(true);
     try {
-      const result = await parseProductText(aiText);
+      const result = await parseProductText(aiText, aiImage || undefined);
       const parsed = result.parsed;
       const providerNote = getProviderNote(result.provider, t);
       
@@ -166,6 +167,7 @@ export default function AddProductPage() {
                  titleRaw: parsed.titleRaw || "",
                  priceAmount: parsed.priceAmount || "",
                  colorRaw: v.color || "",
+                 season: parsed.season || "",
                  categorySuggestion: parsed.categorySuggestion || "",
                  productTypeSuggestion: parsed.productTypeSuggestion || "",
                  description: result.description || "",
@@ -183,6 +185,7 @@ export default function AddProductPage() {
          if (parsed.titleRaw) patch("titleRaw", parsed.titleRaw);
          if (parsed.priceAmount) patch("priceAmount", parsed.priceAmount);
          if (parsed.colorRaw) patch("colorRaw", parsed.colorRaw);
+         if (parsed.season) patch("season", parsed.season);
          if (parsed.categorySuggestion) patch("categorySuggestion", parsed.categorySuggestion);
          if (parsed.productTypeSuggestion) patch("productTypeSuggestion", parsed.productTypeSuggestion);
          
@@ -232,22 +235,58 @@ export default function AddProductPage() {
             {t.aiAutoFill}
           </h3>
         </div>
-        <textarea
-          className={cn("min-h-24 w-full resize-y rounded-xl border px-4 py-3 text-sm leading-6 outline-none transition focus:ring-4", s.input)}
-          value={aiText}
-          onChange={(e) => setAiText(e.target.value)}
-          placeholder={t.aiPlaceholder}
-          dir="auto"
-        />
-        <button
-          type="button"
-          onClick={handleAIParsing}
-          disabled={isParsing || !aiText.trim()}
-          className={cn("mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-70", s.primary)}
-        >
-          {isParsing ? <Loader2 className="size-4 animate-spin" /> : <Layers className="size-4" />}
-          {isParsing ? t.aiAnalyzing : t.aiAnalyzeBtn}
-        </button>
+        <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
+          <textarea
+            className={cn("min-h-24 w-full resize-y rounded-xl border px-4 py-3 text-sm leading-6 outline-none transition focus:ring-4", s.input)}
+            value={aiText}
+            onChange={(e) => setAiText(e.target.value)}
+            placeholder={t.aiPlaceholder}
+            dir="auto"
+          />
+          <label className={cn("flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-3 text-center transition", aiImage ? "border-green-500 bg-green-500/10" : s.dropzone)}>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  setAiImage(e.target.files[0]);
+                }
+              }}
+            />
+            {aiImage ? (
+              <>
+                <img src={URL.createObjectURL(aiImage)} alt="AI Target" className="h-10 w-10 object-cover rounded-lg" />
+                <span className="text-[10px] font-bold text-green-600 dark:text-green-400">Görsel Seçildi</span>
+              </>
+            ) : (
+              <>
+                <ImagePlus className={cn("size-6 opacity-50")} />
+                <span className="text-xs font-semibold">Görsel (Opsiyonel)</span>
+              </>
+            )}
+          </label>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleAIParsing}
+            disabled={isParsing || (!aiText.trim() && !aiImage)}
+            className={cn("mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-70", s.primary)}
+          >
+            {isParsing ? <Loader2 className="size-4 animate-spin" /> : <Layers className="size-4" />}
+            {isParsing ? t.aiAnalyzing : t.aiAnalyzeBtn}
+          </button>
+          {aiImage && (
+            <button
+              type="button"
+              onClick={() => setAiImage(null)}
+              className="mt-3 text-xs font-bold text-red-500 hover:underline"
+            >
+              Görseli Kaldır
+            </button>
+          )}
+        </div>
       </section>
 
       {/* Mod seçici */}

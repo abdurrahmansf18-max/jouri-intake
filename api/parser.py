@@ -27,7 +27,7 @@ if os.getenv("OLLAMA_URL"):
     )
 
 _SYSTEM_PROMPT = """
-You are an AI assistant for a clothing store. The user will provide a raw product description (usually in Arabic or mixed languages).
+You are an AI assistant for a clothing store. The user will provide a raw product description (usually in Arabic or mixed languages) and optionally a product image.
 Your job is to extract and translate the information into a JSON object matching the following schema.
 Translate the title and description to English.
 
@@ -36,10 +36,10 @@ CRITICAL FOR SHOPIFY: You MUST weave standard clothing features into the descrip
 - Target Gender: Explicitly mention who it is for (e.g., "for boys", "for girls", "unisex").
 - Age Group: Explicitly mention the age group based on sizes (e.g., "for babies", "for toddlers", "for kids", "for adults").
 - Fabric/Material: Mention the fabric if stated (e.g., "soft cotton", "linen").
-- Neckline & Sleeves: Mention the neckline and sleeve length ONLY IF they are explicitly stated in the text.
+- Neckline & Sleeves: Mention the neckline and sleeve length ONLY IF they are explicitly stated in the text, OR clearly visible in the provided image.
 - Features: Mention features like "elastic waistband" or "button closure" ONLY IF present.
 
-STRICT RULE: DO NOT guess, assume, or hallucinate any features (like "short sleeves" or "long sleeves") if they are not explicitly mentioned in the input text. It is better to omit a feature than to guess wrongly.
+STRICT RULE: DO NOT guess, assume, or hallucinate any features (like "short sleeves" or "long sleeves") if they are not explicitly mentioned in the input text OR clearly visible in the image. It is better to omit a feature than to guess wrongly.
 
 Example: "Crafted from soft breathable cotton, this boys' pajama set is perfect for toddlers..."
 
@@ -49,6 +49,11 @@ SOURCE-GROUNDING RULES:
 - If category is not explicit, infer it only from clear words like boys/girls/women/men/baby or age sizes such as 1 Year, 2 Years, 6 Months.
 - If information is missing, leave the field empty instead of guessing.
 - The description may be appealing, but it must not claim a fabric/material/feature/sleeve-length that is not present in the input.
+
+CRITICAL: Determine the 'season' (Mevsim) based on the image and text. It MUST be exactly one of these three words (in Turkish): "Yazlık", "Kışlık", or "Mevsimlik".
+- Yazlık: For summer/hot weather (e.g., short sleeves, shorts, thin fabric).
+- Kışlık: For winter/cold weather (e.g., jackets, thick coats, sweaters, fleece).
+- Mevsimlik: For mid-season/transitional weather (e.g., long-sleeve thin shirts, light trousers, spring/autumn wear).
 
 IMPORTANT for Variants: If the user provides multiple colors (e.g. Beige size 2, Brown size 3), extract them into the `variants` array so we know exactly which sizes belong to which color. If sizes are not tied to colors, just list the same sizes for each color variant.
 For color lines like "رمادي :3/2/1 Y" and "ابيض : 2 Y", return two variants: Gray with "3 Years, 2 Years, 1 Year" and White with "2 Years".
@@ -63,6 +68,7 @@ JSON Schema:
     "productTypeSuggestion": "e.g. 'Pajamas', 'Dress', 'T-Shirt', 'Jumpsuit', 'Romper', 'Bodysuit'",
     "priceAmount": "numeric string, e.g. 25",
     "currency": "EUR",
+    "season": "Must be exactly 'Yazlık', 'Kışlık', or 'Mevsimlik'",
     "variants": [
         {
             "color": "Color in English (e.g. Beige)",
@@ -142,7 +148,7 @@ async def _request_ai_text(client: AsyncOpenAI, model_name: str, text: str, imag
     content = response.choices[0].message.content or ""
     return content.strip().strip('"').strip()
 
-async def parse_description_ai(description: str) -> ParsedProduct:
+async def parse_description_ai(description: str, image_base64: str = None) -> ParsedProduct:
     if _gemini_client:
         try:
             return await _parse_with_ai(
@@ -150,6 +156,7 @@ async def parse_description_ai(description: str) -> ParsedProduct:
                 _gemini_model_name,
                 description,
                 provider="gemini",
+                image_base64=image_base64,
             )
         except Exception as e:
             print("Gemini parsing failed:", _brief_error(e))
@@ -161,6 +168,7 @@ async def parse_description_ai(description: str) -> ParsedProduct:
                 _ollama_model_name,
                 description,
                 provider="gemma",
+                image_base64=image_base64,
             )
         except Exception as e:
             print("Gemma parsing failed:", _brief_error(e))
@@ -168,19 +176,26 @@ async def parse_description_ai(description: str) -> ParsedProduct:
     return parse_description_structured(description)
 
 
-async def _parse_with_ai(client: AsyncOpenAI, model_name: str, description: str, provider: str) -> dict:
-    content = await _request_ai_content(client, model_name, description)
+async def _parse_with_ai(client: AsyncOpenAI, model_name: str, description: str, provider: str, image_base64: str = None) -> dict:
+    content = await _request_ai_content(client, model_name, description, image_base64)
     data = json.loads(_strip_json_fence(content))
     return _merge_ai_data(description, data, provider)
 
 
-async def _request_ai_content(client: AsyncOpenAI, model_name: str, description: str) -> str:
+async def _request_ai_content(client: AsyncOpenAI, model_name: str, description: str, image_base64: str = None) -> str:
+    user_content = description
+    if image_base64:
+        user_content = [
+            {"type": "text", "text": description},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+        ]
+
     try:
         response = await client.chat.completions.create(
             model=model_name,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": description}
+                {"role": "user", "content": user_content}
             ],
             response_format={ "type": "json_object" }
         )
@@ -191,7 +206,7 @@ async def _request_ai_content(client: AsyncOpenAI, model_name: str, description:
             model=model_name,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": description}
+                {"role": "user", "content": user_content}
             ],
         )
     return (response.choices[0].message.content or "").strip()

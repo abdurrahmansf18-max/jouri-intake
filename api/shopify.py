@@ -223,9 +223,9 @@ async def _graphql_request(
 
 def _product_payload(product: Product, *, include_create_only: bool) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "title": product.title_raw or "Jouri Product",
+        "title": product.title_raw or "Binbon Kids Product",
         "body_html": _description_html(product.description),
-        "vendor": (os.getenv("SHOPIFY_VENDOR") or "Jouri").strip() or "Jouri",
+        "vendor": (os.getenv("SHOPIFY_VENDOR") or "Binbon Kids").strip() or "Binbon Kids",
         "product_type": product.product_type or "",
         "tags": _tags(product),
     }
@@ -518,11 +518,12 @@ def _description_html(description: str) -> str:
 
 def _tags(product: Product) -> str:
     raw = [
-        "Jouri",
-        f"jouri-id:{product.id}",
+        "Binbon Kids",
+        f"binbonkids-id:{product.id}",
         product.category,
         product.product_type,
         product.color_raw,
+        f"Season: {product.season}" if product.season else None,
         *(product.tags or []),
     ]
     seen: set[str] = set()
@@ -550,17 +551,17 @@ def _handle(product: Product) -> str:
     title = product.title_raw or product.folder_name or product.id
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
     suffix = re.sub(r"[^a-z0-9]+", "", product.id.lower())[-8:]
-    return f"{slug[:50] or 'jouri-product'}-{suffix}"
+    return f"{slug[:50] or 'binbonkids-product'}-{suffix}"
 
 
 def _sku(product: Product, size: str) -> str:
     base = re.sub(r"[^A-Za-z0-9]+", "-", product.id).strip("-").upper()[-18:]
     size_part = re.sub(r"[^A-Za-z0-9]+", "-", size).strip("-").upper()[:10] or "ONE"
-    return f"JOURI-{base}-{size_part}"
+    return f"BINBONKIDS-{base}-{size_part}"
 
 
 def _image_alt(product: Product, folder: str, file_name: str) -> str:
-    return f"Jouri:{product.id}:{folder}:{file_name}"
+    return f"Binbon Kids:{product.id}:{folder}:{file_name}"
 
 
 def _image_limit() -> int:

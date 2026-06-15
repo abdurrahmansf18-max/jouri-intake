@@ -28,6 +28,7 @@ class ParsedProduct(BaseModel):
     priceAmount: str = ""
     currency: str = ""
     colorRaw: str = ""
+    season: str = ""
     colorGermanSuggestion: str = ""
     sizesRaw: str = ""
     tags: list[str] = Field(default_factory=list)
@@ -108,6 +109,7 @@ class ParsedProductUpdate(BaseModel):
     currency: Optional[str] = None
     colorRaw: Optional[str] = None
     colorGermanSuggestion: Optional[str] = None
+    season: Optional[str] = None
     sizesRaw: Optional[str] = None
     tags: Optional[list[str]] = None
 
@@ -118,6 +120,15 @@ class ProductUpdateRequest(BaseModel):
     description: Optional[str] = None
     sizeStocks: Optional[list[SizeStock]] = None
     parsed: Optional[ParsedProductUpdate] = None
+
+
+class BulkUpdateRequest(BaseModel):
+    productIds: list[str]
+    season: Optional[str] = None
+
+
+class BulkShopifyPushRequest(BaseModel):
+    productIds: list[str]
 
 
 class SellProductRequest(BaseModel):
@@ -147,3 +158,4 @@ class AuthRequest(BaseModel):
 
 class ParseRequest(BaseModel):
     text: str
+    imageBase64: Optional[str] = None

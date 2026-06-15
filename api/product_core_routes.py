@@ -15,6 +15,7 @@ from database import get_db
 from db_models import Product
 from dependencies import verify_access
 from models import (
+    BulkUpdateRequest,
     ProductRecord,
     ProductUpdateRequest,
     StatusUpdateRequest,
@@ -123,6 +124,7 @@ async def create_product(
         currency=parsed.currency or "EUR",
         color_raw=parsed.colorRaw,
         color_german=parsed.colorGermanSuggestion,
+        season=parsed.season,
         sizes_raw=parsed.sizesRaw,
         tags=parsed.tags,
         images=[img.model_dump() for img in saved_images],
@@ -246,8 +248,10 @@ def update_product(
             track("color", p.color_raw, pd.colorRaw); p.color_raw = pd.colorRaw
         if pd.colorGermanSuggestion is not None:
             p.color_german = pd.colorGermanSuggestion
+        if pd.season is not None:
+            track("season", p.season, pd.season); p.season = pd.season
         if pd.sizesRaw is not None:
-            track("size", p.sizes_raw, pd.sizesRaw); p.sizes_raw = pd.sizesRaw
+            track("sizes", p.sizes_raw, pd.sizesRaw); p.sizes_raw = pd.sizesRaw
         if pd.tags is not None:
             p.tags = pd.tags
 
@@ -448,3 +452,88 @@ def delete_product(
     db.commit()
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_deleted", "id": product_id})
     return {"ok": True}
+
+
+@router.patch("/api/products/bulk/update", response_model=list[ProductRecord])
+def bulk_update_products(
+    body: BulkUpdateRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    updated_records = []
+    for pid in body.productIds:
+        p = db.query(Product).filter(Product.id == pid).first()
+        if not p:
+            continue
+        
+        if body.season is not None:
+            p.season = body.season
+        
+        activity_logger.log(
+            db, "bulk_update",
+            product_id=p.id,
+            product_title=p.title_raw,
+            details={"season": body.season} if body.season is not None else {}
+        )
+        updated_records.append(p)
+        
+    db.commit()
+    
+    result = []
+    for p in updated_records:
+        db.refresh(p)
+        record = product_service.to_record(p)
+        result.append(record)
+        background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+        
+    return result
+
+
+@router.post("/api/products/bulk/shopify-push")
+async def bulk_push_to_shopify(
+    body: BulkShopifyPushRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    import asyncio
+    
+    products = db.query(Product).filter(Product.id.in_(body.productIds)).all()
+    results = []
+
+    for p in products:
+        try:
+            res = await shopify.push_to_shopify(p)
+            p.shopify_product_id = str(res.get("product", {}).get("id") or "")
+            p.shopify_product_handle = str(res.get("product", {}).get("handle") or "")
+            p.shopify_synced_at = datetime.now(timezone.utc).isoformat()
+            p.shopify_last_error = ""
+
+            activity_logger.log(
+                db,
+                "shopify_sync",
+                product_id=p.id,
+                product_title=p.title_raw,
+                details={
+                    "created": res.get("created"),
+                    "product_id": p.shopify_product_id,
+                    "handle": p.shopify_product_handle,
+                },
+            )
+            db.commit()
+            db.refresh(p)
+            record = product_service.to_record(p)
+            background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+            results.append({"id": p.id, "success": True})
+        except Exception as e:
+            p.shopify_last_error = str(e)
+            db.commit()
+            record = product_service.to_record(p)
+            background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+            results.append({"id": p.id, "success": False, "error": str(e)})
+
+        # Rate limiting pause
+        await asyncio.sleep(1)
+
+    return {"success": True, "results": results}

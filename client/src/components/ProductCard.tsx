@@ -15,9 +15,12 @@ interface Props {
   showRestoreBtn?: boolean;
   showSoldSizes?: boolean;
   searchQuery?: string;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string, selected: boolean) => void;
 }
 
-export default function ProductCard({ record, onOpen, onEdit, onReplace, showRestoreBtn, showSoldSizes, searchQuery }: Props) {
+export default function ProductCard({ record, onOpen, onEdit, onReplace, showRestoreBtn, showSoldSizes, searchQuery, selectable, selected, onToggleSelect }: Props) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
@@ -45,15 +48,25 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
       className={cn(
         "group cursor-pointer rounded-xl border overflow-hidden",
         "transition-all duration-200 hover:-translate-y-1 hover:border-violet-400/50 hover:shadow-lg hover:shadow-violet-900/20",
-        "select-none",
+        "select-none relative",
         s.subPanel,
       )}
       onClick={onOpen}
     >
       {/* ── Görsel şeridi ── */}
+      {selectable && (
+        <div className="absolute top-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => onToggleSelect?.(record.id, e.target.checked)}
+            className="size-5 rounded border-2 border-white cursor-pointer"
+          />
+        </div>
+      )}
       {record.images.length > 0 ? (
         <div
-          className="flex gap-1.5 overflow-x-auto p-2"
+          className="flex gap-1.5 overflow-x-auto p-2 relative"
           style={{ scrollbarWidth: "none", background: "rgba(0,0,0,0.25)" }}
         >
           {record.images.map((img) => (

@@ -30,6 +30,7 @@ type Draft = {
   categorySuggestion: string; productTypeSuggestion: string;
   priceAmount: string;
   colorRaw: string; colorGermanSuggestion: string;
+  season: string;
   notes: string; description: string;
   restoreStock: string;
   saleQuantity: string; saleNote: string;
@@ -44,6 +45,7 @@ function recordToDraft(r: ProductRecord): Draft {
     priceAmount: r.parsed.priceAmount,
     colorRaw: r.parsed.colorRaw,
     colorGermanSuggestion: r.parsed.colorGermanSuggestion,
+    season: r.parsed.season || "",
     notes: r.notes || "",
     description: r.description || "",
     restoreStock: String(Math.max(1, r.stockQuantity || 1)),
@@ -645,6 +647,14 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       </span>
                     </InfoRow>}
 
+                    {/* Mevsim */}
+                    {p.season && <InfoRow label={(t as any).season || "Mevsim"} s={s}>
+                      <span className="inline-flex items-center gap-1">
+                        <Tag className="size-3 text-orange-400" />
+                        <span dir="auto">{p.season}</span>
+                      </span>
+                    </InfoRow>}
+
                     {/* Bedenler + Toplam stok — yan yana */}
                     {record.sizeStocks.length > 0 ? (
                       <div className="grid grid-cols-2 gap-0 py-2.5">
@@ -1096,6 +1106,15 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <DetailField label={t.rawTitle}            s={s} value={draft.titleRaw}              onChange={(v) => patch("titleRaw", v)} />
                     <DetailField label={t.price}               s={s} value={draft.priceAmount}            onChange={(v) => patch("priceAmount", v)} prefix="€" inputDir="ltr" />
                     <DetailField label={t.color}               s={s} value={draft.colorRaw}               onChange={(v) => patch("colorRaw", v)} />
+                    <label className="grid gap-1.5">
+                      <span className={cn("text-xs font-black", s.strong)}>{(t as any).season || "Mevsim"}</span>
+                      <select value={draft.season || ""} onChange={(e) => patch("season", e.target.value)} className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}>
+                        <option value="">—</option>
+                        <option value="Yazlık">Yazlık / Summer</option>
+                        <option value="Kışlık">Kışlık / Winter</option>
+                        <option value="Mevsimlik">Mevsimlik / Mid-season</option>
+                      </select>
+                    </label>
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />
                     <DetailField label={t.productType}         s={s} value={draft.productTypeSuggestion}  onChange={(v) => patch("productTypeSuggestion", v)} />
                   </div>

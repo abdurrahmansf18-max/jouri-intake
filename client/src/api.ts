@@ -62,11 +62,24 @@ export async function fetchProducts(): Promise<ProductRecord[]> {
 
 export type AiParseProvider = "gemini" | "gemma" | "parser";
 
-export async function parseProductText(text: string): Promise<{ parsed: ParsedProduct, description: string, variants?: any[], provider?: AiParseProvider }> {
+export async function parseProductText(text: string, imageFile?: File): Promise<{ parsed: ParsedProduct, description: string, variants?: any[], provider?: AiParseProvider }> {
+  let imageBase64: string | undefined;
+  if (imageFile) {
+    const buffer = await imageFile.arrayBuffer();
+    // Convert to base64 using btoa
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    imageBase64 = window.btoa(binary);
+  }
+
   const res = await fetch("/api/parse-product", {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, imageBase64 }),
   });
   return handleResponse(res);
 }
@@ -157,6 +170,24 @@ export async function updateRelatedProducts(productId: string, relatedIds: strin
     body: JSON.stringify({ relatedIds }),
   });
   return handleResponse<ProductRecord>(res);
+}
+
+export async function bulkUpdateProducts(ids: string[], updates: any): Promise<{ success: boolean; count: number }> {
+  const res = await fetch("/api/products/bulk/update", {
+    method: "PATCH",
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ productIds: ids, ...updates }), // Updated to use productIds
+  });
+  return handleResponse<{ success: boolean; count: number }>(res);
+}
+
+export async function bulkPushToShopify(ids: string[]): Promise<{ success: boolean; results: any[] }> {
+  const res = await fetch("/api/products/bulk/shopify-push", {
+    method: "POST",
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ productIds: ids }),
+  });
+  return handleResponse<{ success: boolean; results: any[] }>(res);
 }
 
 export async function getAiPrompts(
