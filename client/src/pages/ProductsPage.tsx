@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag } from "lucide-react";
+import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag, Sparkles } from "lucide-react";
 import { useApp } from "../context";
 import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -8,7 +8,7 @@ import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
 import { useProductCacheActions, useProductCacheSync, useProductsQuery } from "../queries";
-import { bulkUpdateProducts, bulkPushToShopify } from "../api";
+import { bulkUpdateProducts, bulkPushToShopify, bulkAISeason } from "../api";
 
 const PAGE_SIZE = 30;
 
@@ -442,6 +442,25 @@ export default function ProductsPage() {
             </label>
             {bulkMode && selectedIds.length > 0 && (
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-black text-white hover:bg-indigo-500 flex items-center gap-2"
+                  onClick={async () => {
+                    if (confirm(`Seçili ${selectedIds.length} ürünün mevsim bilgisini Yapay Zeka ile doldurmak istediğinize emin misiniz? (Bu işlem biraz vakit alabilir)`)) {
+                      try {
+                        alert("Yapay zeka analiz işlemi başlatılıyor. Lütfen pencereyi kapatmayın...");
+                        await bulkAISeason(selectedIds);
+                        alert("Yapay Zeka mevsim analizini başarıyla tamamladı.");
+                        window.location.reload();
+                      } catch (e) {
+                        alert("Hata oluştu.");
+                      }
+                    }
+                  }}
+                >
+                  <Sparkles className="size-4" />
+                  AI Mevsim Analizi
+                </button>
                 <button
                   type="button"
                   className="rounded-lg bg-green-600 px-4 py-2 text-sm font-black text-white hover:bg-green-500"

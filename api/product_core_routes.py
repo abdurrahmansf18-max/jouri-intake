@@ -538,3 +538,59 @@ async def bulk_push_to_shopify(
         await asyncio.sleep(1)
 
     return {"success": True, "results": results}
+
+
+@router.post("/api/products/bulk/ai-season")
+async def bulk_ai_season(
+    body: BulkAISeasonRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    import asyncio
+    import base64
+    from pathlib import Path
+    
+    products = db.query(Product).filter(Product.id.in_(body.productIds)).all()
+    results = []
+
+    for p in products:
+        try:
+            image_base64 = None
+            if p.images and len(p.images) > 0:
+                first_img = p.images[0]
+                img_path = Path(p.folder_path) / "originals" / first_img["fileName"]
+                if img_path.exists():
+                    with open(img_path, "rb") as f:
+                        image_base64 = base64.b64encode(f.read()).decode("utf-8")
+            
+            # Call AI parser
+            from parser import parse_description_ai
+            text_to_parse = f"{p.title_raw}\n{p.description}"
+            parsed_product = await parse_description_ai(text_to_parse, image_base64)
+            
+            new_season = parsed_product.season
+            if new_season:
+                p.season = new_season
+                activity_logger.log(
+                    db,
+                    "bulk_update",
+                    product_id=p.id,
+                    product_title=p.title_raw,
+                    details={"season": new_season, "source": "ai_bulk_season"}
+                )
+                db.commit()
+                db.refresh(p)
+                record = product_service.to_record(p)
+                background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+                results.append({"id": p.id, "success": True, "season": new_season})
+            else:
+                results.append({"id": p.id, "success": False, "error": "AI did not return a season"})
+                
+        except Exception as e:
+            results.append({"id": p.id, "success": False, "error": str(e)})
+
+        # Rate limiting pause
+        await asyncio.sleep(1)
+
+    return {"success": True, "results": results}

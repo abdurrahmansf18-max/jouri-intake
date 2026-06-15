@@ -159,3 +159,7 @@ class AuthRequest(BaseModel):
 class ParseRequest(BaseModel):
     text: str
     imageBase64: Optional[str] = None
+
+
+class BulkAISeasonRequest(BaseModel):
+    productIds: list[str]
