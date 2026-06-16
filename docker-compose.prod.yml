@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   db:
     image: postgres:16-alpine
@@ -25,18 +23,21 @@ services:
   api:
     build:
       context: ./api
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile.prod
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://jouri:jouri_password@db:5432/jouri
       - JWT_SECRET=jouri_super_secret_key
       - OLLAMA_URL=http://ollama:11434/v1
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - SHOPIFY_SHOP_URL=${SHOPIFY_SHOP_URL}
-      - SHOPIFY_ACCESS_TOKEN=${SHOPIFY_ACCESS_TOKEN}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - SHOPIFY_STORE_URL=${SHOPIFY_STORE_URL:-}
+      - SHOPIFY_SHOP_URL=${SHOPIFY_SHOP_URL:-}
+      - SHOPIFY_ACCESS_TOKEN=${SHOPIFY_ACCESS_TOKEN:-}
       - SHOPIFY_VENDOR=Binbon Kids
+      - PRODUCTS_BASE=/home/ubuntu/products_photo
     volumes:
       - /home/ubuntu/products_photo:/home/ubuntu/products_photo
 
