@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag, Sparkles } from "lucide-react";
 import { useApp } from "../context";
-import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens } from "../i18n";
+import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens, translateTerm } from "../i18n";
 import { DARK, LIGHT } from "../theme";
 import type { ProductRecord, StatusFilter } from "../types";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
+import { PromptModal } from "../components/PromptModal";
 import { useProductCacheActions, useProductCacheSync, useProductsQuery } from "../queries";
 import { bulkUpdateProducts, bulkPushToShopify, bulkAISeason } from "../api";
 
@@ -36,6 +37,15 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
+  const [promptConfig, setPromptConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description?: string;
+    placeholder?: string;
+    type?: "text" | "password";
+    onConfirm: (v: string) => void;
+    onCancel: () => void;
+  } | null>(null);
   const [page, setPage] = useState(1);
   const productsQuery = useProductsQuery();
   const cacheActions = useProductCacheActions();
@@ -169,7 +179,7 @@ export default function ProductsPage() {
       ].join(" "));
       return tokens.every((tok) => haystack.includes(tok));
     });
-  }, [records, filter, search, categoryFilter, typeFilter]);
+  }, [records, filter, search, categoryFilter, typeFilter, seasonFilter]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = useMemo(() => {
@@ -196,11 +206,11 @@ export default function ProductsPage() {
   const selectedCategoryLabel =
     categoryFilter === "all" ? t.allCategories :
     categoryFilter === "uncategorized" ? t.uncategorized :
-    categoryFilter;
+    translateTerm(categoryFilter, locale);
   const selectedTypeLabel =
     typeFilter === "all" ? t.allProductTypes :
     typeFilter === "untyped" ? t.untyped :
-    typeFilter;
+    translateTerm(typeFilter, locale);
 
   if (loading) {
     return (
@@ -246,7 +256,7 @@ export default function ProductsPage() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => { setCategoryMenuOpen((open) => !open); setTypeMenuOpen(false); }}
+                onClick={() => { setCategoryMenuOpen((open) => !open); setTypeMenuOpen(false); setSeasonMenuOpen(false); }}
                 className={cn(
                   "inline-flex min-h-10 max-w-full items-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition active:scale-95",
                   categoryFilter !== "uncategorized" && categoryFilter !== "all" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
@@ -298,7 +308,7 @@ export default function ProductsPage() {
                       categoryFilter === category ? s.filterActive : s.filterIdle,
                     )}
                   >
-                    <span className="min-w-0 truncate" dir="auto">{category}</span>
+                    <span className="min-w-0 truncate" dir="auto">{translateTerm(category, locale)}</span>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
                   </button>
                 ))}
@@ -311,7 +321,7 @@ export default function ProductsPage() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => { setTypeMenuOpen((open) => !open); setCategoryMenuOpen(false); }}
+                onClick={() => { setTypeMenuOpen((open) => !open); setCategoryMenuOpen(false); setSeasonMenuOpen(false); }}
                 className={cn(
                   "inline-flex min-h-10 max-w-full items-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition active:scale-95",
                   typeFilter !== "untyped" && typeFilter !== "all" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
@@ -363,7 +373,7 @@ export default function ProductsPage() {
                       typeFilter === productType ? s.filterActive : s.filterIdle,
                     )}
                   >
-                    <span className="min-w-0 truncate" dir="auto">{productType}</span>
+                    <span className="min-w-0 truncate" dir="auto">{translateTerm(productType, locale)}</span>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
                   </button>
                 ))}
@@ -385,7 +395,7 @@ export default function ProductsPage() {
                 <Tag className="size-4 shrink-0 text-orange-400" />
                 <span className="shrink-0">{(t as any).season || "Mevsim"}</span>
                 <span className={cn("min-w-0 truncate rounded-lg px-2 py-0.5", seasonFilter !== "all" && seasonFilter !== "unspecified" ? "bg-white/20" : "bg-white/5")}>
-                  {seasonFilter === "all" ? "Tüm Mevsimler" : seasonFilter === "unspecified" ? "Belirtilmedi" : seasonFilter}
+                  {seasonFilter === "all" ? "Tüm Mevsimler" : seasonFilter === "unspecified" ? "Belirtilmedi" : translateTerm(seasonFilter, locale)}
                 </span>
                 <ChevronDown className={cn("size-4 shrink-0 transition", seasonMenuOpen && "rotate-180")} />
               </button>
@@ -428,7 +438,7 @@ export default function ProductsPage() {
                       seasonFilter === season ? s.filterActive : s.filterIdle,
                     )}
                   >
-                    <span className="min-w-0 truncate" dir="auto">{season}</span>
+                    <span className="min-w-0 truncate" dir="auto">{translateTerm(season, locale)}</span>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
                   </button>
                 ))}
@@ -479,8 +489,17 @@ export default function ProductsPage() {
                     });
 
                     if (hasPublished) {
-                      const pw = prompt((t as any).passwordPrompt || "Yayımlanmış ürünleri düzenlemek için yetki şifresi:");
-                      if (pw !== "123456") {
+                      const pw = await new Promise<string | null>(resolve => {
+                        setPromptConfig({
+                          isOpen: true,
+                          title: (t as any).passwordPrompt || "Yayımlanmış ürünleri düzenlemek için yetki şifresi:",
+                          type: "password",
+                          onConfirm: (val) => { setPromptConfig(null); resolve(val); },
+                          onCancel: () => { setPromptConfig(null); resolve(null); }
+                        });
+                      });
+
+                      if (pw !== "1234") {
                         showToast((t as any).passwordIncorrect || "Hatalı şifre!", "error");
                         // Yayımlanmış olanları listeden çıkar
                         processIds = processIds.filter(id => {
@@ -524,7 +543,7 @@ export default function ProductsPage() {
                   }}
                 >
                   {aiLoading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                  {aiProgress ? aiProgress : "AI Mevsim Analizi"}
+                  {aiProgress ? aiProgress : ((t as any).aiAnalyzeBtn || "AI Mevsim Analizi")}
                 </button>
                 <button
                   type="button"
@@ -563,14 +582,23 @@ export default function ProductsPage() {
                     setTimeout(() => window.location.reload(), 1500);
                   }}
                 >
-                  {pushProgress ? pushProgress : "Shopify'a Gönder"}
+                  {pushProgress ? pushProgress : ((t as any).shopifyBtn || "Shopify'a Gönder")}
                 </button>
                 <button
                   type="button"
                   className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-black text-white hover:bg-violet-500"
                   onClick={async () => {
-                    const newSeason = prompt(`Seçili ${selectedIds.length} ürün için mevsim girin (Summer, Winter, Mid-season):`);
-                    if (newSeason !== null) {
+                    const newSeason = await new Promise<string | null>(resolve => {
+                      setPromptConfig({
+                        isOpen: true,
+                        title: (t as any).editSeasonTitle || `Seçili ${selectedIds.length} ürün için mevsim girin:`,
+                        placeholder: "Summer, Winter, Mid-season...",
+                        type: "text",
+                        onConfirm: (val) => { setPromptConfig(null); resolve(val); },
+                        onCancel: () => { setPromptConfig(null); resolve(null); }
+                      });
+                    });
+                    if (newSeason !== null && newSeason.trim() !== "") {
                       try {
                         await bulkUpdateProducts(selectedIds, { season: newSeason });
                         showToast("Mevsim başarıyla güncellendi.", "success");
@@ -637,6 +665,14 @@ export default function ProductsPage() {
           allProducts={allProducts}
           navigationProducts={filtered}
           onNavigate={(product) => { setSelectedId(product.id); setDetailMode("view"); }}
+        />
+      )}
+
+      {promptConfig && (
+        <PromptModal
+          {...promptConfig}
+          confirmText={(t as any).confirm || "Tamam"}
+          cancelText={(t as any).cancel || "İptal"}
         />
       )}
     </div>

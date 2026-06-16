@@ -969,3 +969,70 @@ export function logActionLabel(action: string, locale: Locale, details?: Record<
     default: return t.logUnknown;
   }
 }
+
+export function translateTerm(term: string, locale: Locale): string {
+  if (locale === "tr") {
+    switch (term) {
+      case "Boys": return "Erkek Çocuk";
+      case "Girls": return "Kız Çocuk";
+      case "Kids": return "Çocuk";
+      case "Women": return "Kadın";
+      case "Men": return "Erkek";
+      case "Baby": return "Bebek";
+      case "Summer": return "Yaz";
+      case "Winter": return "Kış";
+      case "Mid-season": return "Mevsimlik";
+      case "Pajamas": return "Pijama";
+      case "T-Shirt": return "Tişört";
+      case "T-Shirt Set": return "Tişört Takımı";
+      case "Dress": return "Elbise";
+      case "Set": return "Takım";
+      case "Shorts": return "Şort";
+      case "Pants": return "Pantolon";
+      case "Jeans": return "Kot Pantolon";
+      case "Shirt": return "Gömlek";
+      case "Blouse": return "Bluz";
+      case "Jacket": return "Ceket";
+      case "Coat": return "Mont";
+      case "Sweater": return "Kazak";
+      case "Hoodie": return "Kapşonlu";
+      case "Skirt": return "Etek";
+      case "Romper": return "Salopet";
+      case "Bodysuit": return "Çıtçıtlı Body";
+      case "Jumpsuit": return "Tulum";
+      default: return term;
+    }
+  } else if (locale === "ar") {
+    switch (term) {
+      case "Boys": return "ولادي";
+      case "Girls": return "بناتي";
+      case "Kids": return "أطفال";
+      case "Women": return "نسائي";
+      case "Men": return "رجالي";
+      case "Baby": return "مواليد";
+      case "Summer": return "صيفي";
+      case "Winter": return "شتوي";
+      case "Mid-season": return "محير";
+      case "Pajamas": return "بيجاما";
+      case "T-Shirt": return "تيشيرت";
+      case "T-Shirt Set": return "طقم تيشيرت";
+      case "Dress": return "فستان";
+      case "Set": return "طقم";
+      case "Shorts": return "شورت";
+      case "Pants": return "بنطلون";
+      case "Jeans": return "جينز";
+      case "Shirt": return "قميص";
+      case "Blouse": return "بلوزة";
+      case "Jacket": return "جاكيت";
+      case "Coat": return "معطف";
+      case "Sweater": return "كنزة";
+      case "Hoodie": return "هودي";
+      case "Skirt": return "تنورة";
+      case "Romper": return "رومبر";
+      case "Bodysuit": return "بدي";
+      case "Jumpsuit": return "أفرول";
+      default: return term;
+    }
+  }
+  return term;
+}
