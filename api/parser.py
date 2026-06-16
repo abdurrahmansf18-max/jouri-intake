@@ -222,9 +222,15 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
     structured_variants = structured.get("variants", [])
     ai_variants = _normalize_variants(data.get("variants", []))
     variants = structured_variants or ai_variants
+    structured_sizes_raw = structured_parsed.get("sizesRaw", "")
+    if not structured_variants and structured_sizes_raw and ai_variants:
+        variants = [
+            {"color": variant.get("color", ""), "sizes": structured_sizes_raw}
+            for variant in ai_variants
+        ]
 
-    color_raw = _field(data.get("colorRaw", ""))
-    sizes_raw = _field(data.get("sizesRaw", ""))
+    color_raw = structured_parsed.get("colorRaw", "") or _field(data.get("colorRaw", ""))
+    sizes_raw = structured_sizes_raw or _field(data.get("sizesRaw", ""))
 
     if structured_variants:
         color_raw = structured_parsed.get("colorRaw", "")
