@@ -44,7 +44,7 @@ services:
     volumes:
       - /home/ubuntu/jouri/products_photo:/products_photo
       - /home/ubuntu/jouri/backups:/backups
-      - /home/ubuntu/.config/rclone:/root/.config/rclone:ro
+      - /home/ubuntu/.config/rclone:/root/.config/rclone
 
   client:
     build:
