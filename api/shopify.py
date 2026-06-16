@@ -459,7 +459,17 @@ async def _sync_variants(
                 deleted += 1
                 continue
             except ShopifyPushError:
-                pass
+                payload = {
+                    "variant": {
+                        "id": current["id"],
+                        "inventory_quantity": 0,
+                        "inventory_management": "shopify",
+                        "inventory_policy": "deny",
+                    }
+                }
+                await _request(session, credentials, "PUT", f"variants/{current['id']}.json", payload)
+                disabled += 1
+                continue
         if option and option_key not in local_keys and option != "Default Title":
             payload = {
                 "variant": {
