@@ -502,6 +502,14 @@ function normalizeAiSizeToken(item: string, inheritedSuffix: string): string {
   if (ageRange) {
     return formatAgeRange(ageRange[1], ageRange[2], ageRange[3]);
   }
+  const compactAgeRange = compact.match(/^(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)(YEARS?|MONTHS?)$/i);
+  if (compactAgeRange) {
+    return formatAgeRange(compactAgeRange[1], compactAgeRange[2], compactAgeRange[3]);
+  }
+  const compactAge = compact.match(/^(\d+(?:[.,]\d+)?)(YEARS?|MONTHS?)$/i);
+  if (compactAge) {
+    return formatAgeSize(compactAge[1], compactAge[2].toUpperCase().startsWith("YEAR") ? "Y" : "M");
+  }
   const ownRangeSuffix = compact.match(/^(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)([YM])$/i);
   if (ownRangeSuffix) {
     return formatAgeRange(ownRangeSuffix[1], ownRangeSuffix[2], ownRangeSuffix[3]);

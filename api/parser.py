@@ -656,11 +656,19 @@ def _normalize_sizes(value: str, default_suffix: str = "") -> list[str]:
         if not cleaned:
             continue
         range_with_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)([YM])", cleaned, re.IGNORECASE)
+        range_with_word_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)(YEARS?|MONTHS?)", cleaned, re.IGNORECASE)
         range_without_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)", cleaned)
+        age_word_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)(YEARS?|MONTHS?)", cleaned, re.IGNORECASE)
         if range_with_suffix:
             cleaned = _format_age_size_range(range_with_suffix.group(1), range_with_suffix.group(2), range_with_suffix.group(3).upper())
+        elif range_with_word_suffix:
+            unit = "Y" if range_with_word_suffix.group(3).upper().startswith("YEAR") else "M"
+            cleaned = _format_age_size_range(range_with_word_suffix.group(1), range_with_word_suffix.group(2), unit)
         elif range_without_suffix and suffix in {"Y", "M"}:
             cleaned = _format_age_size_range(range_without_suffix.group(1), range_without_suffix.group(2), suffix)
+        elif age_word_suffix:
+            unit = "Y" if age_word_suffix.group(2).upper().startswith("YEAR") else "M"
+            cleaned = _format_age_size(age_word_suffix.group(1), unit)
         elif suffix in {"Y", "M"} and re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
             cleaned = _format_age_size(cleaned, suffix)
         elif suffix and re.fullmatch(r"\d+(?:[.,]\d+)?", cleaned):
