@@ -39,7 +39,7 @@ services:
       - SHOPIFY_VENDOR=Binbon Kids
       - PRODUCTS_BASE=/products_photo
     volumes:
-      - /home/ubuntu/products_photo:/products_photo
+      - /home/ubuntu/jouri/products_photo:/products_photo
 
   client:
     build:
