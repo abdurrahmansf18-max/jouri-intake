@@ -211,6 +211,10 @@ export default function ProductsPage() {
     typeFilter === "all" ? t.allProductTypes :
     typeFilter === "untyped" ? t.untyped :
     translateTerm(typeFilter, locale);
+  const selectedSeasonLabel =
+    seasonFilter === "all" ? t.allSeasons :
+    seasonFilter === "unspecified" ? t.unspecified :
+    translateTerm(seasonFilter, locale);
 
   if (loading) {
     return (
@@ -381,7 +385,7 @@ export default function ProductsPage() {
             )}
           </div>
 
-          {/* Mevsim */}
+          {/* Season */}
           <div className="grid gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -393,9 +397,9 @@ export default function ProductsPage() {
                 )}
               >
                 <Tag className="size-4 shrink-0 text-orange-400" />
-                <span className="shrink-0">{(t as any).season || "Mevsim"}</span>
+                <span className="shrink-0">{t.season}</span>
                 <span className={cn("min-w-0 truncate rounded-lg px-2 py-0.5", seasonFilter !== "all" && seasonFilter !== "unspecified" ? "bg-white/20" : "bg-white/5")}>
-                  {seasonFilter === "all" ? "Tüm Mevsimler" : seasonFilter === "unspecified" ? "Belirtilmedi" : translateTerm(seasonFilter, locale)}
+                  {selectedSeasonLabel}
                 </span>
                 <ChevronDown className={cn("size-4 shrink-0 transition", seasonMenuOpen && "rotate-180")} />
               </button>
@@ -407,7 +411,7 @@ export default function ProductsPage() {
                   seasonFilter === "unspecified" ? s.filterActive : cn(s.controlGroup, s.controlIdle),
                 )}
               >
-                Belirtilmedi
+                {t.unspecified}
                 <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-black">{seasonCounts.unspecified}</span>
               </button>
             </div>
@@ -415,7 +419,7 @@ export default function ProductsPage() {
             {seasonMenuOpen && (
               <div className={cn("grid max-h-64 gap-1 overflow-y-auto rounded-xl border p-2", s.subPanel)}>
                 <div className={cn("px-2 py-1 text-[10px] font-black uppercase tracking-wide", s.muted)}>
-                  Mevsimler
+                  {t.seasonFilterList}
                 </div>
                 <button
                   type="button"
@@ -425,7 +429,7 @@ export default function ProductsPage() {
                     seasonFilter === "all" ? s.filterActive : s.filterIdle,
                   )}
                 >
-                  <span>Tüm Mevsimler</span>
+                  <span>{t.allSeasons}</span>
                   <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{recordsForSeasonCounts.length}</span>
                 </button>
                 {seasonCounts.seasons.map(([season, count]) => (
@@ -446,17 +450,17 @@ export default function ProductsPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between border-t pt-4 border-white/10">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+          <div className="flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex min-w-0 items-center gap-2 text-sm font-bold cursor-pointer">
                 <input type="checkbox" checked={bulkMode} onChange={(e) => {
                   setBulkMode(e.target.checked);
                   if (!e.target.checked) setSelectedIds([]);
                 }} className="size-4 rounded" />
-                Çoklu Düzenleme Modu
+                <span className="min-w-0">{t.bulkModeLabel}</span>
               </label>
               {bulkMode && (
-                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer text-gray-400">
+                <label className="flex min-w-0 items-center gap-2 text-sm font-medium cursor-pointer text-gray-400">
                   <input type="checkbox" 
                     checked={selectedIds.length > 0 && selectedIds.length === paginated.length} 
                     onChange={(e) => {
@@ -468,17 +472,17 @@ export default function ProductsPage() {
                     }} 
                     className="size-4 rounded" 
                   />
-                  Tümünü Seç (Sayfa)
+                  <span className="min-w-0">{t.selectAllPage}</span>
                 </label>
               )}
             </div>
             {bulkMode && selectedIds.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto lg:grid-cols-3">
                 <button
                   type="button"
                   disabled={aiLoading}
                   className={cn(
-                    "rounded-lg px-4 py-2 text-sm font-black text-white flex items-center gap-2 transition-colors",
+                    "flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
                     aiLoading ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500"
                   )}
                   onClick={async () => {
@@ -492,7 +496,7 @@ export default function ProductsPage() {
                       const pw = await new Promise<string | null>(resolve => {
                         setPromptConfig({
                           isOpen: true,
-                          title: (t as any).passwordPrompt || "Yayımlanmış ürünleri düzenlemek için yetki şifresi:",
+                          title: t.passwordPrompt,
                           type: "password",
                           onConfirm: (val) => { setPromptConfig(null); resolve(val); },
                           onCancel: () => { setPromptConfig(null); resolve(null); }
@@ -500,8 +504,7 @@ export default function ProductsPage() {
                       });
 
                       if (pw !== "1234") {
-                        showToast((t as any).passwordIncorrect || "Hatalı şifre!", "error");
-                        // Yayımlanmış olanları listeden çıkar
+                        showToast(t.passwordIncorrect, "error");
                         processIds = processIds.filter(id => {
                           const r = records.find(x => x.id === id);
                           return r && r.status !== "published";
@@ -517,10 +520,8 @@ export default function ProductsPage() {
                     for (let i = 0; i < processIds.length; i++) {
                       const id = processIds[i];
                       const r = records.find(x => x.id === id);
-                      const productName = r?.parsed?.titleRaw || "Unknown";
-                      const progressMsg = (t as any).processingAi 
-                        ? (t as any).processingAi(i + 1, processIds.length, productName) 
-                        : `İşleniyor: ${i + 1} / ${processIds.length} (${productName})`;
+                      const productName = r?.parsed?.titleRaw || t.selectedProductFallback;
+                      const progressMsg = t.processingAi(i + 1, processIds.length, productName);
                       
                       setAiProgress(progressMsg);
                       
@@ -529,27 +530,27 @@ export default function ProductsPage() {
                         if (result.success && result.results[0]?.success) {
                           successCount++;
                         } else {
-                          showToast(`${productName}: ${(t as any).aiBulkError || "Hata oluştu."}`, "error");
+                          showToast(`${productName}: ${t.aiBulkError}`, "error");
                         }
                       } catch (e) {
-                        showToast(`${productName}: ${(t as any).aiBulkError || "Hata oluştu."}`, "error");
+                        showToast(`${productName}: ${t.aiBulkError}`, "error");
                       }
                     }
                     
                     setAiProgress(null);
                     setAiLoading(false);
-                    showToast((t as any).aiBulkSuccess || "Yapay Zeka analizi tamamlandı.", "success");
+                    showToast(t.aiBulkSuccess, "success");
                     setTimeout(() => window.location.reload(), 1500);
                   }}
                 >
                   {aiLoading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                  {aiProgress ? aiProgress : ((t as any).aiAnalyzeBtn || "AI Mevsim Analizi")}
+                  <span className="min-w-0 text-center leading-tight">{aiProgress ? aiProgress : t.aiAnalyzeBtn}</span>
                 </button>
                 <button
                   type="button"
                   disabled={pushLoading}
                   className={cn(
-                    "rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
+                    "min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
                     pushLoading ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-500"
                   )}
                   onClick={async () => {
@@ -558,10 +559,8 @@ export default function ProductsPage() {
                     for (let i = 0; i < selectedIds.length; i++) {
                       const id = selectedIds[i];
                       const r = records.find(x => x.id === id);
-                      const productName = r?.parsed?.titleRaw || "Unknown";
-                      const progressMsg = (t as any).processingAi 
-                        ? (t as any).processingAi(i + 1, selectedIds.length, productName) 
-                        : `İşleniyor: ${i + 1} / ${selectedIds.length} (${productName})`;
+                      const productName = r?.parsed?.titleRaw || t.selectedProductFallback;
+                      const progressMsg = t.processingAi(i + 1, selectedIds.length, productName);
                       
                       setPushProgress(progressMsg);
                       
@@ -571,10 +570,10 @@ export default function ProductsPage() {
                         if (itemResult?.success) {
                           successCount++;
                         } else {
-                          showToast(`${productName}: ${itemResult?.error || "Shopify hatası"}`, "error");
+                          showToast(`${productName}: ${itemResult?.error || t.shopifyError}`, "error");
                         }
                       } catch (e) {
-                        showToast(`${productName} Shopify hatası`, "error");
+                        showToast(`${productName}: ${t.shopifyError}`, "error");
                       }
                     }
                     setPushProgress(null);
@@ -582,23 +581,23 @@ export default function ProductsPage() {
                     const failCount = selectedIds.length - successCount;
                     showToast(
                       failCount > 0
-                        ? `Shopify senkronizasyonu tamamlandı: ${successCount} başarılı, ${failCount} hatalı.`
-                        : "Shopify senkronizasyonu tamamlandı.",
+                        ? t.shopifySyncPartial(successCount, failCount)
+                        : t.shopifySyncComplete,
                       failCount > 0 ? "error" : "success",
                     );
                     setTimeout(() => window.location.reload(), 1500);
                   }}
                 >
-                  {pushProgress ? pushProgress : ((t as any).shopifyBtn || "Shopify'a Gönder")}
+                  <span className="block min-w-0 text-center leading-tight">{pushProgress ? pushProgress : t.shopifyBtn}</span>
                 </button>
                 <button
                   type="button"
-                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-black text-white hover:bg-violet-500"
+                  className="min-h-11 min-w-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-black text-white hover:bg-violet-500 sm:col-span-2 lg:col-span-1"
                   onClick={async () => {
                     const newSeason = await new Promise<string | null>(resolve => {
                       setPromptConfig({
                         isOpen: true,
-                        title: (t as any).editSeasonTitle || `Seçili ${selectedIds.length} ürün için mevsim girin:`,
+                        title: t.editSeasonTitle(selectedIds.length),
                         placeholder: "Summer, Winter, Mid-season...",
                         type: "text",
                         onConfirm: (val) => { setPromptConfig(null); resolve(val); },
@@ -608,15 +607,15 @@ export default function ProductsPage() {
                     if (newSeason !== null && newSeason.trim() !== "") {
                       try {
                         await bulkUpdateProducts(selectedIds, { season: newSeason });
-                        showToast("Mevsim başarıyla güncellendi.", "success");
+                        showToast(t.seasonUpdateSuccess, "success");
                         setTimeout(() => window.location.reload(), 1000);
                       } catch (e) {
-                        showToast("Hata oluştu.", "error");
+                        showToast(t.errors.ERR_GENERAL, "error");
                       }
                     }
                   }}
                 >
-                  {selectedIds.length} Ürünü Düzenle
+                  <span className="block min-w-0 text-center leading-tight">{t.bulkEditSelected(selectedIds.length)}</span>
                 </button>
               </div>
             )}
