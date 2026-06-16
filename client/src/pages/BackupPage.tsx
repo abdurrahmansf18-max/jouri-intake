@@ -112,9 +112,10 @@ export default function BackupPage() {
       : t.backupDriveStorageUnknown;
   const dbSqlSize = status.last_db_sql_size ?? status.last_db_size ?? "-";
   const dbJsonSize = status.last_db_json_size ?? "-";
-  const driveErrorText = status.drive_error && status.drive_error.length > 110
-    ? `${status.drive_error.slice(0, 110)}...`
-    : status.drive_error;
+  const localizedDriveError = localizeDriveError(status.drive_error, locale);
+  const driveErrorText = localizedDriveError && localizedDriveError.length > 110
+    ? `${localizedDriveError.slice(0, 110)}...`
+    : localizedDriveError;
 
   return (
     <div className="grid gap-5">
@@ -381,4 +382,37 @@ export default function BackupPage() {
 
     </div>
   );
+}
+
+function localizeDriveError(error: string | null | undefined, locale: "tr" | "ar") {
+  if (!error) return error;
+  const lower = error.toLowerCase();
+
+  if (lower.includes("rclone yapılandırması okunamadı") || lower.includes("rclone configuration") || lower.includes("config file")) {
+    return locale === "ar"
+      ? "تعذر قراءة إعدادات rclone."
+      : "rclone yapılandırması okunamadı.";
+  }
+  if (lower.includes("rclone komutu bulunamadı") || lower.includes("rclone command") || lower.includes("executable file not found")) {
+    return locale === "ar"
+      ? "لم يتم العثور على أمر rclone."
+      : "rclone komutu bulunamadı.";
+  }
+  if (lower.includes("google drive yetki") || lower.includes("invalid_grant") || lower.includes("token")) {
+    return locale === "ar"
+      ? "يجب تجديد صلاحية Google Drive."
+      : "Google Drive yetki anahtarı yenilenmeli.";
+  }
+  if (lower.includes("kota") || lower.includes("quota") || lower.includes("rate_limit")) {
+    return locale === "ar"
+      ? "تم تجاوز حد Google Drive API."
+      : "Google Drive API kota limiti aşıldı.";
+  }
+  if (lower.includes("zaman aşımı") || lower.includes("timeout") || lower.includes("timed out")) {
+    return locale === "ar"
+      ? "انتهت مهلة مزامنة Google Drive."
+      : "Google Drive senkronu zaman aşımına uğradı.";
+  }
+
+  return error;
 }
