@@ -140,12 +140,6 @@ export default function AddProductPage() {
     }
   }
 
-  function splitAiSizes(sizesVal: string | string[] | undefined): string[] {
-    if (!sizesVal) return [];
-    if (Array.isArray(sizesVal)) return sizesVal;
-    return sizesVal.split(",").map((s) => s.trim()).filter(Boolean);
-  }
-
   // Bulk Mode state from AI
   const [bulkCards, setBulkCards] = useState<any[] | undefined>(undefined);
 
@@ -482,7 +476,7 @@ export default function AddProductPage() {
 
 function splitAiSizes(value: string | string[] | undefined): string[] {
   const raw = Array.isArray(value) ? value.join(",") : (value || "");
-  const suffix = raw.match(/\b([A-Za-z]+)\b\s*$/)?.[1]?.toUpperCase() || "";
+  const suffix = detectSizeSuffix(raw);
   const sizes: string[] = [];
   raw
     .replace(/،/g, ",")
@@ -498,6 +492,10 @@ function splitAiSizes(value: string | string[] | undefined): string[] {
 
 function normalizeAiSizeToken(item: string, inheritedSuffix: string): string {
   const compact = item.replace(/\s+/g, "");
+  const prefixRange = compact.match(/^([YM])(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)$/i);
+  if (prefixRange) {
+    return formatAgeRange(prefixRange[2], prefixRange[3], prefixRange[1]);
+  }
   const ageRange = item.match(/^(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*(years?|months?)$/i);
   if (ageRange) {
     return formatAgeRange(ageRange[1], ageRange[2], ageRange[3]);
@@ -526,6 +524,12 @@ function normalizeAiSizeToken(item: string, inheritedSuffix: string): string {
     return formatAgeSize(ownSuffix[1], ownSuffix[2].toUpperCase());
   }
   return item.toUpperCase();
+}
+
+function detectSizeSuffix(value: string): string {
+  const prefix = value.match(/^\s*([YM])\b/i)?.[1]?.toUpperCase();
+  if (prefix === "Y" || prefix === "M") return prefix;
+  return value.match(/\b([YM])\b\s*$/i)?.[1]?.toUpperCase() || "";
 }
 
 function formatAgeSize(value: string, suffix: string): string {

@@ -240,6 +240,12 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
                 if s and s not in all_sizes:
                     all_sizes.append(s)
         sizes_raw = ", ".join(all_sizes)
+    elif sizes_raw:
+        normalized_sizes = _normalize_sizes(sizes_raw)
+        if normalized_sizes:
+            sizes_raw = ", ".join(normalized_sizes)
+    if color_raw:
+        color_raw = _translate_color(color_raw)
 
     title_raw = _field(data.get("titleRaw", ""))
     if _contains_arabic(title_raw):
@@ -655,11 +661,14 @@ def _normalize_sizes(value: str, default_suffix: str = "") -> list[str]:
         cleaned = re.sub(r"[^0-9A-Za-z.+-]", "", cleaned)
         if not cleaned:
             continue
+        prefix_range = re.fullmatch(r"([YM])(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)", cleaned, re.IGNORECASE)
         range_with_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)([YM])", cleaned, re.IGNORECASE)
         range_with_word_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)(YEARS?|MONTHS?)", cleaned, re.IGNORECASE)
         range_without_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)", cleaned)
         age_word_suffix = re.fullmatch(r"(\d+(?:[.,]\d+)?)(YEARS?|MONTHS?)", cleaned, re.IGNORECASE)
-        if range_with_suffix:
+        if prefix_range:
+            cleaned = _format_age_size_range(prefix_range.group(2), prefix_range.group(3), prefix_range.group(1).upper())
+        elif range_with_suffix:
             cleaned = _format_age_size_range(range_with_suffix.group(1), range_with_suffix.group(2), range_with_suffix.group(3).upper())
         elif range_with_word_suffix:
             unit = "Y" if range_with_word_suffix.group(3).upper().startswith("YEAR") else "M"
@@ -688,6 +697,10 @@ def _looks_like_size_line(value: str) -> bool:
 
 
 def _detect_size_suffix(value: str) -> str:
+    prefix_match = re.search(r"^\s*([A-Za-z]+)\b", value)
+    prefix = prefix_match.group(1).upper() if prefix_match else ""
+    if prefix in {"Y", "M"}:
+        return prefix
     suffix_match = re.search(r"\b([A-Za-z]+)\b\s*$", value)
     suffix = suffix_match.group(1).upper() if suffix_match else ""
     return suffix if suffix in {"Y", "M"} else ""
@@ -768,8 +781,13 @@ def _translate_color(value: str) -> str:
         "سماوي": "Sky Blue",
         "كحلي": "Navy",
         "تركواز": "Turquoise",
+        "تركويز": "Turquoise",
+        "تركوازي": "Turquoise",
+        "تركوازى": "Turquoise",
         "فيروزي": "Turquoise",
         "فيروزى": "Turquoise",
+        "بترولي": "Petrol Blue",
+        "بترول": "Petrol Blue",
         "وردي": "Pink",
         "زهري": "Pink",
         "زهر": "Pink",
@@ -778,6 +796,13 @@ def _translate_color(value: str) -> str:
         "ليلكي": "Lilac",
         "بيج": "Beige",
         "بني": "Brown",
+        "بطيخي": "Watermelon",
+        "بطيخى": "Watermelon",
+        "بطيخ": "Watermelon",
+        "كاربوزي": "Watermelon",
+        "كارپوزي": "Watermelon",
+        "karpuz": "Watermelon",
+        "watermelon": "Watermelon",
         "اخضر": "Green",
         "أخضر": "Green",
         "زيتي": "Olive",
@@ -794,7 +819,7 @@ def _translate_color(value: str) -> str:
 
 
 def _normalize_color_key(value: str) -> str:
-    key = " ".join(value.strip().split())
+    key = " ".join(value.strip().split()).lower()
     key = re.sub(r"^(?:ال)", "", key)
     key = key.replace("إ", "ا").replace("أ", "ا").replace("آ", "ا").replace("ى", "ي")
     return key

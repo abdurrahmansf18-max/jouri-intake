@@ -160,7 +160,3 @@ class ParseRequest(BaseModel):
     text: str
     imageBase64: Optional[str] = None
     imageMimeType: Optional[str] = None
-
-
-class BulkAISeasonRequest(BaseModel):
-    productIds: list[str]

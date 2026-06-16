@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag, Sparkles } from "lucide-react";
+import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag } from "lucide-react";
 import { useApp } from "../context";
 import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens } from "../i18n";
 import { DARK, LIGHT } from "../theme";
@@ -9,7 +9,7 @@ import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
 import { PromptModal } from "../components/PromptModal";
 import { useProductCacheActions, useProductCacheSync, useProductsQuery } from "../queries";
-import { bulkUpdateProducts, bulkPushToShopify, bulkAISeason } from "../api";
+import { bulkUpdateProducts, bulkPushToShopify } from "../api";
 
 const PAGE_SIZE = 30;
 
@@ -30,8 +30,6 @@ export default function ProductsPage() {
   const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiProgress, setAiProgress] = useState<string | null>(null);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushProgress, setPushProgress] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -74,9 +72,12 @@ export default function ProductsPage() {
       const productType = normalizeProductType(r.parsed?.productTypeSuggestion ?? "");
       if (typeFilter === "untyped") return !productType;
       if (typeFilter !== "all") return productType === typeFilter;
+      const season = r.parsed?.season ?? "";
+      if (seasonFilter === "unspecified") return !season;
+      if (seasonFilter !== "all") return season === seasonFilter;
       return true;
     }),
-    [statusRecords, typeFilter],
+    [statusRecords, typeFilter, seasonFilter],
   );
 
   const recordsForTypeCounts = useMemo(
@@ -84,9 +85,12 @@ export default function ProductsPage() {
       const category = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (categoryFilter === "uncategorized") return !category;
       if (categoryFilter !== "all") return category === categoryFilter;
+      const season = r.parsed?.season ?? "";
+      if (seasonFilter === "unspecified") return !season;
+      if (seasonFilter !== "all") return season === seasonFilter;
       return true;
     }),
-    [statusRecords, categoryFilter],
+    [statusRecords, categoryFilter, seasonFilter],
   );
 
   const categoryCounts = useMemo(() => {
@@ -125,12 +129,16 @@ export default function ProductsPage() {
 
   const recordsForSeasonCounts = useMemo(
     () => statusRecords.filter((r) => {
-      const season = r.parsed?.season ?? "";
-      if (seasonFilter === "unspecified") return !season;
-      if (seasonFilter !== "all") return season === seasonFilter;
+      const category = normalizeCategory(r.parsed?.categorySuggestion ?? "");
+      if (categoryFilter === "uncategorized" && category) return false;
+      if (categoryFilter !== "all" && categoryFilter !== "uncategorized" && category !== categoryFilter) return false;
+
+      const productType = normalizeProductType(r.parsed?.productTypeSuggestion ?? "");
+      if (typeFilter === "untyped" && productType) return false;
+      if (typeFilter !== "all" && typeFilter !== "untyped" && productType !== typeFilter) return false;
       return true;
     }),
-    [statusRecords, seasonFilter],
+    [statusRecords, categoryFilter, typeFilter],
   );
 
   const seasonCounts = useMemo(() => {
@@ -477,75 +485,7 @@ export default function ProductsPage() {
               )}
             </div>
             {bulkMode && selectedIds.length > 0 && (
-              <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto lg:grid-cols-3">
-                <button
-                  type="button"
-                  disabled={aiLoading}
-                  className={cn(
-                    "flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
-                    aiLoading ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500"
-                  )}
-                  onClick={async () => {
-                    let processIds = [...selectedIds];
-                    const hasPublished = processIds.some(id => {
-                      const r = records.find(x => x.id === id);
-                      return r && r.status === "published";
-                    });
-
-                    if (hasPublished) {
-                      const pw = await new Promise<string | null>(resolve => {
-                        setPromptConfig({
-                          isOpen: true,
-                          title: t.passwordPrompt,
-                          type: "password",
-                          onConfirm: (val) => { setPromptConfig(null); resolve(val); },
-                          onCancel: () => { setPromptConfig(null); resolve(null); }
-                        });
-                      });
-
-                      if (pw !== "1234") {
-                        showToast(t.passwordIncorrect, "error");
-                        processIds = processIds.filter(id => {
-                          const r = records.find(x => x.id === id);
-                          return r && r.status !== "published";
-                        });
-                        if (processIds.length === 0) return;
-                      }
-                    }
-                    
-                    if (processIds.length === 0) return;
-
-                    setAiLoading(true);
-                    let successCount = 0;
-                    for (let i = 0; i < processIds.length; i++) {
-                      const id = processIds[i];
-                      const r = records.find(x => x.id === id);
-                      const productName = r?.parsed?.titleRaw || t.selectedProductFallback;
-                      const progressMsg = t.processingAi(i + 1, processIds.length, productName);
-                      
-                      setAiProgress(progressMsg);
-                      
-                      try {
-                        const result = await bulkAISeason([id]);
-                        if (result.success && result.results[0]?.success) {
-                          successCount++;
-                        } else {
-                          showToast(`${productName}: ${t.aiBulkError}`, "error");
-                        }
-                      } catch (e) {
-                        showToast(`${productName}: ${t.aiBulkError}`, "error");
-                      }
-                    }
-                    
-                    setAiProgress(null);
-                    setAiLoading(false);
-                    showToast(t.aiBulkSuccess, "success");
-                    setTimeout(() => window.location.reload(), 1500);
-                  }}
-                >
-                  {aiLoading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                  <span className="min-w-0 text-center leading-tight">{aiProgress ? aiProgress : t.aiAnalyzeBtn}</span>
-                </button>
+              <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto">
                 <button
                   type="button"
                   disabled={pushLoading}

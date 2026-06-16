@@ -192,15 +192,6 @@ export async function bulkPushToShopify(ids: string[]): Promise<{ success: boole
   return handleResponse<{ success: boolean; results: any[] }>(res);
 }
 
-export async function bulkAISeason(ids: string[]): Promise<{ success: boolean; results: any[] }> {
-  const res = await fetch("/api/products/bulk/ai-season", {
-    method: "POST",
-    headers: headers({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ productIds: ids }),
-  });
-  return handleResponse<{ success: boolean; results: any[] }>(res);
-}
-
 export async function getAiPrompts(
   productId: string,
   sourceFileName: string,
