@@ -43,6 +43,8 @@ services:
       - PRODUCTS_BASE=/products_photo
     volumes:
       - /home/ubuntu/jouri/products_photo:/products_photo
+      - /home/ubuntu/jouri/backups:/backups
+      - /home/ubuntu/.config/rclone:/root/.config/rclone:ro
 
   client:
     build:
