@@ -19,6 +19,7 @@ node_modules/
 
 # Frontend build
 client/dist/
+*.tsbuildinfo
 
 # Product images — büyük medya, git'e eklenmez
 ../products_photo/
