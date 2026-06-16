@@ -148,7 +148,8 @@ async def _request_ai_text(client: AsyncOpenAI, model_name: str, text: str, imag
     content = response.choices[0].message.content or ""
     return content.strip().strip('"').strip()
 
-async def parse_description_ai(description: str, image_base64: str = None) -> ParsedProduct:
+async def parse_description_ai(description: str, image_base64: str = None, image_mime_type: str = None) -> ParsedProduct:
+    image_mime_type = _normalize_image_mime_type(image_mime_type)
     if _gemini_client:
         try:
             return await _parse_with_ai(
@@ -157,6 +158,7 @@ async def parse_description_ai(description: str, image_base64: str = None) -> Pa
                 description,
                 provider="gemini",
                 image_base64=image_base64,
+                image_mime_type=image_mime_type,
             )
         except Exception as e:
             print("Gemini parsing failed:", _brief_error(e))
@@ -169,6 +171,7 @@ async def parse_description_ai(description: str, image_base64: str = None) -> Pa
                 description,
                 provider="gemma",
                 image_base64=image_base64,
+                image_mime_type=image_mime_type,
             )
         except Exception as e:
             print("Gemma parsing failed:", _brief_error(e))
@@ -176,18 +179,19 @@ async def parse_description_ai(description: str, image_base64: str = None) -> Pa
     return parse_description_structured(description)
 
 
-async def _parse_with_ai(client: AsyncOpenAI, model_name: str, description: str, provider: str, image_base64: str = None) -> dict:
-    content = await _request_ai_content(client, model_name, description, image_base64)
+async def _parse_with_ai(client: AsyncOpenAI, model_name: str, description: str, provider: str, image_base64: str = None, image_mime_type: str = None) -> dict:
+    content = await _request_ai_content(client, model_name, description, image_base64, image_mime_type)
     data = json.loads(_strip_json_fence(content))
     return _merge_ai_data(description, data, provider)
 
 
-async def _request_ai_content(client: AsyncOpenAI, model_name: str, description: str, image_base64: str = None) -> str:
+async def _request_ai_content(client: AsyncOpenAI, model_name: str, description: str, image_base64: str = None, image_mime_type: str = None) -> str:
     user_content = description
     if image_base64:
+        image_mime_type = _normalize_image_mime_type(image_mime_type)
         user_content = [
             {"type": "text", "text": description},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+            {"type": "image_url", "image_url": {"url": f"data:{image_mime_type};base64,{image_base64}"}}
         ]
 
     try:
@@ -257,6 +261,7 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
     product_type = normalize_product_type(
         structured_parsed.get("productTypeSuggestion", "") or _field(data.get("productTypeSuggestion", ""))
     )
+    season = normalize_season(_field(data.get("season", ""))) or structured_parsed.get("season", "")
 
     return {
         "parsed": ParsedProduct(
@@ -268,7 +273,7 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
             colorRaw=color_raw,
             colorGermanSuggestion="",
             sizesRaw=sizes_raw,
-            season=_field(data.get("season", "")),
+            season=season,
             tags=[]
         ).model_dump(),
         "description": _safe_description(description, data.get("description", ""), structured.get("description", "")),
@@ -308,6 +313,7 @@ def parse_description(description: str) -> ParsedProduct:
         colorRaw=color_raw,
         colorGermanSuggestion="",
         sizesRaw=_clean(sizes_match.group(1)) if sizes_match else "",
+        season=_guess_season(description, ""),
         tags=[],
     )
 
@@ -327,6 +333,13 @@ def parse_description_structured(description: str) -> dict:
             for variant in variants
             for size in variant.get("sizes", "").split(",")
         )
+    else:
+        normalized_sizes = _normalize_sizes(parsed.sizesRaw)
+        if normalized_sizes:
+            parsed.sizesRaw = ", ".join(normalized_sizes)
+
+    if parsed.colorRaw:
+        parsed.colorRaw = _translate_color(parsed.colorRaw)
 
     price = _extract_price(description)
     if price and not parsed.priceAmount:
@@ -339,6 +352,7 @@ def parse_description_structured(description: str) -> dict:
     if not parsed.productTypeSuggestion:
         parsed.productTypeSuggestion = _guess_product_type(description)
     parsed.productTypeSuggestion = normalize_product_type(parsed.productTypeSuggestion)
+    parsed.season = normalize_season(parsed.season) or _guess_season(description, parsed.productTypeSuggestion)
     if not parsed.categorySuggestion:
         parsed.categorySuggestion = _guess_category(parsed.sizesRaw, description)
     parsed.categorySuggestion = normalize_category(parsed.categorySuggestion)
@@ -497,6 +511,63 @@ def normalize_product_type(value: str) -> str:
         "اوفرول": "Jumpsuit",
     }
     return product_types.get(key, cleaned)
+
+
+def normalize_season(value: str) -> str:
+    cleaned = _field(value)
+    if not cleaned:
+        return ""
+    cleaned = (
+        cleaned.replace("ı", "i").replace("İ", "I")
+        .replace("ş", "s").replace("Ş", "S")
+        .replace("ğ", "g").replace("Ğ", "G")
+        .replace("ü", "u").replace("Ü", "U")
+        .replace("ö", "o").replace("Ö", "O")
+        .replace("ç", "c").replace("Ç", "C")
+    )
+    key = _normalize_category_key(cleaned)
+    seasons = {
+        "summer": "Summer",
+        "yaz": "Summer",
+        "yazlik": "Summer",
+        "صيفي": "Summer",
+        "صيف": "Summer",
+        "winter": "Winter",
+        "kis": "Winter",
+        "kislik": "Winter",
+        "شتوي": "Winter",
+        "شتاء": "Winter",
+        "midseason": "Mid-season",
+        "mevsimlik": "Mid-season",
+        "springautumn": "Mid-season",
+        "springfall": "Mid-season",
+        "ربيعي": "Mid-season",
+        "خريفي": "Mid-season",
+        "محير": "Mid-season",
+    }
+    return seasons.get(key, cleaned if cleaned in {"Summer", "Winter", "Mid-season"} else "")
+
+
+def _guess_season(description: str, product_type: str = "") -> str:
+    text = description.lower()
+    if re.search(r"(?:جاكيت|jacket|coat|معطف|سويتر|sweater|كنزة|كنزه|هودي|hoodie|fleece|polar|thick|winter|شتوي|kislik|kışlık)", description, re.IGNORECASE):
+        return "Winter"
+    if re.search(r"(?:شورت|shorts?|short sleeve|sleeveless|tank|summer|صيفي|قطني خفيف|thin fabric|linen|كتان)", description, re.IGNORECASE):
+        return "Summer"
+    if product_type in {"Jacket", "Coat", "Sweater", "Hoodie"}:
+        return "Winter"
+    if product_type == "Shorts":
+        return "Summer"
+    if product_type in {"Pajamas", "Set", "T-Shirt", "T-Shirt Set", "Shirt", "Blouse", "Pants"}:
+        return "Mid-season"
+    return ""
+
+
+def _normalize_image_mime_type(value: str | None) -> str:
+    cleaned = (value or "image/jpeg").strip().lower()
+    if cleaned in {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}:
+        return "image/jpeg" if cleaned == "image/jpg" else cleaned
+    return "image/jpeg"
 
 
 def _normalize_category_key(value: str) -> str:
@@ -756,22 +827,25 @@ def _translate_title(value: str) -> str:
 
 def _guess_product_type(description: str) -> str:
     text = description.lower()
+    has_set = bool(re.search(r"(?:توينز|طقم|set)", description, re.IGNORECASE))
+    has_tshirt = bool(re.search(r"(?:تيشيرت|تيشرت|تشيرت|t-?shirt)", description, re.IGNORECASE))
+    has_pajama = "بيجاما" in description or "بجاما" in description or "pajama" in text or "pyjama" in text
     if re.search(r"(?:jumpsuit|dungaree|overalls?|tulum|salopet|افرول|افورول|اوفرول)", description, re.IGNORECASE):
         return "Jumpsuit"
     if re.search(r"(?:rompers?|سالوبيت|سلوبت|سالوبت)", description, re.IGNORECASE):
         return "Romper"
     if re.search(r"(?:bodysuits?|onesies?|بربتوز|بدي)", description, re.IGNORECASE):
         return "Bodysuit"
-    if re.search(r"(?:توينز|طقم|set)", description, re.IGNORECASE):
-        return "Set"
-    if "بيجاما" in description or "pajama" in text:
+    if has_pajama:
         return "Pajamas"
+    if has_tshirt and has_set:
+        return "T-Shirt Set"
+    if has_tshirt:
+        return "T-Shirt"
     if re.search(r"(?:فستان|dress)", description, re.IGNORECASE):
         return "Dress"
-    if re.search(r"(?:طقم|set)", description, re.IGNORECASE):
+    if has_set:
         return "Set"
-    if re.search(r"(?:تيشيرت|تيشرت|تشيرت|t-?shirt)", description, re.IGNORECASE):
-        return "T-Shirt"
     if re.search(r"(?:بلوزة|blouse|top)", description, re.IGNORECASE):
         return "Top"
     if re.search(r"(?:بنطلون|pants|trousers)", description, re.IGNORECASE):

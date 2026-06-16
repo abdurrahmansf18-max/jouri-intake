@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { createProduct } from "../api";
 import { useApp } from "../context";
-import { COPY, cn } from "../i18n";
+import { COPY, cn, translateTerm } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import { formatPrice } from "../format";
 import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
@@ -18,6 +18,7 @@ type BulkDraft = {
   titleRaw: string;
   priceAmount: string;
   colorRaw: string;
+  season: string;
   categorySuggestion: string;
   productTypeSuggestion: string;
   description: string;
@@ -35,6 +36,7 @@ function makeDraft(): BulkDraft {
     titleRaw: "",
     priceAmount: "",
     colorRaw: "",
+    season: "",
     categorySuggestion: "",
     productTypeSuggestion: "",
     description: "",
@@ -170,6 +172,7 @@ export default function BulkProductForm({ initialCards }: { initialCards?: BulkD
             priceAmount: card.priceAmount,
             currency: "EUR",
             colorRaw: card.colorRaw,
+            season: card.season,
           },
         }, "bulk");
         results.push({ id: card.id, ok: true });
@@ -449,6 +452,13 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             onChange={(v) => onPatch({ categorySuggestion: v })}
             s={s} disabled={busy}
           />
+          <BulkSeasonField
+            label={t.season}
+            value={card.season}
+            onChange={(v) => onPatch({ season: v })}
+            s={s} disabled={busy}
+            locale={locale}
+          />
           <BulkField
             label={t.productType}
             value={card.productTypeSuggestion}
@@ -540,6 +550,33 @@ function BulkField({ label, value, onChange, s, disabled, inputDir = "auto", pla
           dir={inputDir}
         />
       </span>
+    </label>
+  );
+}
+
+function BulkSeasonField({ label, value, onChange, s, disabled, locale }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  s: ThemeStyles;
+  disabled: boolean;
+  locale: "tr" | "ar";
+}) {
+  const seasons = ["Summer", "Winter", "Mid-season"];
+  return (
+    <label className="grid gap-1">
+      <span className={cn("text-[10px] font-black leading-none", s.strong)}>{label}</span>
+      <select
+        className={cn("min-h-9 w-full rounded-lg border px-2.5 text-xs font-semibold outline-none focus:ring-2", s.input)}
+        value={seasons.includes(value) ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+      >
+        <option value="">-</option>
+        {seasons.map((season) => (
+          <option key={season} value={season}>{translateTerm(season, locale)}</option>
+        ))}
+      </select>
     </label>
   );
 }

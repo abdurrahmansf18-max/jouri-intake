@@ -12,7 +12,7 @@ import {
   pushToShopify, getAiPrompts
 } from "../api";
 import { useApp } from "../context";
-import { COPY, cn, statusLabel } from "../i18n";
+import { COPY, cn, statusLabel, translateTerm } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord, ProductStatus, SavedImage, SizeStock } from "../types";
 import { formatPrice } from "../format";
@@ -1108,11 +1108,11 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <DetailField label={t.color}               s={s} value={draft.colorRaw}               onChange={(v) => patch("colorRaw", v)} />
                     <label className="grid gap-1.5">
                       <span className={cn("text-xs font-black", s.strong)}>{(t as any).season || "Mevsim"}</span>
-                      <select value={draft.season || ""} onChange={(e) => patch("season", e.target.value)} className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}>
-                        <option value="">—</option>
-                        <option value="Yazlık">Yazlık / Summer</option>
-                        <option value="Kışlık">Kışlık / Winter</option>
-                        <option value="Mevsimlik">Mevsimlik / Mid-season</option>
+                      <select value={canonicalSeasonValue(draft.season)} onChange={(e) => patch("season", e.target.value)} className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}>
+                        <option value="">-</option>
+                        {["Summer", "Winter", "Mid-season"].map((season) => (
+                          <option key={season} value={season}>{translateTerm(season, locale)}</option>
+                        ))}
                       </select>
                     </label>
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />
@@ -1507,6 +1507,18 @@ function InfoRow({ label, s, children }: { label?: string; s?: ThemeStyles; chil
       <span className={cn("min-w-0 flex-1 text-sm font-semibold", s?.title ?? "text-white")}>{children}</span>
     </div>
   );
+}
+
+function canonicalSeasonValue(value: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/ı/g, "i")
+    .replace(/ş/g, "s");
+  if (["summer", "yaz", "yazlik", "صيفي"].includes(normalized)) return "Summer";
+  if (["winter", "kis", "kislik", "شتوي"].includes(normalized)) return "Winter";
+  if (["mid-season", "midseason", "mevsimlik", "محير"].includes(normalized)) return "Mid-season";
+  return "";
 }
 
 function DetailField({ label, inputDir = "auto", onChange, prefix, s, type = "text", value }: {

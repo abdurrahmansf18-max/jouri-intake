@@ -15,5 +15,5 @@ async def parse_product_text(
     req: ParseRequest,
     _: Annotated[None, Depends(verify_access)],
 ):
-    result = await parse_description_ai(req.text, req.imageBase64)
+    result = await parse_description_ai(req.text, req.imageBase64, req.imageMimeType)
     return result

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { createProduct, updateRelatedProducts, parseProductText } from "../api";
 import { useApp } from "../context";
-import { COPY, cn, normalizeCategory, normalizeProductType } from "../i18n";
+import { COPY, cn, normalizeCategory, normalizeProductType, translateTerm } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEditor";
 import BulkProductForm from "../components/BulkProductForm";
@@ -188,6 +188,7 @@ export default function AddProductPage() {
          if (parsed.season) patch("season", parsed.season);
          if (parsed.categorySuggestion) patch("categorySuggestion", parsed.categorySuggestion);
          if (parsed.productTypeSuggestion) patch("productTypeSuggestion", parsed.productTypeSuggestion);
+         if (aiImage && files.length === 0) handleFiles([aiImage]);
          
          if (parsed.sizesRaw) {
            const sizes = splitAiSizes(parsed.sizesRaw);
@@ -256,13 +257,13 @@ export default function AddProductPage() {
             />
             {aiImage ? (
               <>
-                <img src={URL.createObjectURL(aiImage)} alt="AI Target" className="h-10 w-10 object-cover rounded-lg" />
-                <span className="text-[10px] font-bold text-green-600 dark:text-green-400">Görsel Seçildi</span>
+                <img src={URL.createObjectURL(aiImage)} alt={t.aiImagePreviewAlt} className="h-10 w-10 object-cover rounded-lg" />
+                <span className="text-[10px] font-bold text-green-600 dark:text-green-400">{t.aiImageSelected}</span>
               </>
             ) : (
               <>
                 <ImagePlus className={cn("size-6 opacity-50")} />
-                <span className="text-xs font-semibold">Görsel (Opsiyonel)</span>
+                <span className="text-xs font-semibold">{t.aiImageOptional}</span>
               </>
             )}
           </label>
@@ -283,7 +284,7 @@ export default function AddProductPage() {
               onClick={() => setAiImage(null)}
               className="mt-3 text-xs font-bold text-red-500 hover:underline"
             >
-              Görseli Kaldır
+              {t.aiImageRemove}
             </button>
           )}
         </div>
@@ -399,6 +400,7 @@ export default function AddProductPage() {
               <Field label={`${t.color} *`}           s={s} value={draft.colorRaw}              onChange={(v) => patch("colorRaw", v)} />
               <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} listId="category-options" />
               <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} listId="product-type-options" />
+              <SeasonField label={t.season} s={s} value={draft.season} locale={locale} onChange={(v) => patch("season", v)} />
             </div>
             {existingCategories.length > 0 && (
               <datalist id="category-options">
@@ -582,6 +584,29 @@ function Field({
           dir={inputDir}
         />
       </span>
+    </label>
+  );
+}
+
+function SeasonField({
+  label, locale, onChange, s, value,
+}: {
+  label: string; locale: "tr" | "ar"; onChange: (v: string) => void; s: ThemeStyles; value: string;
+}) {
+  const seasons = ["Summer", "Winter", "Mid-season"];
+  return (
+    <label className="grid gap-1.5">
+      <span className={cn("text-xs font-black", s.strong)}>{label}</span>
+      <select
+        className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
+        value={seasons.includes(value) ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">-</option>
+        {seasons.map((season) => (
+          <option key={season} value={season}>{translateTerm(season, locale)}</option>
+        ))}
+      </select>
     </label>
   );
 }

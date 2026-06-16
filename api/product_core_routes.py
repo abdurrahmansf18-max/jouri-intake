@@ -23,7 +23,7 @@ from models import (
     StatusUpdateRequest,
     UpdateRelatedRequest,
 )
-from parser import normalize_category, normalize_product_type, parse_description
+from parser import normalize_category, normalize_product_type, normalize_season, parse_description
 from realtime import ws_manager
 
 
@@ -58,6 +58,7 @@ async def create_product(
     currency: Annotated[str | None, Form()] = None,
     colorRaw: Annotated[str | None, Form()] = None,
     colorGermanSuggestion: Annotated[str | None, Form()] = None,
+    season: Annotated[str | None, Form()] = None,
     sizeStocksJson: Annotated[str | None, Form()] = None,
     notes: Annotated[str | None, Form()] = None,
     source: Annotated[str | None, Form()] = None,
@@ -97,6 +98,7 @@ async def create_product(
         "currency": currency.strip() if currency else (parsed.currency or "EUR"),
         "colorRaw": colorRaw.strip() if colorRaw else parsed.colorRaw,
         "colorGermanSuggestion": colorGermanSuggestion.strip() if colorGermanSuggestion else parsed.colorGermanSuggestion,
+        "season": normalize_season(season or parsed.season),
         "sizesRaw": sizes_raw_derived or parsed.sizesRaw,
     }
     parsed = parsed.model_copy(update=overrides)
@@ -251,7 +253,8 @@ def update_product(
         if pd.colorGermanSuggestion is not None:
             p.color_german = pd.colorGermanSuggestion
         if pd.season is not None:
-            track("season", p.season, pd.season); p.season = pd.season
+            season = normalize_season(pd.season)
+            track("season", p.season, season); p.season = season
         if pd.sizesRaw is not None:
             track("sizes", p.sizes_raw, pd.sizesRaw); p.sizes_raw = pd.sizesRaw
         if pd.tags is not None:
@@ -480,13 +483,13 @@ def bulk_update_products(
             continue
         
         if body.season is not None:
-            p.season = body.season
+            p.season = normalize_season(body.season)
         
         activity_logger.log(
             db, "bulk_update",
             product_id=p.id,
             product_title=p.title_raw,
-            details={"season": body.season} if body.season is not None else {}
+            details={"season": normalize_season(body.season)} if body.season is not None else {}
         )
         updated_records.append(p)
         
@@ -577,17 +580,27 @@ async def bulk_ai_season(
 ):
     import asyncio
     import base64
-    from pathlib import Path
     
-    products = db.query(Product).filter(Product.id.in_(body.productIds)).all()
+    products_by_id = {
+        product.id: product
+        for product in db.query(Product).filter(Product.id.in_(body.productIds)).all()
+    }
     results = []
 
-    for p in products:
+    for product_id in body.productIds:
+        p = products_by_id.get(product_id)
+        if not p:
+            results.append({"id": product_id, "success": False, "error": "Product not found"})
+            continue
         try:
             image_base64 = None
             if p.images and len(p.images) > 0:
                 first_img = p.images[0]
-                img_path = Path(p.folder_path) / "originals" / first_img["fileName"]
+                img_path = file_manager.resolve_image_path(
+                    p.folder_path,
+                    first_img.get("folder", "originals"),
+                    first_img.get("fileName", ""),
+                )
                 if img_path.exists():
                     with open(img_path, "rb") as f:
                         image_base64 = base64.b64encode(f.read()).decode("utf-8")
@@ -597,7 +610,7 @@ async def bulk_ai_season(
             text_to_parse = f"{p.title_raw}\n{p.description}"
             parsed_product = await parse_description_ai(text_to_parse, image_base64)
             
-            new_season = parsed_product.get("parsed", {}).get("season")
+            new_season = normalize_season(parsed_product.get("parsed", {}).get("season"))
             if new_season:
                 p.season = new_season
                 activity_logger.log(
@@ -616,9 +629,10 @@ async def bulk_ai_season(
                 results.append({"id": p.id, "success": False, "error": "AI did not return a season"})
                 
         except Exception as e:
+            db.rollback()
             results.append({"id": p.id, "success": False, "error": str(e)})
 
         # Rate limiting pause
         await asyncio.sleep(1)
 
-    return {"success": True, "results": results}
+    return {"success": all(result.get("success") for result in results), "results": results}

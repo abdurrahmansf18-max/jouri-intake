@@ -64,7 +64,9 @@ export type AiParseProvider = "gemini" | "gemma" | "parser";
 
 export async function parseProductText(text: string, imageFile?: File): Promise<{ parsed: ParsedProduct, description: string, variants?: any[], provider?: AiParseProvider }> {
   let imageBase64: string | undefined;
+  let imageMimeType: string | undefined;
   if (imageFile) {
+    imageMimeType = imageFile.type || "image/jpeg";
     const buffer = await imageFile.arrayBuffer();
     // Convert to base64 using btoa
     let binary = '';
@@ -79,7 +81,7 @@ export async function parseProductText(text: string, imageFile?: File): Promise<
   const res = await fetch("/api/parse-product", {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ text, imageBase64 }),
+    body: JSON.stringify({ text, imageBase64, imageMimeType }),
   });
   return handleResponse(res);
 }
@@ -172,13 +174,13 @@ export async function updateRelatedProducts(productId: string, relatedIds: strin
   return handleResponse<ProductRecord>(res);
 }
 
-export async function bulkUpdateProducts(ids: string[], updates: any): Promise<{ success: boolean; count: number }> {
+export async function bulkUpdateProducts(ids: string[], updates: any): Promise<ProductRecord[]> {
   const res = await fetch("/api/products/bulk/update", {
     method: "PATCH",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ productIds: ids, ...updates }), // Updated to use productIds
   });
-  return handleResponse<{ success: boolean; count: number }>(res);
+  return handleResponse<ProductRecord[]>(res);
 }
 
 export async function bulkPushToShopify(ids: string[]): Promise<{ success: boolean; results: any[] }> {
