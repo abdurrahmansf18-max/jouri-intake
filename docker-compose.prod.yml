@@ -6,11 +6,11 @@ services:
     environment:
       POSTGRES_USER: jouri
       POSTGRES_PASSWORD: jouri_password
-      POSTGRES_DB: jouri_db
+      POSTGRES_DB: jouri
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jouri -d jouri_db"]
+      test: ["CMD-SHELL", "pg_isready -U jouri -d jouri"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -30,7 +30,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://jouri:jouri_password@db:5432/jouri_db
+      - DATABASE_URL=postgresql://jouri:jouri_password@db:5432/jouri
       - JWT_SECRET=jouri_super_secret_key
       - OLLAMA_URL=http://ollama:11434/v1
       - GEMINI_API_KEY=${GEMINI_API_KEY}
