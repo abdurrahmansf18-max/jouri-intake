@@ -37,9 +37,9 @@ services:
       - SHOPIFY_SHOP_URL=${SHOPIFY_SHOP_URL:-}
       - SHOPIFY_ACCESS_TOKEN=${SHOPIFY_ACCESS_TOKEN:-}
       - SHOPIFY_VENDOR=Binbon Kids
-      - PRODUCTS_BASE=/home/ubuntu/products_photo
+      - PRODUCTS_BASE=/products_photo
     volumes:
-      - /home/ubuntu/products_photo:/home/ubuntu/products_photo
+      - /home/ubuntu/products_photo:/products_photo
 
   client:
     build:
