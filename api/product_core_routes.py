@@ -570,7 +570,7 @@ async def bulk_ai_season(
             text_to_parse = f"{p.title_raw}\n{p.description}"
             parsed_product = await parse_description_ai(text_to_parse, image_base64)
             
-            new_season = parsed_product.season
+            new_season = parsed_product.get("parsed", {}).get("season")
             if new_season:
                 p.season = new_season
                 activity_logger.log(

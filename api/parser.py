@@ -268,6 +268,7 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
             colorRaw=color_raw,
             colorGermanSuggestion="",
             sizesRaw=sizes_raw,
+            season=_field(data.get("season", "")),
             tags=[]
         ).model_dump(),
         "description": _safe_description(description, data.get("description", ""), structured.get("description", "")),

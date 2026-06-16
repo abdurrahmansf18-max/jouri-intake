@@ -16,7 +16,7 @@ const FILTERS: StatusFilter[] = ["all", "pending", "ai_enhanced", "published"];
 
 
 export default function ProductsPage() {
-  const { locale, theme } = useApp();
+  const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
 
@@ -29,6 +29,7 @@ export default function ProductsPage() {
   const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
@@ -433,46 +434,78 @@ export default function ProductsPage() {
           </div>
 
           <div className="flex items-center justify-between border-t pt-4 border-white/10">
-            <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
-              <input type="checkbox" checked={bulkMode} onChange={(e) => {
-                setBulkMode(e.target.checked);
-                if (!e.target.checked) setSelectedIds([]);
-              }} className="size-4 rounded" />
-              Çoklu Düzenleme Modu
-            </label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+                <input type="checkbox" checked={bulkMode} onChange={(e) => {
+                  setBulkMode(e.target.checked);
+                  if (!e.target.checked) setSelectedIds([]);
+                }} className="size-4 rounded" />
+                Çoklu Düzenleme Modu
+              </label>
+              {bulkMode && (
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer text-gray-400">
+                  <input type="checkbox" 
+                    checked={selectedIds.length > 0 && selectedIds.length === paginated.length} 
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(paginated.map(r => r.id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }} 
+                    className="size-4 rounded" 
+                  />
+                  Tümünü Seç (Sayfa)
+                </label>
+              )}
+            </div>
             {bulkMode && selectedIds.length > 0 && (
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-black text-white hover:bg-indigo-500 flex items-center gap-2"
+                  disabled={aiLoading}
+                  className={cn(
+                    "rounded-lg px-4 py-2 text-sm font-black text-white flex items-center gap-2 transition-colors",
+                    aiLoading ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500"
+                  )}
                   onClick={async () => {
-                    if (confirm(`Seçili ${selectedIds.length} ürünün mevsim bilgisini Yapay Zeka ile doldurmak istediğinize emin misiniz? (Bu işlem biraz vakit alabilir)`)) {
-                      try {
-                        alert("Yapay zeka analiz işlemi başlatılıyor. Lütfen pencereyi kapatmayın...");
-                        await bulkAISeason(selectedIds);
-                        alert("Yapay Zeka mevsim analizini başarıyla tamamladı.");
-                        window.location.reload();
-                      } catch (e) {
-                        alert("Hata oluştu.");
-                      }
+                    const editableIds = selectedIds.filter(id => {
+                      const r = records.find(x => x.id === id);
+                      return r && r.status !== "published";
+                    });
+                    
+                    if (editableIds.length === 0) {
+                      showToast("Seçilen ürünler yayımlandığı için düzenlenemez.", "error");
+                      return;
+                    }
+
+                    showToast("Yapay zeka analiz işlemi başlatılıyor. Lütfen bekleyin...", "success");
+                    setAiLoading(true);
+                    try {
+                      await bulkAISeason(editableIds);
+                      showToast("Yapay Zeka mevsim analizini başarıyla tamamladı.", "success");
+                      setTimeout(() => window.location.reload(), 1500);
+                    } catch (e) {
+                      showToast("Analiz sırasında hata oluştu.", "error");
+                    } finally {
+                      setAiLoading(false);
                     }
                   }}
                 >
-                  <Sparkles className="size-4" />
+                  {aiLoading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                   AI Mevsim Analizi
                 </button>
                 <button
                   type="button"
                   className="rounded-lg bg-green-600 px-4 py-2 text-sm font-black text-white hover:bg-green-500"
                   onClick={async () => {
-                    if (confirm(`Seçili ${selectedIds.length} ürünü Shopify'a göndermek istediğinize emin misiniz?`)) {
-                      try {
-                        await bulkPushToShopify(selectedIds);
-                        alert("Shopify senkronizasyonu tamamlandı.");
-                        window.location.reload();
-                      } catch (e) {
-                        alert("Hata oluştu.");
-                      }
+                    showToast("Shopify senkronizasyonu başlatıldı...", "success");
+                    try {
+                      await bulkPushToShopify(selectedIds);
+                      showToast("Shopify senkronizasyonu tamamlandı.", "success");
+                      setTimeout(() => window.location.reload(), 1500);
+                    } catch (e) {
+                      showToast("Hata oluştu.", "error");
                     }
                   }}
                 >
@@ -486,9 +519,10 @@ export default function ProductsPage() {
                     if (newSeason !== null) {
                       try {
                         await bulkUpdateProducts(selectedIds, { season: newSeason });
-                        window.location.reload();
+                        showToast("Mevsim başarıyla güncellendi.", "success");
+                        setTimeout(() => window.location.reload(), 1000);
                       } catch (e) {
-                        alert("Hata oluştu.");
+                        showToast("Hata oluştu.", "error");
                       }
                     }
                   }}
