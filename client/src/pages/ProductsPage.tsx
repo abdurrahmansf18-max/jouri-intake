@@ -30,6 +30,9 @@ export default function ProductsPage() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiProgress, setAiProgress] = useState<string | null>(null);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushProgress, setPushProgress] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
@@ -469,47 +472,98 @@ export default function ProductsPage() {
                     aiLoading ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500"
                   )}
                   onClick={async () => {
-                    const editableIds = selectedIds.filter(id => {
+                    let processIds = [...selectedIds];
+                    const hasPublished = processIds.some(id => {
                       const r = records.find(x => x.id === id);
-                      return r && r.status !== "published";
+                      return r && r.status === "published";
                     });
-                    
-                    if (editableIds.length === 0) {
-                      showToast("Seçilen ürünler yayımlandığı için düzenlenemez.", "error");
-                      return;
-                    }
 
-                    showToast("Yapay zeka analiz işlemi başlatılıyor. Lütfen bekleyin...", "success");
-                    setAiLoading(true);
-                    try {
-                      await bulkAISeason(editableIds);
-                      showToast("Yapay Zeka mevsim analizini başarıyla tamamladı.", "success");
-                      setTimeout(() => window.location.reload(), 1500);
-                    } catch (e) {
-                      showToast("Analiz sırasında hata oluştu.", "error");
-                    } finally {
-                      setAiLoading(false);
+                    if (hasPublished) {
+                      const pw = prompt((t as any).passwordPrompt || "Yayımlanmış ürünleri düzenlemek için yetki şifresi:");
+                      if (pw !== "123456") {
+                        showToast((t as any).passwordIncorrect || "Hatalı şifre!", "error");
+                        // Yayımlanmış olanları listeden çıkar
+                        processIds = processIds.filter(id => {
+                          const r = records.find(x => x.id === id);
+                          return r && r.status !== "published";
+                        });
+                        if (processIds.length === 0) return;
+                      }
                     }
+                    
+                    if (processIds.length === 0) return;
+
+                    setAiLoading(true);
+                    let successCount = 0;
+                    for (let i = 0; i < processIds.length; i++) {
+                      const id = processIds[i];
+                      const r = records.find(x => x.id === id);
+                      const productName = r?.parsed?.titleRaw || "Unknown";
+                      const progressMsg = (t as any).processingAi 
+                        ? (t as any).processingAi(i + 1, processIds.length, productName) 
+                        : `İşleniyor: ${i + 1} / ${processIds.length} (${productName})`;
+                      
+                      setAiProgress(progressMsg);
+                      
+                      try {
+                        const result = await bulkAISeason([id]);
+                        if (result.success && result.results[0]?.success) {
+                          successCount++;
+                        } else {
+                          showToast(`${productName}: ${(t as any).aiBulkError || "Hata oluştu."}`, "error");
+                        }
+                      } catch (e) {
+                        showToast(`${productName}: ${(t as any).aiBulkError || "Hata oluştu."}`, "error");
+                      }
+                    }
+                    
+                    setAiProgress(null);
+                    setAiLoading(false);
+                    showToast((t as any).aiBulkSuccess || "Yapay Zeka analizi tamamlandı.", "success");
+                    setTimeout(() => window.location.reload(), 1500);
                   }}
                 >
                   {aiLoading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                  AI Mevsim Analizi
+                  {aiProgress ? aiProgress : "AI Mevsim Analizi"}
                 </button>
                 <button
                   type="button"
-                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-black text-white hover:bg-green-500"
+                  disabled={pushLoading}
+                  className={cn(
+                    "rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
+                    pushLoading ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-500"
+                  )}
                   onClick={async () => {
-                    showToast("Shopify senkronizasyonu başlatıldı...", "success");
-                    try {
-                      await bulkPushToShopify(selectedIds);
-                      showToast("Shopify senkronizasyonu tamamlandı.", "success");
-                      setTimeout(() => window.location.reload(), 1500);
-                    } catch (e) {
-                      showToast("Hata oluştu.", "error");
+                    setPushLoading(true);
+                    let successCount = 0;
+                    for (let i = 0; i < selectedIds.length; i++) {
+                      const id = selectedIds[i];
+                      const r = records.find(x => x.id === id);
+                      const productName = r?.parsed?.titleRaw || "Unknown";
+                      const progressMsg = (t as any).processingAi 
+                        ? (t as any).processingAi(i + 1, selectedIds.length, productName) 
+                        : `İşleniyor: ${i + 1} / ${selectedIds.length} (${productName})`;
+                      
+                      setPushProgress(progressMsg);
+                      
+                      try {
+                        const result = await bulkPushToShopify([id]);
+                        if (result.success) {
+                          successCount++;
+                        } else {
+                          showToast(`${productName} Shopify hatası`, "error");
+                        }
+                      } catch (e) {
+                        showToast(`${productName} Shopify hatası`, "error");
+                      }
                     }
+                    setPushProgress(null);
+                    setPushLoading(false);
+                    showToast("Shopify senkronizasyonu tamamlandı.", "success");
+                    setTimeout(() => window.location.reload(), 1500);
                   }}
                 >
-                  Shopify'a Gönder
+                  {pushProgress ? pushProgress : "Shopify'a Gönder"}
                 </button>
                 <button
                   type="button"
