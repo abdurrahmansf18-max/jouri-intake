@@ -567,10 +567,11 @@ export default function ProductsPage() {
                       
                       try {
                         const result = await bulkPushToShopify([id]);
-                        if (result.success) {
+                        const itemResult = result.results?.[0];
+                        if (itemResult?.success) {
                           successCount++;
                         } else {
-                          showToast(`${productName} Shopify hatası`, "error");
+                          showToast(`${productName}: ${itemResult?.error || "Shopify hatası"}`, "error");
                         }
                       } catch (e) {
                         showToast(`${productName} Shopify hatası`, "error");
@@ -578,7 +579,13 @@ export default function ProductsPage() {
                     }
                     setPushProgress(null);
                     setPushLoading(false);
-                    showToast("Shopify senkronizasyonu tamamlandı.", "success");
+                    const failCount = selectedIds.length - successCount;
+                    showToast(
+                      failCount > 0
+                        ? `Shopify senkronizasyonu tamamlandı: ${successCount} başarılı, ${failCount} hatalı.`
+                        : "Shopify senkronizasyonu tamamlandı.",
+                      failCount > 0 ? "error" : "success",
+                    );
                     setTimeout(() => window.location.reload(), 1500);
                   }}
                 >

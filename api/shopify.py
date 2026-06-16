@@ -192,7 +192,7 @@ async def _request(
         text = await response.text()
         if allow_404 and response.status == 404:
             return None
-        if response.status not in {200, 201}:
+        if response.status not in {200, 201, 204}:
             raise ShopifyPushError(_summarize_shopify_error(response.status, text))
         if not text.strip():
             return {}
@@ -389,9 +389,10 @@ def _local_variants(product: Product) -> list[dict[str, Any]]:
     seen: set[str] = set()
     for stock in stocks:
         size = str(stock.get("size") or "One Size").strip() or "One Size"
-        if size in seen:
+        size_key = _size_key(size)
+        if size_key in seen:
             continue
-        seen.add(size)
+        seen.add(size_key)
         try:
             qty = max(0, int(stock.get("qty", 0)))
         except Exception:
@@ -422,24 +423,44 @@ async def _sync_variants(
     product: Product,
 ) -> dict[str, int]:
     existing = shopify_product.get("variants") or []
-    existing_by_size = {str(v.get("option1") or "").strip(): v for v in existing}
+    existing_by_key: dict[str, list[dict[str, Any]]] = {}
+    for variant in existing:
+        key = _size_key(str(variant.get("option1") or "").strip())
+        if key:
+            existing_by_key.setdefault(key, []).append(variant)
+
     local_variants = _local_variants(product)
-    local_sizes = {v["option1"] for v in local_variants}
-    updated = created = disabled = 0
+    local_keys = {_size_key(v["option1"]) for v in local_variants}
+    used_existing_ids: set[str] = set()
+    updated = created = disabled = deleted = 0
 
     for variant in local_variants:
-        current = existing_by_size.get(variant["option1"])
+        key = _size_key(variant["option1"])
+        candidates = existing_by_key.get(key) or []
+        current = _best_existing_variant(candidates, variant["option1"])
         if current:
             payload = {"variant": {"id": current["id"], **variant}}
             await _request(session, credentials, "PUT", f"variants/{current['id']}.json", payload)
+            used_existing_ids.add(str(current["id"]))
             updated += 1
         else:
             await _request(session, credentials, "POST", f"products/{shopify_product_id}/variants.json", {"variant": variant})
             created += 1
 
     for current in existing:
+        current_id = str(current.get("id") or "")
+        if current_id in used_existing_ids:
+            continue
         option = str(current.get("option1") or "").strip()
-        if option and option not in local_sizes and option != "Default Title":
+        option_key = _size_key(option)
+        if option_key in local_keys:
+            try:
+                await _request(session, credentials, "DELETE", f"variants/{current['id']}.json")
+                deleted += 1
+                continue
+            except ShopifyPushError:
+                pass
+        if option and option_key not in local_keys and option != "Default Title":
             payload = {
                 "variant": {
                     "id": current["id"],
@@ -451,7 +472,44 @@ async def _sync_variants(
             await _request(session, credentials, "PUT", f"variants/{current['id']}.json", payload)
             disabled += 1
 
-    return {"created": created, "updated": updated, "disabled": disabled}
+    return {"created": created, "updated": updated, "disabled": disabled, "deleted": deleted}
+
+
+def _best_existing_variant(candidates: list[dict[str, Any]], local_size: str) -> dict[str, Any] | None:
+    if not candidates:
+        return None
+    local_clean = _clean_size_text(local_size)
+    for candidate in candidates:
+        if _clean_size_text(str(candidate.get("option1") or "")) == local_clean:
+            return candidate
+    return candidates[0]
+
+
+def _size_key(size: str) -> str:
+    cleaned = _clean_size_text(size)
+    if not cleaned:
+        return "onesize"
+
+    cleaned = re.sub(r"\b(years?|yrs?|yas|yaş)\b", "y", cleaned)
+    cleaned = re.sub(r"\b(months?|mos?|ay)\b", "m", cleaned)
+    cleaned = re.sub(r"\b(one size|onesize|tek beden|standard)\b", "onesize", cleaned)
+    cleaned = re.sub(r"(\d+)\s*-\s*(\d+)\s*y\b", r"\1-\2y", cleaned)
+    cleaned = re.sub(r"(\d+)\s*-\s*(\d+)\s*m\b", r"\1-\2m", cleaned)
+    cleaned = re.sub(r"(\d+)\s*y\b", r"\1y", cleaned)
+    cleaned = re.sub(r"(\d+)\s*m\b", r"\1m", cleaned)
+    return re.sub(r"[^a-z0-9]+", "", cleaned) or "onesize"
+
+
+def _clean_size_text(size: str) -> str:
+    value = (size or "").strip().lower()
+    value = value.replace("ı", "i").replace("İ", "i")
+    value = value.replace("ş", "s").replace("Ş", "s")
+    value = value.replace("ğ", "g").replace("Ğ", "g")
+    value = value.replace("ü", "u").replace("Ü", "u")
+    value = value.replace("ö", "o").replace("Ö", "o")
+    value = value.replace("ç", "c").replace("Ç", "c")
+    value = re.sub(r"\s+", " ", value)
+    return value
 
 
 async def _upload_missing_images(

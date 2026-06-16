@@ -501,34 +501,53 @@ async def bulk_push_to_shopify(
 ):
     import asyncio
     
-    products = db.query(Product).filter(Product.id.in_(body.productIds)).all()
+    products_by_id = {
+        product.id: product
+        for product in db.query(Product).filter(Product.id.in_(body.productIds)).all()
+    }
     results = []
 
-    for p in products:
+    for product_id in body.productIds:
+        p = products_by_id.get(product_id)
+        if not p:
+            results.append({"id": product_id, "success": False, "error": "Product not found"})
+            continue
+        if p.status != "published":
+            p.shopify_last_error = "Shopify'a göndermek için ürün published durumunda olmalı."
+            db.commit()
+            record = product_service.to_record(p)
+            background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+            results.append({"id": p.id, "success": False, "error": p.shopify_last_error})
+            continue
+
         try:
             res = await shopify.push_to_shopify(p)
-            p.shopify_product_id = str(res.get("product", {}).get("id") or "")
-            p.shopify_product_handle = str(res.get("product", {}).get("handle") or "")
-            p.shopify_synced_at = datetime.now(timezone.utc).isoformat()
-            p.shopify_last_error = ""
+            shopify_product = res.get("product") or {}
+            p.shopify_product_id = str(shopify_product.get("id") or "")
+            p.shopify_product_handle = str(shopify_product.get("handle") or "")
+            p.shopify_synced_at = datetime.now(timezone.utc)
+            p.shopify_last_error = None
 
             activity_logger.log(
                 db,
-                "shopify_sync",
+                "shopify_push",
                 product_id=p.id,
                 product_title=p.title_raw,
                 details={
-                    "created": res.get("created"),
-                    "product_id": p.shopify_product_id,
+                    "mode": "create" if res.get("created") else "update",
+                    "shopify_product_id": p.shopify_product_id,
                     "handle": p.shopify_product_handle,
+                    "images": res.get("images"),
+                    "variants": res.get("variants"),
                 },
             )
             db.commit()
             db.refresh(p)
             record = product_service.to_record(p)
             background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
-            results.append({"id": p.id, "success": True})
+            results.append({"id": p.id, "success": True, "created": bool(res.get("created")), "variants": res.get("variants")})
         except Exception as e:
+            db.rollback()
             p.shopify_last_error = str(e)
             db.commit()
             record = product_service.to_record(p)
@@ -538,7 +557,7 @@ async def bulk_push_to_shopify(
         # Rate limiting pause
         await asyncio.sleep(1)
 
-    return {"success": True, "results": results}
+    return {"success": all(result.get("success") for result in results), "results": results}
 
 
 @router.post("/api/products/bulk/ai-season")
