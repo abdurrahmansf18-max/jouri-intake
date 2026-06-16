@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: jouri
+      POSTGRES_PASSWORD: jouri_password
+      POSTGRES_DB: jouri_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jouri -d jouri_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://jouri:jouri_password@db:5432/jouri_db
+      - JWT_SECRET=jouri_super_secret_key
+      - OLLAMA_URL=http://ollama:11434/v1
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SHOPIFY_SHOP_URL=${SHOPIFY_SHOP_URL}
+      - SHOPIFY_ACCESS_TOKEN=${SHOPIFY_ACCESS_TOKEN}
+      - SHOPIFY_VENDOR=Binbon Kids
+    volumes:
+      - /home/ubuntu/products_photo:/home/ubuntu/products_photo
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - client
+      - api
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+  ollama_data:
