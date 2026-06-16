@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -586,6 +587,7 @@ async def bulk_ai_season(
         for product in db.query(Product).filter(Product.id.in_(body.productIds)).all()
     }
     results = []
+    predictions: dict[str, str] = {}
 
     for product_id in body.productIds:
         p = products_by_id.get(product_id)
@@ -612,18 +614,7 @@ async def bulk_ai_season(
             
             new_season = normalize_season(parsed_product.get("parsed", {}).get("season"))
             if new_season:
-                p.season = new_season
-                activity_logger.log(
-                    db,
-                    "bulk_update",
-                    product_id=p.id,
-                    product_title=p.title_raw,
-                    details={"season": new_season, "source": "ai_bulk_season"}
-                )
-                db.commit()
-                db.refresh(p)
-                record = product_service.to_record(p)
-                background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+                predictions[p.id] = new_season
                 results.append({"id": p.id, "success": True, "season": new_season})
             else:
                 results.append({"id": p.id, "success": False, "error": "AI did not return a season"})
@@ -635,4 +626,94 @@ async def bulk_ai_season(
         # Rate limiting pause
         await asyncio.sleep(1)
 
+    processed_groups: set[frozenset[str]] = set()
+    for product_id, predicted_season in predictions.items():
+        product = products_by_id.get(product_id)
+        if not product:
+            continue
+        group = _related_product_group(db, product)
+        group_key = frozenset(p.id for p in group)
+        if group_key in processed_groups:
+            continue
+        processed_groups.add(group_key)
+
+        group_season = _choose_group_season(group, predictions, fallback=predicted_season)
+        if not group_season:
+            continue
+
+        group_ids = {grouped_product.id for grouped_product in group}
+        for result in results:
+            if result.get("id") in group_ids and result.get("success"):
+                result["season"] = group_season
+                result["harmonizedVariantGroup"] = len(group) > 1
+
+        for grouped_product in group:
+            if grouped_product.season == group_season:
+                continue
+            grouped_product.season = group_season
+            activity_logger.log(
+                db,
+                "bulk_update",
+                product_id=grouped_product.id,
+                product_title=grouped_product.title_raw,
+                details={
+                    "season": group_season,
+                    "source": "ai_bulk_season",
+                    "harmonizedVariantGroup": True,
+                },
+            )
+
+        db.commit()
+        for grouped_product in group:
+            db.refresh(grouped_product)
+            record = product_service.to_record(grouped_product)
+            background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+
     return {"success": all(result.get("success") for result in results), "results": results}
+
+
+def _related_product_group(db: Session, product: Product) -> list[Product]:
+    seen = {product.id}
+    queue = list(product.related_products or [])
+    group = [product]
+
+    while queue:
+        related_id = queue.pop(0)
+        if related_id in seen:
+            continue
+        related = db.query(Product).filter(Product.id == related_id).first()
+        if not related:
+            continue
+        seen.add(related.id)
+        group.append(related)
+        for next_id in related.related_products or []:
+            if next_id not in seen:
+                queue.append(next_id)
+
+    return group
+
+
+def _choose_group_season(products: list[Product], predictions: dict[str, str], fallback: str = "") -> str:
+    values = [
+        normalize_season(predictions.get(product.id) or product.season)
+        for product in products
+    ]
+    values = [value for value in values if value]
+    if not values:
+        return normalize_season(fallback)
+
+    counts = Counter(values)
+    top_count = max(counts.values())
+    winners = [season for season, count in counts.items() if count == top_count]
+    if len(winners) == 1:
+        return winners[0]
+
+    group_prediction_values = [
+        normalize_season(predictions.get(product.id))
+        for product in products
+        if product.id in predictions
+    ]
+    prediction_counts = Counter(value for value in group_prediction_values if value in winners)
+    if prediction_counts:
+        return prediction_counts.most_common(1)[0][0]
+    return normalize_season(fallback) or winners[0]
