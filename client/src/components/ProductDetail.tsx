@@ -12,7 +12,7 @@ import {
   pushToShopify, getAiPrompts
 } from "../api";
 import { useApp } from "../context";
-import { COPY, cn, statusLabel, translateTerm } from "../i18n";
+import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord, ProductStatus, SavedImage, SizeStock } from "../types";
 import { formatPrice } from "../format";
@@ -1111,7 +1111,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <select value={canonicalSeasonValue(draft.season)} onChange={(e) => patch("season", e.target.value)} className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}>
                         <option value="">-</option>
                         {["Summer", "Winter", "Mid-season"].map((season) => (
-                          <option key={season} value={season}>{translateTerm(season, locale)}</option>
+                          <option key={season} value={season}>{season}</option>
                         ))}
                       </select>
                     </label>

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { createProduct, updateRelatedProducts, parseProductText } from "../api";
 import { useApp } from "../context";
-import { COPY, cn, normalizeCategory, normalizeProductType, translateTerm } from "../i18n";
+import { COPY, cn, normalizeCategory, normalizeProductType } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEditor";
 import BulkProductForm from "../components/BulkProductForm";
@@ -400,7 +400,7 @@ export default function AddProductPage() {
               <Field label={`${t.color} *`}           s={s} value={draft.colorRaw}              onChange={(v) => patch("colorRaw", v)} />
               <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} listId="category-options" />
               <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} listId="product-type-options" />
-              <SeasonField label={t.season} s={s} value={draft.season} locale={locale} onChange={(v) => patch("season", v)} />
+              <SeasonField label={t.season} s={s} value={draft.season} onChange={(v) => patch("season", v)} />
             </div>
             {existingCategories.length > 0 && (
               <datalist id="category-options">
@@ -597,9 +597,9 @@ function Field({
 }
 
 function SeasonField({
-  label, locale, onChange, s, value,
+  label, onChange, s, value,
 }: {
-  label: string; locale: "tr" | "ar"; onChange: (v: string) => void; s: ThemeStyles; value: string;
+  label: string; onChange: (v: string) => void; s: ThemeStyles; value: string;
 }) {
   const seasons = ["Summer", "Winter", "Mid-season"];
   return (
@@ -612,7 +612,7 @@ function SeasonField({
       >
         <option value="">-</option>
         {seasons.map((season) => (
-          <option key={season} value={season}>{translateTerm(season, locale)}</option>
+          <option key={season} value={season}>{season}</option>
         ))}
       </select>
     </label>

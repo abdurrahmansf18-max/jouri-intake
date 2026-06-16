@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag, Sparkles } from "lucide-react";
 import { useApp } from "../context";
-import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens, translateTerm } from "../i18n";
+import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens } from "../i18n";
 import { DARK, LIGHT } from "../theme";
 import type { ProductRecord, StatusFilter } from "../types";
 import ProductCard from "../components/ProductCard";
@@ -206,15 +206,15 @@ export default function ProductsPage() {
   const selectedCategoryLabel =
     categoryFilter === "all" ? t.allCategories :
     categoryFilter === "uncategorized" ? t.uncategorized :
-    translateTerm(categoryFilter, locale);
+    categoryFilter;
   const selectedTypeLabel =
     typeFilter === "all" ? t.allProductTypes :
     typeFilter === "untyped" ? t.untyped :
-    translateTerm(typeFilter, locale);
+    typeFilter;
   const selectedSeasonLabel =
     seasonFilter === "all" ? t.allSeasons :
     seasonFilter === "unspecified" ? t.unspecified :
-    translateTerm(seasonFilter, locale);
+    seasonFilter;
 
   if (loading) {
     return (
@@ -312,7 +312,7 @@ export default function ProductsPage() {
                       categoryFilter === category ? s.filterActive : s.filterIdle,
                     )}
                   >
-                    <span className="min-w-0 truncate" dir="auto">{translateTerm(category, locale)}</span>
+                    <span className="min-w-0 truncate" dir="ltr">{category}</span>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
                   </button>
                 ))}
@@ -377,7 +377,7 @@ export default function ProductsPage() {
                       typeFilter === productType ? s.filterActive : s.filterIdle,
                     )}
                   >
-                    <span className="min-w-0 truncate" dir="auto">{translateTerm(productType, locale)}</span>
+                    <span className="min-w-0 truncate" dir="ltr">{productType}</span>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
                   </button>
                 ))}
@@ -442,7 +442,7 @@ export default function ProductsPage() {
                       seasonFilter === season ? s.filterActive : s.filterIdle,
                     )}
                   >
-                    <span className="min-w-0 truncate" dir="auto">{translateTerm(season, locale)}</span>
+                    <span className="min-w-0 truncate" dir="ltr">{season}</span>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-black">{count}</span>
                   </button>
                 ))}
