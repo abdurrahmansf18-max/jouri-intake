@@ -373,6 +373,16 @@ def update_related_products(
     return record
 
 
+@router.post("/api/products/bulk/shopify-push")
+async def bulk_push_to_shopify(
+    body: BulkShopifyPushRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    db: Session = Depends(get_db),
+):
+    return await _bulk_push_to_shopify_impl(body, background_tasks, db)
+
+
 @router.post("/api/products/{product_id}/shopify-push", response_model=ProductRecord)
 async def push_product_to_shopify(
     product_id: str,
@@ -492,12 +502,10 @@ def bulk_update_products(
     return result
 
 
-@router.post("/api/products/bulk/shopify-push")
-async def bulk_push_to_shopify(
+async def _bulk_push_to_shopify_impl(
     body: BulkShopifyPushRequest,
     background_tasks: BackgroundTasks,
-    _: Annotated[None, Depends(verify_access)],
-    db: Session = Depends(get_db),
+    db: Session,
 ):
     import asyncio
     
