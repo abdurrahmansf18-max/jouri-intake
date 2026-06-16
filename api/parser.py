@@ -223,9 +223,13 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
     ai_variants = _normalize_variants(data.get("variants", []))
     variants = structured_variants or ai_variants
     structured_sizes_raw = structured_parsed.get("sizesRaw", "")
-    if not structured_variants and structured_sizes_raw and ai_variants:
+    structured_color_raw = structured_parsed.get("colorRaw", "")
+    if not structured_variants and (structured_sizes_raw or structured_color_raw) and ai_variants:
         variants = [
-            {"color": variant.get("color", ""), "sizes": structured_sizes_raw}
+            {
+                "color": structured_color_raw or variant.get("color", ""),
+                "sizes": structured_sizes_raw or variant.get("sizes", ""),
+            }
             for variant in ai_variants
         ]
 
@@ -997,7 +1001,22 @@ def _safe_description(source: str, ai_description, fallback: str) -> str:
         return fallback
     if _contains_unsupported_material_claim(source, description):
         return fallback
-    return description
+    return _repair_mojibake(description)
+
+
+def _repair_mojibake(value: str) -> str:
+    replacements = {
+        "â": "'",
+        "â": "'",
+        "â": '"',
+        "â": '"',
+        "â": "-",
+        "â": "-",
+        "Â": "",
+    }
+    for bad, good in replacements.items():
+        value = value.replace(bad, good)
+    return value
 
 
 def _contains_unsupported_material_claim(source: str, description: str) -> bool:
