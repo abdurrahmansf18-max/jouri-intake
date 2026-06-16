@@ -27,24 +27,12 @@ services:
     env_file: .env
     environment:
       PRODUCTS_BASE: /products_photo
-      OLLAMA_URL: http://ollama:11434/v1/
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b-it-qat}
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-      ollama:
-        condition: service_started
-
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    expose:
-      - "11434"
 
   client:
     build:
@@ -62,4 +50,3 @@ services:
 
 volumes:
   postgres_data:
-  ollama_data:
