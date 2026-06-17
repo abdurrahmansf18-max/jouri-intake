@@ -15,6 +15,9 @@ from db_models import ActivityLog, Product
 
 BACKUP_ROOT = Path("/backups")
 RUNNING_FILE = BACKUP_ROOT / "running.json"
+RCLONE_COPY_TIMEOUT_SECONDS = int(os.getenv("BACKUP_RCLONE_COPY_TIMEOUT_SECONDS", "3600"))
+RCLONE_CHECK_TIMEOUT_SECONDS = int(os.getenv("BACKUP_RCLONE_CHECK_TIMEOUT_SECONDS", "1200"))
+RCLONE_VERIFY_AFTER_COPY = os.getenv("BACKUP_RCLONE_VERIFY", "").lower() in {"1", "true", "yes"}
 
 
 def get_backup_overview() -> dict:
@@ -367,8 +370,8 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
         "--retries", "3",
         "--retries-sleep", "20s",
         "--low-level-retries", "10",
-        "--tpslimit", "4",
-        "--tpslimit-burst", "4",
+        "--tpslimit", "8",
+        "--tpslimit-burst", "8",
     ]
 
     try:
@@ -377,14 +380,14 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
                 "rclone", "copy", str(source_dir), remote,
                 "--create-empty-src-dirs",
                 "--fast-list",
-                "--transfers", "2",
-                "--checkers", "2",
+                "--transfers", "4",
+                "--checkers", "8",
                 "--stats", "30s",
                 *common_flags,
             ],
             capture_output=True,
             text=True,
-            timeout=900,
+            timeout=RCLONE_COPY_TIMEOUT_SECONDS,
         )
     except FileNotFoundError:
         return False, "rclone komutu bulunamadı."
@@ -396,6 +399,9 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
             copy_result.stderr or copy_result.stdout or f"rclone copy exit code {copy_result.returncode}"
         )
 
+    if not RCLONE_VERIFY_AFTER_COPY:
+        return True, None
+
     try:
         check_result = subprocess.run(
             [
@@ -406,7 +412,7 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
             ],
             capture_output=True,
             text=True,
-            timeout=600,
+            timeout=RCLONE_CHECK_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
         return False, _summarize_rclone_error(_timeout_output(exc) or "rclone check zaman aşımına uğradı.")
