@@ -41,6 +41,7 @@ services:
       - SHOPIFY_API_VERSION=${SHOPIFY_API_VERSION:-}
       - SHOPIFY_VENDOR=Binbon Kids
       - PRODUCTS_BASE=/products_photo
+      - BACKUP_TIMEZONE=Europe/Istanbul
     volumes:
       - /home/ubuntu/jouri/products_photo:/products_photo
       - /home/ubuntu/jouri/backups:/backups

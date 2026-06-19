@@ -5,6 +5,7 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
@@ -18,6 +19,10 @@ RUNNING_FILE = BACKUP_ROOT / "running.json"
 RCLONE_COPY_TIMEOUT_SECONDS = int(os.getenv("BACKUP_RCLONE_COPY_TIMEOUT_SECONDS", "3600"))
 RCLONE_CHECK_TIMEOUT_SECONDS = int(os.getenv("BACKUP_RCLONE_CHECK_TIMEOUT_SECONDS", "1200"))
 RCLONE_VERIFY_AFTER_COPY = os.getenv("BACKUP_RCLONE_VERIFY", "").lower() in {"1", "true", "yes"}
+try:
+    BACKUP_TIMEZONE = ZoneInfo(os.getenv("BACKUP_TIMEZONE", "Europe/Istanbul"))
+except ZoneInfoNotFoundError:
+    BACKUP_TIMEZONE = timezone.utc
 
 
 def get_backup_overview() -> dict:
@@ -67,7 +72,7 @@ def run_manual_backup(db: Session) -> dict:
     if not BACKUP_ROOT.exists():
         raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(BACKUP_TIMEZONE)
     date_str = now.strftime("%Y-%m-%d")
     started_str = now.strftime("%Y-%m-%dT%H:%M:%S")
 
