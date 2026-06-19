@@ -17,7 +17,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Jouri Intake API", lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="Binbon Kids Intake API", lifespan=lifespan, docs_url=None, redoc_url=None)
 
 app.add_middleware(
     CORSMiddleware,

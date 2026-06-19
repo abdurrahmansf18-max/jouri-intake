@@ -44,7 +44,8 @@ STRICT RULE: DO NOT guess, assume, or hallucinate any features (like "short slee
 Example: "Crafted from soft breathable cotton, this boys' pajama set is perfect for toddlers..."
 
 SOURCE-GROUNDING RULES:
-- Do not invent colors, product pieces, materials, themes, or category.
+- Do not invent colors, product pieces, materials, themes, brand names, store names, or category.
+- The official storefront brand is Binbon Kids. Never use Jouri in product titles, descriptions, tags, or brand-like copy. Only mention Binbon Kids if a brand/store name is explicitly needed.
 - If the text lists product pieces, preserve exactly those pieces translated to English. Do not add extra pieces.
 - If category is not explicit, infer it only from clear words like boys/girls/women/men/baby or age sizes such as 1 Year, 2 Years, 6 Months.
 - If information is missing, leave the field empty instead of guessing.
@@ -90,6 +91,7 @@ CRITICAL FOR SHOPIFY: You MUST weave standard clothing features into the descrip
 - Features: Mention features like "elastic waistband" or "button closure" ONLY IF present.
 
 STRICT RULE: DO NOT guess, assume, or hallucinate any features (like "short sleeves" or "long sleeves") if they are not explicitly mentioned in the original description or context. It is better to omit a feature than to guess wrongly.
+BRAND RULE: The official storefront brand is Binbon Kids. Never use Jouri in the rewritten description. Only mention Binbon Kids if a brand/store name is explicitly needed.
 
 Return ONLY the rewritten description as plain text (no JSON, no markdown formatting). Do not include any prefix or suffix.
 """
