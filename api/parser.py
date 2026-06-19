@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 import json
 from dotenv import load_dotenv
@@ -50,10 +50,10 @@ SOURCE-GROUNDING RULES:
 - If information is missing, leave the field empty instead of guessing.
 - The description may be appealing, but it must not claim a fabric/material/feature/sleeve-length that is not present in the input.
 
-CRITICAL: Determine the 'season' based on the image and text. It MUST be exactly one of these three words (in English): "Summer", "Winter", or "Mid-season".
+CRITICAL: Determine the 'season' based on the image and text. It MUST be exactly one of these three words (in English): "Summer", "Winter", or "Spring".
 - Summer: For hot weather (e.g., short sleeves, shorts, thin fabric).
 - Winter: For cold weather (e.g., jackets, thick coats, sweaters, fleece).
-- Mid-season: For transitional weather (e.g., long-sleeve thin shirts, light trousers, spring/autumn wear).
+- Spring: For mild spring or transitional weather (e.g., long-sleeve thin shirts, light trousers, light cardigans).
 
 IMPORTANT for Variants: If the user provides multiple colors (e.g. Beige size 2, Brown size 3), extract them into the `variants` array so we know exactly which sizes belong to which color. If sizes are not tied to colors, just list the same sizes for each color variant.
 For color lines like "رمادي :3/2/1 Y" and "ابيض : 2 Y", return two variants: Gray with "3 Years, 2 Years, 1 Year" and White with "2 Years".
@@ -68,7 +68,7 @@ JSON Schema:
     "productTypeSuggestion": "e.g. 'Pajamas', 'Dress', 'T-Shirt', 'Jumpsuit', 'Romper', 'Bodysuit'",
     "priceAmount": "numeric string, e.g. 25",
     "currency": "EUR",
-    "season": "Must be exactly 'Summer', 'Winter', or 'Mid-season'",
+    "season": "Must be exactly 'Summer', 'Winter', or 'Spring'",
     "variants": [
         {
             "color": "Color in English (e.g. Beige)",
@@ -553,15 +553,20 @@ def normalize_season(value: str) -> str:
         "kislik": "Winter",
         "شتوي": "Winter",
         "شتاء": "Winter",
-        "midseason": "Mid-season",
-        "mevsimlik": "Mid-season",
-        "springautumn": "Mid-season",
-        "springfall": "Mid-season",
-        "ربيعي": "Mid-season",
-        "خريفي": "Mid-season",
-        "محير": "Mid-season",
+        "spring": "Spring",
+        "ilkbahar": "Spring",
+        "ilkbaharlik": "Spring",
+        "midseason": "Spring",
+        "midseasonal": "Spring",
+        "midsezon": "Spring",
+        "mevsimlik": "Spring",
+        "springautumn": "Spring",
+        "springfall": "Spring",
+        "ربيعي": "Spring",
+        "خريفي": "Spring",
+        "محير": "Spring",
     }
-    return seasons.get(key, cleaned if cleaned in {"Summer", "Winter", "Mid-season"} else "")
+    return seasons.get(key, cleaned if cleaned in {"Summer", "Winter", "Spring"} else "")
 
 
 def _guess_season(description: str, product_type: str = "") -> str:
@@ -575,7 +580,7 @@ def _guess_season(description: str, product_type: str = "") -> str:
     if product_type == "Shorts":
         return "Summer"
     if product_type in {"Pajamas", "Set", "T-Shirt", "T-Shirt Set", "Shirt", "Blouse", "Pants"}:
-        return "Mid-season"
+        return "Spring"
     return ""
 
 

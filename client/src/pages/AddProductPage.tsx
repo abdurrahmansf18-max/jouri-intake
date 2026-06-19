@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+﻿import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ClipboardList,
@@ -605,7 +605,7 @@ function SeasonField({
 }: {
   label: string; onChange: (v: string) => void; s: ThemeStyles; value: string;
 }) {
-  const seasons = ["Summer", "Winter", "Mid-season"];
+  const seasons = ["Summer", "Winter", "Spring"];
   return (
     <label className="grid gap-1.5">
       <span className={cn("text-xs font-black", s.strong)}>{label}</span>

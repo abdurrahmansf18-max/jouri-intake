@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag } from "lucide-react";
 import { useApp } from "../context";
 import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens } from "../i18n";
@@ -538,7 +538,7 @@ export default function ProductsPage() {
                       setPromptConfig({
                         isOpen: true,
                         title: t.editSeasonTitle(selectedIds.length),
-                        placeholder: "Summer, Winter, Mid-season...",
+                        placeholder: "Summer, Winter, Spring...",
                         type: "text",
                         onConfirm: (val) => { setPromptConfig(null); resolve(val); },
                         onCancel: () => { setPromptConfig(null); resolve(null); }

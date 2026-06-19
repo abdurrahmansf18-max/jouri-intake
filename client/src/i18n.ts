@@ -1,4 +1,4 @@
-import type { Locale, ProductStatus, StatusFilter } from "./types";
+﻿import type { Locale, ProductStatus, StatusFilter } from "./types";
 
 export const COPY = {
   tr: {
@@ -1141,7 +1141,8 @@ export function translateTerm(term: string, locale: Locale): string {
       case "Baby": return "Bebek";
       case "Summer": return "Yaz";
       case "Winter": return "Kış";
-      case "Mid-season": return "Mevsimlik";
+      case "Spring": return "İlkbahar";
+      case "Mid-season": return "İlkbahar";
       case "Pajamas": return "Pijama";
       case "T-Shirt": return "Tişört";
       case "T-Shirt Set": return "Tişört Takımı";
@@ -1172,7 +1173,8 @@ export function translateTerm(term: string, locale: Locale): string {
       case "Baby": return "مواليد";
       case "Summer": return "صيفي";
       case "Winter": return "شتوي";
-      case "Mid-season": return "محير";
+      case "Spring": return "ربيعي";
+      case "Mid-season": return "ربيعي";
       case "Pajamas": return "بيجاما";
       case "T-Shirt": return "تيشيرت";
       case "T-Shirt Set": return "طقم تيشيرت";

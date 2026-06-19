@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle, CheckCircle2, ClipboardList, Loader2, Package,
@@ -560,7 +560,7 @@ function BulkSeasonField({ label, value, onChange, s, disabled }: {
   s: ThemeStyles;
   disabled: boolean;
 }) {
-  const seasons = ["Summer", "Winter", "Mid-season"];
+  const seasons = ["Summer", "Winter", "Spring"];
   return (
     <label className="grid gap-1">
       <span className={cn("text-[10px] font-black leading-none", s.strong)}>{label}</span>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, ChevronLeft, ChevronRight, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
@@ -1110,7 +1110,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <span className={cn("text-xs font-black", s.strong)}>{(t as any).season || "Mevsim"}</span>
                       <select value={canonicalSeasonValue(draft.season)} onChange={(e) => patch("season", e.target.value)} className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}>
                         <option value="">-</option>
-                        {["Summer", "Winter", "Mid-season"].map((season) => (
+                        {["Summer", "Winter", "Spring"].map((season) => (
                           <option key={season} value={season}>{season}</option>
                         ))}
                       </select>
@@ -1517,7 +1517,7 @@ function canonicalSeasonValue(value: string): string {
     .replace(/ş/g, "s");
   if (["summer", "yaz", "yazlik", "صيفي"].includes(normalized)) return "Summer";
   if (["winter", "kis", "kislik", "شتوي"].includes(normalized)) return "Winter";
-  if (["mid-season", "midseason", "mevsimlik", "محير"].includes(normalized)) return "Mid-season";
+  if (["spring", "ilkbahar", "ilkbaharlik", "mid-season", "midseason", "midsezon", "mevsimlik", "ربيعي", "خريفي", "محير"].includes(normalized)) return "Spring";
   return "";
 }
 
