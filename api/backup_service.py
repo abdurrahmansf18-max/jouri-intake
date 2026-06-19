@@ -459,9 +459,13 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
     except FileNotFoundError:
         return False, "rclone komutu bulunamadı."
     except subprocess.TimeoutExpired as exc:
+        if _remote_tree_matches_source(source_dir, remote):
+            return True, None
         return False, _summarize_rclone_error(_timeout_output(exc) or "rclone copy zaman aşımına uğradı.")
 
     if copy_result.returncode != 0:
+        if _remote_tree_matches_source(source_dir, remote):
+            return True, None
         return False, _summarize_rclone_error(
             copy_result.stderr or copy_result.stdout or f"rclone copy exit code {copy_result.returncode}"
         )
@@ -491,6 +495,44 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
         return False, f"Drive doğrulaması başarısız: {message}"
 
     return True, None
+
+
+def _remote_tree_matches_source(source_dir: Path, remote: str) -> bool:
+    local_count, local_size = _tree_count_and_size(source_dir)
+    if local_count <= 0:
+        return False
+
+    try:
+        result = subprocess.run(
+            ["rclone", "size", remote],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except Exception:
+        return False
+
+    if result.returncode != 0:
+        return False
+
+    output = result.stdout or result.stderr or ""
+    objects_match = re.search(r"Total objects:\s+(\d+)", output)
+    size_match = re.search(r"Total size:.*\((\d+)\s+Byte\)", output)
+    if not objects_match or not size_match:
+        return False
+
+    return int(objects_match.group(1)) == local_count and int(size_match.group(1)) == local_size
+
+
+def _tree_count_and_size(path: Path) -> tuple[int, int]:
+    count = 0
+    size = 0
+    for file_path in path.rglob("*"):
+        if not file_path.is_file():
+            continue
+        count += 1
+        size += file_path.stat().st_size
+    return count, size
 
 
 def _timeout_output(exc) -> str:
