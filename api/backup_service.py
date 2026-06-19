@@ -67,6 +67,26 @@ def start_manual_backup(background_tasks: BackgroundTasks) -> dict:
     return get_backup_overview()
 
 
+def run_scheduled_backup() -> dict:
+    """Cron gibi senkron çalışan otomatik işler için tek yedekleme giriş noktası."""
+    if not BACKUP_ROOT.exists():
+        raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
+
+    running_status = _read_running_status()
+    if running_status:
+        return get_backup_overview()
+
+    started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    _write_running_status({"started_at": started_at})
+
+    db = SessionLocal()
+    try:
+        return run_manual_backup(db)
+    finally:
+        db.close()
+        RUNNING_FILE.unlink(missing_ok=True)
+
+
 def run_manual_backup(db: Session) -> dict:
     """Manuel yedekleme: pg_dump db.sql + JSON export + artımlı fotoğraf kopyalama."""
     if not BACKUP_ROOT.exists():
@@ -130,15 +150,7 @@ def run_manual_backup(db: Session) -> dict:
         photos_src = Path("/products_photo")
         photos_dst = today_dir / "products_photo"
         if photos_src.exists():
-            photos_dst.mkdir(exist_ok=True)
-            for item in photos_src.rglob("*"):
-                if not item.is_file():
-                    continue
-                rel = item.relative_to(photos_src)
-                dst_file = photos_dst / rel
-                dst_file.parent.mkdir(parents=True, exist_ok=True)
-                if not dst_file.exists() or item.stat().st_mtime > dst_file.stat().st_mtime:
-                    shutil.copy2(item, dst_file)
+            _copy_photos_incremental(photos_src, photos_dst, date_str)
 
         drive_ok, drive_error = _copy_backup_to_drive(today_dir, date_str)
 
@@ -268,6 +280,56 @@ def _write_backup_error(started_at: str, error: str) -> None:
         "running_started_at": None,
     })
     status_file.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _copy_photos_incremental(photos_src: Path, photos_dst: Path, date_str: str) -> None:
+    photos_dst.mkdir(exist_ok=True)
+    previous_photos = _previous_photos_backup(date_str)
+
+    for item in photos_src.rglob("*"):
+        if not item.is_file():
+            continue
+        rel = item.relative_to(photos_src)
+        dst_file = photos_dst / rel
+        dst_file.parent.mkdir(parents=True, exist_ok=True)
+
+        if dst_file.exists() and _same_file_snapshot(item, dst_file):
+            continue
+
+        dst_file.unlink(missing_ok=True)
+        previous_file = previous_photos / rel if previous_photos else None
+        if previous_file and previous_file.exists() and _same_file_snapshot(item, previous_file):
+            try:
+                os.link(previous_file, dst_file)
+                continue
+            except OSError:
+                pass
+
+        shutil.copy2(item, dst_file)
+
+
+def _previous_photos_backup(date_str: str) -> Path | None:
+    if not BACKUP_ROOT.exists():
+        return None
+    for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
+        if not entry.is_dir() or not entry.name.startswith("20") or entry.name >= date_str:
+            continue
+        photos_dir = entry / "products_photo"
+        if photos_dir.exists():
+            return photos_dir
+    return None
+
+
+def _same_file_snapshot(source: Path, candidate: Path) -> bool:
+    try:
+        source_stat = source.stat()
+        candidate_stat = candidate.stat()
+    except FileNotFoundError:
+        return False
+    return (
+        source_stat.st_size == candidate_stat.st_size
+        and abs(source_stat.st_mtime_ns - candidate_stat.st_mtime_ns) < 1_000_000_000
+    )
 
 
 def _list_drive_backups() -> list[str]:
