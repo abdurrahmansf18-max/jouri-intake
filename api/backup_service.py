@@ -9,6 +9,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import BackgroundTasks, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
@@ -41,6 +42,12 @@ def get_backup_overview() -> dict:
     status["running"] = bool(running_status)
     if running_status:
         status["running_started_at"] = running_status.get("started_at")
+
+    db = SessionLocal()
+    try:
+        status["database"] = _database_overview(db)
+    finally:
+        db.close()
 
     backups = []
     if BACKUP_ROOT.exists():
@@ -194,6 +201,7 @@ def run_manual_backup(db: Session) -> dict:
             "drive_ok": drive_ok,
             "drive_error": drive_error,
             "drive_layout": DRIVE_LAYOUT_VERSION,
+            "database": _database_overview(db),
             **drive_summary,
             "running": False,
             "running_started_at": None,
@@ -213,6 +221,45 @@ def run_manual_backup(db: Session) -> dict:
         print(f"[backup] Manuel yedekleme hatası: {exc}")
         _write_backup_error(started_str, str(exc))
         raise HTTPException(status_code=500, detail={"code": "ERR_BACKUP_FAILED"})
+
+
+def _database_overview(db: Session) -> dict:
+    status_rows = (
+        db.query(Product.status, func.count(Product.id))
+        .group_by(Product.status)
+        .all()
+    )
+    by_status = {status or "unknown": int(count or 0) for status, count in status_rows}
+    total_products = int(sum(by_status.values()))
+    total_stock = int(db.query(func.coalesce(func.sum(Product.stock_quantity), 0)).scalar() or 0)
+    total_sold = int(db.query(func.coalesce(func.sum(Product.sold_quantity), 0)).scalar() or 0)
+    shopify_synced = int(
+        db.query(func.count(Product.id))
+        .filter(Product.shopify_product_id.isnot(None))
+        .scalar()
+        or 0
+    )
+    shopify_errors = int(
+        db.query(func.count(Product.id))
+        .filter(Product.shopify_last_error.isnot(None), Product.shopify_last_error != "")
+        .scalar()
+        or 0
+    )
+    activity_logs = int(db.query(func.count(ActivityLog.id)).scalar() or 0)
+    latest_product = db.query(func.max(Product.created_at)).scalar()
+    latest_activity = db.query(func.max(ActivityLog.created_at)).scalar()
+
+    return {
+        "products_total": total_products,
+        "products_by_status": by_status,
+        "stock_total": total_stock,
+        "sold_total": total_sold,
+        "shopify_synced": shopify_synced,
+        "shopify_errors": shopify_errors,
+        "activity_logs": activity_logs,
+        "latest_product_at": latest_product.isoformat() if latest_product else None,
+        "latest_activity_at": latest_activity.isoformat() if latest_activity else None,
+    }
 
 
 def _run_manual_backup_background() -> None:

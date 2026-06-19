@@ -325,6 +325,18 @@ export interface BackupEntry {
   photo_unique_blobs?: number;
 }
 
+export interface BackupDatabaseStatus {
+  products_total?: number;
+  products_by_status?: Record<string, number>;
+  stock_total?: number;
+  sold_total?: number;
+  shopify_synced?: number;
+  shopify_errors?: number;
+  activity_logs?: number;
+  latest_product_at?: string | null;
+  latest_activity_at?: string | null;
+}
+
 export interface BackupStatus {
   last_run?: string;
   last_date?: string;
@@ -342,6 +354,7 @@ export interface BackupStatus {
   drive_db_path?: string;
   drive_manifest_path?: string;
   drive_photos_path?: string;
+  database?: BackupDatabaseStatus;
   running?: boolean;
   running_started_at?: string | null;
   backups?: BackupEntry[];

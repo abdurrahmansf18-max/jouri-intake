@@ -11,6 +11,7 @@ import {
   Images,
   Layers3,
   Loader2,
+  PackageCheck,
   RefreshCw,
   Save,
   Server,
@@ -38,6 +39,7 @@ export default function BackupPage() {
 
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
   const status = backupsQuery.data?.status ?? {};
+  const dbStatus = status.database ?? {};
   const backups = backupsQuery.data?.backups ?? [];
   const driveBackups = backupsQuery.data?.drive_backups ?? [];
   const loading = backupsQuery.isLoading;
@@ -132,6 +134,11 @@ export default function BackupPage() {
     ? new Date(status.last_run!).toLocaleString(dateLocale)
     : t.backupNever;
   const driveLayoutText = status.drive_layout ?? t.backupDriveLayoutUnknown;
+  const latestActivityText = dbStatus.latest_activity_at
+    ? new Date(dbStatus.latest_activity_at).toLocaleString(dateLocale)
+    : "-";
+  const productsByStatus = dbStatus.products_by_status ?? {};
+  const statusOrder = ["pending", "ai_enhanced", "published", "sold_archive"];
 
   const architecture = [
     {
@@ -232,6 +239,69 @@ export default function BackupPage() {
             {t.backupDriveErrorPrefix} {driveErrorText}
           </div>
         ) : null}
+      </section>
+
+      <section className={cn("rounded-xl border", s.panel)}>
+        <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 sm:px-5", s.panelBorder)}>
+          <div className="flex items-center gap-2">
+            <Database className="size-5 text-emerald-300" />
+            <div>
+              <h2 className={cn("text-base font-extrabold", s.title)}>{t.backupDatabaseTitle}</h2>
+              <p className={cn("mt-0.5 text-xs font-semibold", s.muted)}>{t.backupDatabaseSubtitle}</p>
+            </div>
+          </div>
+          <span className={cn("rounded-full px-3 py-1 text-[11px] font-black ring-1", s.pill)}>
+            {t.backupLiveData}
+          </span>
+        </div>
+
+        <div className={cn("grid divide-y md:grid-cols-4 md:divide-x md:divide-y-0", s.divider)}>
+          <MetricBlock
+            icon={<PackageCheck className="size-4" />}
+            label={t.backupDbProducts}
+            value={formatNumber(dbStatus.products_total)}
+            detail={t.backupDbProductsDetail}
+            accent="text-emerald-300"
+            s={s}
+          />
+          <MetricBlock
+            icon={<Layers3 className="size-4" />}
+            label={t.backupDbStock}
+            value={formatNumber(dbStatus.stock_total)}
+            detail={`${t.backupDbSold}: ${formatNumber(dbStatus.sold_total)}`}
+            accent="text-violet-300"
+            s={s}
+          />
+          <MetricBlock
+            icon={dbStatus.shopify_errors ? <AlertCircle className="size-4" /> : <CheckCircle2 className="size-4" />}
+            label={t.backupDbShopify}
+            value={`${formatNumber(dbStatus.shopify_synced)} / ${formatNumber(dbStatus.products_total)}`}
+            detail={dbStatus.shopify_errors ? `${t.backupDbShopifyErrors}: ${dbStatus.shopify_errors}` : t.backupDbShopifyOk}
+            accent={dbStatus.shopify_errors ? "text-red-300" : "text-sky-300"}
+            s={s}
+          />
+          <MetricBlock
+            icon={<Clock className="size-4" />}
+            label={t.backupDbActivity}
+            value={formatNumber(dbStatus.activity_logs)}
+            detail={latestActivityText}
+            accent="text-amber-300"
+            s={s}
+          />
+        </div>
+
+        <div className={cn("border-t px-4 py-4 sm:px-5", s.panelBorder)}>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {statusOrder.map((statusKey) => (
+              <StatusPill
+                key={statusKey}
+                label={statusLabel(statusKey, t)}
+                value={productsByStatus[statusKey] ?? 0}
+                s={s}
+              />
+            ))}
+          </div>
+        </div>
       </section>
 
       <section className={cn("rounded-xl border", s.panel)}>
@@ -507,6 +577,44 @@ function EmptyState({
       <p className={cn("text-sm font-semibold", s.muted)}>{text}</p>
     </div>
   );
+}
+
+function StatusPill({
+  label,
+  value,
+  s,
+}: {
+  label: string;
+  value: number;
+  s: typeof DARK | typeof LIGHT;
+}) {
+  return (
+    <div className={cn("flex min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-2 ring-1", s.pill)}>
+      <span className="truncate text-xs font-bold">{label}</span>
+      <span className="shrink-0 text-sm font-black">{value}</span>
+    </div>
+  );
+}
+
+function formatNumber(value: number | null | undefined) {
+  if (value == null) return "-";
+  return new Intl.NumberFormat("tr-TR").format(value);
+}
+
+function statusLabel(
+  status: string,
+  t: {
+    statusPending: string;
+    statusAiEnhanced: string;
+    statusPublished: string;
+    statusSoldArchive: string;
+  },
+) {
+  if (status === "pending") return t.statusPending;
+  if (status === "ai_enhanced") return t.statusAiEnhanced;
+  if (status === "published") return t.statusPublished;
+  if (status === "sold_archive") return t.statusSoldArchive;
+  return status;
 }
 
 function localizeDriveError(error: string | null | undefined, locale: "tr" | "ar") {
