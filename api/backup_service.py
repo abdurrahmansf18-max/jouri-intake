@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import subprocess
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -16,6 +17,9 @@ from db_models import ActivityLog, Product
 
 BACKUP_ROOT = Path("/backups")
 RUNNING_FILE = BACKUP_ROOT / "running.json"
+DRIVE_ROOT = os.getenv("BACKUP_DRIVE_ROOT", "gdrive:jouri-backups").rstrip("/")
+DRIVE_LAYOUT_VERSION = "db-daily-photo-blobs-v1"
+DRIVE_STAGE_ROOT = BACKUP_ROOT / ".drive_stage"
 RCLONE_COPY_TIMEOUT_SECONDS = int(os.getenv("BACKUP_RCLONE_COPY_TIMEOUT_SECONDS", "3600"))
 RCLONE_CHECK_TIMEOUT_SECONDS = int(os.getenv("BACKUP_RCLONE_CHECK_TIMEOUT_SECONDS", "1200"))
 RCLONE_VERIFY_AFTER_COPY = os.getenv("BACKUP_RCLONE_VERIFY", "").lower() in {"1", "true", "yes"}
@@ -152,11 +156,23 @@ def run_manual_backup(db: Session) -> dict:
         if photos_src.exists():
             _copy_photos_incremental(photos_src, photos_dst, date_str)
 
-        drive_ok, drive_error = _copy_backup_to_drive(today_dir, date_str)
-
         db_sql_size = _dir_size(db_sql_file)
         db_json_size = _dir_size(db_json_file)
         img_size = _dir_size(photos_dst) if photos_dst.exists() else "-"
+        photo_manifest = _write_photo_manifest(photos_dst, today_dir / "photos_manifest.json", date_str)
+        backup_manifest_file = today_dir / "backup_manifest.json"
+        _write_backup_manifest(
+            backup_manifest_file,
+            date_str=date_str,
+            started_str=started_str,
+            db_sql_size=db_sql_size,
+            db_json_size=db_json_size,
+            db_sql_error=db_sql_error,
+            img_size=img_size,
+            photo_manifest=photo_manifest,
+        )
+
+        drive_ok, drive_error, drive_summary = _copy_backup_to_drive(today_dir, date_str)
 
         backups_list = []
         for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
@@ -172,8 +188,13 @@ def run_manual_backup(db: Session) -> dict:
             "last_db_json_size": db_json_size,
             "last_db_sql_error": db_sql_error,
             "last_img_size": img_size,
+            "last_photo_files": photo_manifest["file_count"],
+            "last_photo_unique_blobs": photo_manifest["unique_blob_count"],
+            "last_photo_bytes": photo_manifest["total_bytes"],
             "drive_ok": drive_ok,
             "drive_error": drive_error,
+            "drive_layout": DRIVE_LAYOUT_VERSION,
+            **drive_summary,
             "running": False,
             "running_started_at": None,
             "backups": backups_list,
@@ -222,13 +243,19 @@ def delete_drive_backup(date: str) -> dict:
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
         raise HTTPException(status_code=400, detail={"code": "ERR_GENERAL"})
 
-    try:
-        subprocess.run(
-            ["rclone", "purge", f"gdrive:jouri-backups/{date}", "--quiet"],
-            capture_output=True, timeout=30,
-        )
-    except Exception:
-        raise HTTPException(status_code=500, detail={"code": "ERR_GENERAL"})
+    targets = [
+        f"{DRIVE_ROOT}/{date}",  # Eski tarih klasoru yapisi.
+        f"{DRIVE_ROOT}/db/{date}",
+        f"{DRIVE_ROOT}/manifests/{date}",
+    ]
+    for target in targets:
+        try:
+            subprocess.run(
+                ["rclone", "purge", target, "--quiet"],
+                capture_output=True, text=True, timeout=60,
+            )
+        except Exception:
+            raise HTTPException(status_code=500, detail={"code": "ERR_GENERAL"})
 
     return {"ok": True}
 
@@ -332,20 +359,133 @@ def _same_file_snapshot(source: Path, candidate: Path) -> bool:
     )
 
 
+def _write_photo_manifest(photos_dir: Path, target: Path, date_str: str) -> dict:
+    files = []
+    total_bytes = 0
+    unique_hashes: set[str] = set()
+    stage_blobs_root = _photo_blob_stage_root(date_str)
+    if stage_blobs_root.exists():
+        shutil.rmtree(stage_blobs_root)
+    stage_blobs_root.mkdir(parents=True, exist_ok=True)
+
+    if photos_dir.exists():
+        for file_path in sorted(p for p in photos_dir.rglob("*") if p.is_file()):
+            rel = file_path.relative_to(photos_dir).as_posix()
+            file_hash = _sha256_file(file_path)
+            blob_rel = _photo_blob_rel(file_hash, file_path.suffix)
+            blob_stage = stage_blobs_root / blob_rel
+            blob_stage.parent.mkdir(parents=True, exist_ok=True)
+            if not blob_stage.exists():
+                try:
+                    os.link(file_path, blob_stage)
+                except OSError:
+                    shutil.copy2(file_path, blob_stage)
+
+            stat = file_path.stat()
+            total_bytes += stat.st_size
+            unique_hashes.add(file_hash)
+            files.append({
+                "path": rel,
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+                "sha256": file_hash,
+                "blob": blob_rel,
+            })
+
+    manifest = {
+        "schema": "binbonkids-photo-manifest-v1",
+        "date": date_str,
+        "layout": DRIVE_LAYOUT_VERSION,
+        "file_count": len(files),
+        "unique_blob_count": len(unique_hashes),
+        "total_bytes": total_bytes,
+        "files": files,
+    }
+    target.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    return manifest
+
+
+def _write_backup_manifest(
+    target: Path,
+    *,
+    date_str: str,
+    started_str: str,
+    db_sql_size: str,
+    db_json_size: str,
+    db_sql_error: str | None,
+    img_size: str,
+    photo_manifest: dict,
+) -> None:
+    manifest = {
+        "schema": "binbonkids-backup-manifest-v1",
+        "layout": DRIVE_LAYOUT_VERSION,
+        "date": date_str,
+        "started_at": started_str,
+        "local": {
+            "db_sql": "db.sql",
+            "db_json": "db.json",
+            "photos_snapshot": "products_photo/",
+            "photo_manifest": "photos_manifest.json",
+        },
+        "drive": {
+            "db": f"{DRIVE_ROOT}/db/{date_str}/",
+            "manifest": f"{DRIVE_ROOT}/manifests/{date_str}/",
+            "photo_blobs": f"{DRIVE_ROOT}/photos-blobs/",
+        },
+        "sizes": {
+            "db_sql": db_sql_size,
+            "db_json": db_json_size,
+            "photos": img_size,
+        },
+        "db_sql_error": db_sql_error,
+        "photos": {
+            "file_count": photo_manifest["file_count"],
+            "unique_blob_count": photo_manifest["unique_blob_count"],
+            "total_bytes": photo_manifest["total_bytes"],
+        },
+    }
+    target.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _photo_blob_stage_root(date_str: str) -> Path:
+    return DRIVE_STAGE_ROOT / date_str / "photos-blobs"
+
+
+def _photo_blob_rel(file_hash: str, suffix: str) -> Path:
+    safe_suffix = suffix.lower() if re.fullmatch(r"\.[A-Za-z0-9]{1,10}", suffix or "") else ""
+    return Path(file_hash[:2]) / f"{file_hash}{safe_suffix}"
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _list_drive_backups() -> list[str]:
+    dates: set[str] = set()
+    dates.update(_list_remote_date_dirs(f"{DRIVE_ROOT}/manifests/"))
+    dates.update(_list_remote_date_dirs(f"{DRIVE_ROOT}/"))
+    return sorted(dates, reverse=True)
+
+
+def _list_remote_date_dirs(remote: str) -> set[str]:
     try:
         result = subprocess.run(
-            ["rclone", "lsf", "gdrive:jouri-backups/", "--dirs-only"],
+            ["rclone", "lsf", remote, "--dirs-only"],
             capture_output=True, text=True, timeout=15,
         )
-        if result.returncode == 0:
-            return sorted(
-                [d.rstrip("/") for d in result.stdout.strip().split("\n") if d.strip()],
-                reverse=True,
-            )
     except Exception:
-        pass
-    return []
+        return set()
+    if result.returncode != 0:
+        return set()
+    return {
+        d.rstrip("/")
+        for d in result.stdout.strip().split("\n")
+        if re.match(r"^\d{4}-\d{2}-\d{2}/?$", d.strip())
+    }
 
 
 def _dir_size(path) -> str:
@@ -366,8 +506,9 @@ def _dir_size(path) -> str:
 def _backup_entry(entry: Path) -> dict:
     db_sql = entry / "db.sql"
     db_json = entry / "db.json"
+    photo_manifest = entry / "photos_manifest.json"
     primary = db_sql if db_sql.exists() else db_json
-    return {
+    data = {
         "date": entry.name,
         "db_size": _dir_size(primary),
         "db_sql_size": _dir_size(db_sql),
@@ -375,6 +516,14 @@ def _backup_entry(entry: Path) -> dict:
         "img_size": _dir_size(entry / "products_photo"),
         "db_primary": "db.sql" if db_sql.exists() else "db.json",
     }
+    if photo_manifest.exists():
+        try:
+            manifest = json.loads(photo_manifest.read_text(encoding="utf-8"))
+            data["photo_files"] = manifest.get("file_count")
+            data["photo_unique_blobs"] = manifest.get("unique_blob_count")
+        except Exception:
+            pass
+    return data
 
 
 def _write_pg_dump(target: Path) -> str | None:
@@ -429,8 +578,53 @@ def _write_pg_dump(target: Path) -> str | None:
     return None
 
 
-def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | None]:
-    remote = f"gdrive:jouri-backups/{date_str}"
+def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | None, dict]:
+    db_stage = DRIVE_STAGE_ROOT / date_str / "db"
+    manifest_stage = DRIVE_STAGE_ROOT / date_str / "manifests"
+    blob_stage = _photo_blob_stage_root(date_str)
+    db_remote = f"{DRIVE_ROOT}/db/{date_str}"
+    manifest_remote = f"{DRIVE_ROOT}/manifests/{date_str}"
+    blobs_remote = f"{DRIVE_ROOT}/photos-blobs"
+    summary = {
+        "drive_db_path": db_remote,
+        "drive_manifest_path": manifest_remote,
+        "drive_photos_path": blobs_remote,
+    }
+
+    try:
+        _stage_daily_drive_files(source_dir, db_stage, manifest_stage)
+        steps = [
+            ("database", db_stage, db_remote, True),
+            ("manifests", manifest_stage, manifest_remote, True),
+            ("photo blobs", blob_stage, blobs_remote, False),
+        ]
+        for label, local_dir, remote, exact_match in steps:
+            ok, error = _rclone_copy_dir(local_dir, remote, exact_match=exact_match)
+            if not ok:
+                return False, f"{label}: {error}", summary
+        return True, None, summary
+    finally:
+        shutil.rmtree(DRIVE_STAGE_ROOT / date_str, ignore_errors=True)
+
+
+def _stage_daily_drive_files(source_dir: Path, db_stage: Path, manifest_stage: Path) -> None:
+    shutil.rmtree(db_stage, ignore_errors=True)
+    shutil.rmtree(manifest_stage, ignore_errors=True)
+    db_stage.mkdir(parents=True, exist_ok=True)
+    manifest_stage.mkdir(parents=True, exist_ok=True)
+
+    for name in ("db.sql", "db.json"):
+        source = source_dir / name
+        if source.exists():
+            shutil.copy2(source, db_stage / name)
+
+    for name in ("backup_manifest.json", "photos_manifest.json"):
+        source = source_dir / name
+        if source.exists():
+            shutil.copy2(source, manifest_stage / name)
+
+
+def _rclone_copy_dir(source_dir: Path, remote: str, *, exact_match: bool) -> tuple[bool, str | None]:
     common_flags = [
         "--timeout", "5m",
         "--contimeout", "30s",
@@ -459,12 +653,12 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
     except FileNotFoundError:
         return False, "rclone komutu bulunamadı."
     except subprocess.TimeoutExpired as exc:
-        if _remote_tree_matches_source(source_dir, remote):
+        if _remote_matches_or_contains_source(source_dir, remote, exact_match=exact_match):
             return True, None
         return False, _summarize_rclone_error(_timeout_output(exc) or "rclone copy zaman aşımına uğradı.")
 
     if copy_result.returncode != 0:
-        if _remote_tree_matches_source(source_dir, remote):
+        if _remote_matches_or_contains_source(source_dir, remote, exact_match=exact_match):
             return True, None
         return False, _summarize_rclone_error(
             copy_result.stderr or copy_result.stdout or f"rclone copy exit code {copy_result.returncode}"
@@ -495,6 +689,30 @@ def _copy_backup_to_drive(source_dir: Path, date_str: str) -> tuple[bool, str | 
         return False, f"Drive doğrulaması başarısız: {message}"
 
     return True, None
+
+
+def _remote_matches_or_contains_source(source_dir: Path, remote: str, *, exact_match: bool) -> bool:
+    if exact_match:
+        return _remote_tree_matches_source(source_dir, remote)
+    return _remote_contains_source(source_dir, remote)
+
+
+def _remote_contains_source(source_dir: Path, remote: str) -> bool:
+    local_count, _ = _tree_count_and_size(source_dir)
+    if local_count <= 0:
+        return True
+
+    try:
+        result = subprocess.run(
+            ["rclone", "check", str(source_dir), remote, "--one-way", "--size-only"],
+            capture_output=True,
+            text=True,
+            timeout=RCLONE_CHECK_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return False
+
+    return result.returncode == 0
 
 
 def _remote_tree_matches_source(source_dir: Path, remote: str) -> bool:

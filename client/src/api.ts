@@ -321,6 +321,8 @@ export interface BackupEntry {
   db_json_size?: string;
   db_primary?: "db.sql" | "db.json";
   img_size: string;
+  photo_files?: number;
+  photo_unique_blobs?: number;
 }
 
 export interface BackupStatus {
@@ -331,8 +333,15 @@ export interface BackupStatus {
   last_db_json_size?: string;
   last_db_sql_error?: string | null;
   last_img_size?: string;
+  last_photo_files?: number;
+  last_photo_unique_blobs?: number;
+  last_photo_bytes?: number;
   drive_ok?: boolean;
   drive_error?: string | null;
+  drive_layout?: string;
+  drive_db_path?: string;
+  drive_manifest_path?: string;
+  drive_photos_path?: string;
   running?: boolean;
   running_started_at?: string | null;
   backups?: BackupEntry[];

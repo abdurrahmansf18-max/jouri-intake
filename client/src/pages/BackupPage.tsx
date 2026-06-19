@@ -112,6 +112,9 @@ export default function BackupPage() {
       : t.backupDriveStorageUnknown;
   const dbSqlSize = status.last_db_sql_size ?? status.last_db_size ?? "-";
   const dbJsonSize = status.last_db_json_size ?? "-";
+  const photoBlobText = status.last_photo_files && status.last_photo_unique_blobs
+    ? `${status.last_photo_files} ${t.backupFilesShort} / ${status.last_photo_unique_blobs} ${t.backupUniqueBlobsShort}`
+    : t.backupLocalStorage;
   const localizedDriveError = localizeDriveError(status.drive_error, locale);
   const driveErrorText = localizedDriveError && localizedDriveError.length > 110
     ? `${localizedDriveError.slice(0, 110)}...`
@@ -208,7 +211,7 @@ export default function BackupPage() {
             {t.backupImages}
           </div>
           <div className="text-xl font-black text-sky-400">{status.last_img_size ?? "-"}</div>
-          <div className={cn("mt-1 text-xs", s.muted)}>{t.backupLocalStorage}</div>
+          <div className={cn("mt-1 text-xs", s.muted)}>{photoBlobText}</div>
         </div>
 
         {/* Drive status */}
@@ -232,6 +235,11 @@ export default function BackupPage() {
           <div className={cn("mt-1 text-xs", driveState === "fail" ? "text-red-400" : s.muted)}>
             {driveStorageText}
           </div>
+          {driveState === "ok" && status.drive_layout ? (
+            <div className={cn("mt-1 text-[11px] font-semibold leading-4", s.muted)}>
+              {t.backupDriveSmartLayout}
+            </div>
+          ) : null}
           {driveState === "fail" && driveErrorText ? (
             <div className="mt-1 text-[11px] font-semibold leading-4 text-red-400/80">
               {t.backupDriveErrorPrefix} {driveErrorText}
@@ -287,6 +295,14 @@ export default function BackupPage() {
                     <Images className={cn("size-3.5", s.muted)} />
                     <span className={cn("font-bold", s.muted)}>{b.img_size}</span>
                   </div>
+                  {b.photo_files && b.photo_unique_blobs ? (
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
+                      <CloudUpload className={cn("size-3.5", s.muted)} />
+                      <span className={cn("font-bold", s.muted)}>
+                        {b.photo_files}/{b.photo_unique_blobs}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
 
                 <button
