@@ -389,7 +389,7 @@ def _write_photo_manifest(photos_dir: Path, target: Path, date_str: str) -> dict
                 "size": stat.st_size,
                 "mtime_ns": stat.st_mtime_ns,
                 "sha256": file_hash,
-                "blob": blob_rel,
+                "blob": blob_rel.as_posix(),
             })
 
     manifest = {
