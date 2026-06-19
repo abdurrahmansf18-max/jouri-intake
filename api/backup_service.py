@@ -42,12 +42,8 @@ def get_backup_overview() -> dict:
     status["running"] = bool(running_status)
     if running_status:
         status["running_started_at"] = running_status.get("started_at")
-
-    db = SessionLocal()
-    try:
-        status["database"] = _database_overview(db)
-    finally:
-        db.close()
+        status["running_step"] = running_status.get("step")
+        status["running_updated_at"] = running_status.get("updated_at")
 
     backups = []
     if BACKUP_ROOT.exists():
@@ -55,11 +51,19 @@ def get_backup_overview() -> dict:
             if not entry.is_dir() or not entry.name.startswith("20"):
                 continue
             backups.append(_backup_entry(entry))
+    drive_backups = _list_drive_backups()
+
+    db = SessionLocal()
+    try:
+        status["database"] = _database_overview(db)
+    finally:
+        db.close()
+    status["storage"] = _storage_overview(status, len(backups), len(drive_backups))
 
     return {
         "status": status,
         "backups": backups,
-        "drive_backups": _list_drive_backups(),
+        "drive_backups": drive_backups,
     }
 
 
@@ -73,7 +77,7 @@ def start_manual_backup(background_tasks: BackgroundTasks) -> dict:
         return get_backup_overview()
 
     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-    _write_running_status({"started_at": started_at})
+    _write_running_status({"started_at": started_at, "step": "queued"})
     background_tasks.add_task(_run_manual_backup_background)
     return get_backup_overview()
 
@@ -88,7 +92,7 @@ def run_scheduled_backup() -> dict:
         return get_backup_overview()
 
     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-    _write_running_status({"started_at": started_at})
+    _write_running_status({"started_at": started_at, "step": "queued"})
 
     db = SessionLocal()
     try:
@@ -112,8 +116,10 @@ def run_manual_backup(db: Session) -> dict:
 
     try:
         db_sql_file = today_dir / "db.sql"
+        _mark_running_step("database_dump")
         db_sql_error = _write_pg_dump(db_sql_file)
 
+        _mark_running_step("json_export")
         products = db.query(Product).all()
         db_data = {
             "exported_at": started_str,
@@ -160,9 +166,11 @@ def run_manual_backup(db: Session) -> dict:
 
         photos_src = Path("/products_photo")
         photos_dst = today_dir / "products_photo"
+        _mark_running_step("local_snapshot")
         if photos_src.exists():
             _copy_photos_incremental(photos_src, photos_dst, date_str)
 
+        _mark_running_step("manifest")
         db_sql_size = _dir_size(db_sql_file)
         db_json_size = _dir_size(db_json_file)
         img_size = _dir_size(photos_dst) if photos_dst.exists() else "-"
@@ -179,6 +187,7 @@ def run_manual_backup(db: Session) -> dict:
             photo_manifest=photo_manifest,
         )
 
+        _mark_running_step("drive_sync")
         drive_ok, drive_error, drive_summary = _copy_backup_to_drive(today_dir, date_str)
 
         backups_list = []
@@ -207,6 +216,11 @@ def run_manual_backup(db: Session) -> dict:
             "running_started_at": None,
             "backups": backups_list,
         }
+        status_data["storage"] = _storage_overview(
+            status_data,
+            local_backup_count=len(backups_list),
+            drive_backup_count=len(_list_drive_backups()),
+        )
         (BACKUP_ROOT / "status.json").write_text(
             json.dumps(status_data, ensure_ascii=False, indent=2), encoding="utf-8"
         )
@@ -259,6 +273,59 @@ def _database_overview(db: Session) -> dict:
         "activity_logs": activity_logs,
         "latest_product_at": latest_product.isoformat() if latest_product else None,
         "latest_activity_at": latest_activity.isoformat() if latest_activity else None,
+    }
+
+
+def _storage_overview(status: dict, local_backup_count: int, drive_backup_count: int) -> dict:
+    database = status.get("database") or {}
+    return {
+        "database": {
+            "engine": "PostgreSQL",
+            "tables": ["products", "activity_logs"],
+            "stores": [
+                "product_content",
+                "stock_sales",
+                "image_metadata",
+                "shopify_sync",
+                "activity_logs",
+            ],
+            "backup_formats": ["db.sql", "db.json"],
+            "last_sql_size": status.get("last_db_sql_size") or status.get("last_db_size"),
+            "last_json_size": status.get("last_db_json_size"),
+            "products_total": database.get("products_total"),
+            "activity_logs": database.get("activity_logs"),
+        },
+        "vps": {
+            "root": "/backups/YYYY-MM-DD",
+            "snapshot_count": local_backup_count,
+            "files": [
+                "db.sql",
+                "db.json",
+                "products_photo/",
+                "photos_manifest.json",
+                "backup_manifest.json",
+            ],
+            "last_photo_size": status.get("last_img_size"),
+            "last_photo_files": status.get("last_photo_files"),
+            "last_photo_unique_blobs": status.get("last_photo_unique_blobs"),
+        },
+        "drive": {
+            "root": DRIVE_ROOT,
+            "layout": status.get("drive_layout") or DRIVE_LAYOUT_VERSION,
+            "restore_point_count": drive_backup_count,
+            "db_path": status.get("drive_db_path"),
+            "manifest_path": status.get("drive_manifest_path"),
+            "photos_path": status.get("drive_photos_path"),
+            "dedupe": "sha256_photo_blobs",
+            "ok": status.get("drive_ok"),
+            "error": status.get("drive_error"),
+        },
+        "workflow": [
+            "database_dump",
+            "local_snapshot",
+            "photo_manifest",
+            "drive_sync",
+        ],
     }
 
 
@@ -332,9 +399,21 @@ def _read_running_status() -> dict | None:
 
 def _write_running_status(data: dict) -> None:
     BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
+    data = {
+        **data,
+        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+    }
     tmp_file = RUNNING_FILE.with_suffix(".json.tmp")
     tmp_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp_file.replace(RUNNING_FILE)
+
+
+def _mark_running_step(step: str) -> None:
+    current = _read_running_status() or {}
+    current["step"] = step
+    if "started_at" not in current:
+        current["started_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    _write_running_status(current)
 
 
 def _write_backup_error(started_at: str, error: str) -> None:
@@ -346,10 +425,12 @@ def _write_backup_error(started_at: str, error: str) -> None:
         except Exception:
             status = {}
 
+    running_status = _read_running_status() or {}
     status.update({
         "last_run": started_at,
         "drive_ok": False,
         "drive_error": _summarize_rclone_error(error) if error else "Yedekleme başarısız oldu.",
+        "failed_step": running_status.get("step"),
         "running": False,
         "running_started_at": None,
     })

@@ -337,6 +337,39 @@ export interface BackupDatabaseStatus {
   latest_activity_at?: string | null;
 }
 
+export interface BackupStorageOverview {
+  database?: {
+    engine?: string;
+    tables?: string[];
+    stores?: string[];
+    backup_formats?: string[];
+    last_sql_size?: string;
+    last_json_size?: string;
+    products_total?: number;
+    activity_logs?: number;
+  };
+  vps?: {
+    root?: string;
+    snapshot_count?: number;
+    files?: string[];
+    last_photo_size?: string;
+    last_photo_files?: number;
+    last_photo_unique_blobs?: number;
+  };
+  drive?: {
+    root?: string;
+    layout?: string;
+    restore_point_count?: number;
+    db_path?: string;
+    manifest_path?: string;
+    photos_path?: string;
+    dedupe?: string;
+    ok?: boolean | null;
+    error?: string | null;
+  };
+  workflow?: string[];
+}
+
 export interface BackupStatus {
   last_run?: string;
   last_date?: string;
@@ -355,8 +388,12 @@ export interface BackupStatus {
   drive_manifest_path?: string;
   drive_photos_path?: string;
   database?: BackupDatabaseStatus;
+  storage?: BackupStorageOverview;
   running?: boolean;
   running_started_at?: string | null;
+  running_step?: string | null;
+  running_updated_at?: string | null;
+  failed_step?: string | null;
   backups?: BackupEntry[];
 }
 
