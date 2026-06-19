@@ -6,11 +6,15 @@ import {
   Clock,
   CloudUpload,
   Database,
+  FileText,
   HardDrive,
   Images,
+  Layers3,
   Loader2,
   RefreshCw,
   Save,
+  Server,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import { deleteBackup, deleteDriveBackup, runBackup } from "../api";
@@ -18,6 +22,8 @@ import { useApp } from "../context";
 import { COPY, cn } from "../i18n";
 import { DARK, LIGHT } from "../theme";
 import { queryKeys, useBackupsQuery, type BackupOverview } from "../queries";
+
+type DriveState = "unknown" | "ok" | "fail";
 
 export default function BackupPage() {
   const { locale, theme, showToast } = useApp();
@@ -100,7 +106,7 @@ export default function BackupPage() {
   }
 
   const hasStatus = !!status.last_run;
-  const driveState = !hasStatus || status.drive_ok == null
+  const driveState: DriveState = !hasStatus || status.drive_ok == null
     ? "unknown"
     : status.drive_ok
       ? "ok"
@@ -115,38 +121,68 @@ export default function BackupPage() {
   const photoBlobText = status.last_photo_files && status.last_photo_unique_blobs
     ? `${status.last_photo_files} ${t.backupFilesShort} / ${status.last_photo_unique_blobs} ${t.backupUniqueBlobsShort}`
     : t.backupLocalStorage;
+  const photoDedupeText = status.last_photo_files && status.last_photo_unique_blobs
+    ? `${status.last_photo_unique_blobs}/${status.last_photo_files}`
+    : "-";
   const localizedDriveError = localizeDriveError(status.drive_error, locale);
   const driveErrorText = localizedDriveError && localizedDriveError.length > 110
     ? `${localizedDriveError.slice(0, 110)}...`
     : localizedDriveError;
+  const lastRunText = hasStatus
+    ? new Date(status.last_run!).toLocaleString(dateLocale)
+    : t.backupNever;
+  const driveLayoutText = status.drive_layout ?? t.backupDriveLayoutUnknown;
+
+  const architecture = [
+    {
+      icon: <Database className="size-5" />,
+      title: t.backupArchDbTitle,
+      body: t.backupArchDbBody,
+      meta: dbSqlSize,
+      path: status.drive_db_path,
+    },
+    {
+      icon: <FileText className="size-5" />,
+      title: t.backupArchManifestTitle,
+      body: t.backupArchManifestBody,
+      meta: `${driveBackups.length} ${t.backupRestorePointShort}`,
+      path: status.drive_manifest_path,
+    },
+    {
+      icon: <Images className="size-5" />,
+      title: t.backupArchPhotosTitle,
+      body: t.backupArchPhotosBody,
+      meta: photoBlobText,
+      path: status.drive_photos_path,
+    },
+  ];
 
   return (
     <div className="grid gap-5">
-
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.backupTitle}</h1>
+        <div>
+          <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.backupTitle}</h1>
+          <p className={cn("mt-1 text-sm font-semibold", s.muted)}>{t.backupPageSubtitle}</p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Manuel yedekle */}
           <button
             type="button"
             onClick={handleRunBackup}
             disabled={running || loading}
             className={cn(
-              "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
+              "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-extrabold transition",
               "border-violet-400/30 bg-violet-400/10 text-violet-300 hover:bg-violet-400/20 active:scale-95 disabled:opacity-50",
             )}
           >
             {running ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             <span>{running ? t.backupRunning : t.backupRunManual}</span>
           </button>
-          {/* Yenile */}
           <button
             type="button"
             onClick={() => backupsQuery.refetch()}
             disabled={loading || backupsQuery.isFetching}
             className={cn(
-              "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-extrabold transition",
+              "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-extrabold transition",
               s.controlGroup, s.controlIdle,
             )}
           >
@@ -156,103 +192,115 @@ export default function BackupPage() {
         </div>
       </div>
 
-      {/* Manuel yedekleme açıklaması */}
-      <div className={cn("rounded-xl border px-4 py-3 text-xs font-semibold", s.subPanel)}>
-        <span className={cn(s.muted)}>{t.backupManualInfo}</span>
-      </div>
-
-      {/* Status cards */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-
-        {/* Last backup */}
-        <div className={cn("col-span-2 rounded-xl border p-4 sm:col-span-1", s.panel)}>
-          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
-            <Clock className="size-3.5 shrink-0" />
-            {t.backupLastRun}
-          </div>
-          <div className={cn("text-sm font-extrabold leading-5", s.title)}>
-            {hasStatus
-              ? new Date(status.last_run!).toLocaleString(dateLocale)
-              : t.backupNever}
-          </div>
-          <div className={cn("mt-1.5 text-xs leading-4", s.muted)}>{t.backupSchedule}</div>
+      <section className={cn("rounded-xl border", s.panel)}>
+        <div className={cn("grid gap-0 divide-y md:grid-cols-4 md:divide-x md:divide-y-0", s.divider)}>
+          <MetricBlock
+            icon={<Clock className="size-4" />}
+            label={t.backupLastRun}
+            value={lastRunText}
+            detail={running ? t.backupRunning : t.backupSchedule}
+            accent="text-violet-300"
+            s={s}
+          />
+          <MetricBlock
+            icon={<Server className="size-4" />}
+            label={t.backupLocalSnapshot}
+            value={`${backups.length}`}
+            detail={t.backupLocalStorage}
+            accent="text-emerald-300"
+            s={s}
+          />
+          <MetricBlock
+            icon={<CloudUpload className="size-4" />}
+            label={t.backupDrive}
+            value={driveState === "unknown" ? "-" : driveState === "ok" ? t.backupOk : t.backupFail}
+            detail={driveStorageText}
+            accent={driveState === "fail" ? "text-red-300" : "text-sky-300"}
+            s={s}
+          />
+          <MetricBlock
+            icon={<Layers3 className="size-4" />}
+            label={t.backupSmartDedupe}
+            value={photoDedupeText}
+            detail={t.backupDriveSmartLayout}
+            accent="text-amber-300"
+            s={s}
+          />
         </div>
-
-        {/* Primary DB dump size */}
-        <div className={cn("rounded-xl border p-4", s.panel)}>
-          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
-            <Database className="size-3.5 shrink-0" />
-            {t.backupDbSql}
+        {driveState === "fail" && driveErrorText ? (
+          <div className={cn("border-t px-4 py-3 text-xs font-semibold leading-5 text-red-400 sm:px-5", s.panelBorder)}>
+            {t.backupDriveErrorPrefix} {driveErrorText}
           </div>
-          <div className="text-xl font-black text-violet-400">{dbSqlSize}</div>
-          {status.last_db_sql_error ? (
-            <div className="mt-1 break-words text-[11px] font-semibold leading-4 text-red-400/80">
-              {t.backupDbSqlErrorPrefix} {status.last_db_sql_error}
-            </div>
-          ) : (
-            <div className={cn("mt-1 text-xs", s.muted)}>{t.backupDbPrimary}</div>
-          )}
-        </div>
+        ) : null}
+      </section>
 
-        {/* JSON export size */}
-        <div className={cn("rounded-xl border p-4", s.panel)}>
-          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
-            <Database className="size-3.5 shrink-0" />
-            {t.backupJsonExport}
-          </div>
-          <div className="text-xl font-black text-violet-300">{dbJsonSize}</div>
-          <div className={cn("mt-1 text-xs", s.muted)}>{t.backupLocalStorage}</div>
-        </div>
-
-        {/* Images size */}
-        <div className={cn("rounded-xl border p-4", s.panel)}>
-          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
-            <Images className="size-3.5 shrink-0" />
-            {t.backupImages}
-          </div>
-          <div className="text-xl font-black text-sky-400">{status.last_img_size ?? "-"}</div>
-          <div className={cn("mt-1 text-xs", s.muted)}>{photoBlobText}</div>
-        </div>
-
-        {/* Drive status */}
-        <div className={cn("rounded-xl border p-4", s.panel)}>
-          <div className={cn("flex items-center gap-1.5 text-xs font-bold mb-2", s.muted)}>
-            <CloudUpload className="size-3.5 shrink-0" />
-            {t.backupDrive}
-          </div>
+      <section className={cn("rounded-xl border", s.panel)}>
+        <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 sm:px-5", s.panelBorder)}>
           <div className="flex items-center gap-2">
-            {driveState === "unknown" ? (
-              <HardDrive className={cn("size-5", s.muted)} />
-            ) : driveState === "ok" ? (
-              <CheckCircle2 className="size-5 text-emerald-400" />
-            ) : (
-              <AlertCircle className="size-5 text-red-400" />
-            )}
-            <span className={cn("text-sm font-extrabold", s.title)}>
-              {driveState === "unknown" ? "-" : driveState === "ok" ? t.backupOk : t.backupFail}
-            </span>
-          </div>
-          <div className={cn("mt-1 text-xs", driveState === "fail" ? "text-red-400" : s.muted)}>
-            {driveStorageText}
-          </div>
-          {driveState === "ok" && status.drive_layout ? (
-            <div className={cn("mt-1 text-[11px] font-semibold leading-4", s.muted)}>
-              {t.backupDriveSmartLayout}
+            <ShieldCheck className="size-5 text-violet-300" />
+            <div>
+              <h2 className={cn("text-base font-extrabold", s.title)}>{t.backupArchitectureTitle}</h2>
+              <p className={cn("mt-0.5 text-xs font-semibold", s.muted)}>{t.backupArchitectureSubtitle}</p>
             </div>
-          ) : null}
-          {driveState === "fail" && driveErrorText ? (
-            <div className="mt-1 text-[11px] font-semibold leading-4 text-red-400/80">
-              {t.backupDriveErrorPrefix} {driveErrorText}
-            </div>
-          ) : null}
+          </div>
+          <span className={cn("rounded-full px-3 py-1 text-[11px] font-black ring-1", s.pill)}>
+            {driveLayoutText}
+          </span>
         </div>
 
-      </div>
+        <div className={cn("grid divide-y lg:grid-cols-3 lg:divide-x lg:divide-y-0", s.divider)}>
+          {architecture.map((item) => (
+            <div key={item.title} className="min-w-0 p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <div className={cn("grid size-10 shrink-0 place-items-center rounded-lg ring-1", s.iconBox)}>
+                  {item.icon}
+                </div>
+                <div className="min-w-0">
+                  <div className={cn("text-sm font-extrabold", s.title)}>{item.title}</div>
+                  <p className={cn("mt-1 text-xs font-semibold leading-5", s.muted)}>{item.body}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={cn("rounded-md px-2 py-1 text-[11px] font-black ring-1", s.pill)}>
+                      {item.meta}
+                    </span>
+                    {item.path ? (
+                      <span className={cn("max-w-full truncate rounded-md px-2 py-1 text-[11px] font-bold ring-1", s.pill)}>
+                        {item.path}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
 
-      {/* VPS Backup list */}
-      <div className={cn("rounded-xl border", s.panel)}>
-        <div className={cn("flex items-center justify-between px-4 py-4 border-b sm:px-5", s.panelBorder)}>
-          <h2 className={cn("text-base font-extrabold flex items-center gap-2", s.title)}>
+        <div className={cn("border-t px-4 py-4 sm:px-5", s.panelBorder)}>
+          <div className="grid gap-3 md:grid-cols-3">
+            <StatusLine
+              icon={<CheckCircle2 className="size-4 text-emerald-400" />}
+              label={t.backupConsistencyTitle}
+              value={t.backupConsistencyBody}
+              s={s}
+            />
+            <StatusLine
+              icon={<HardDrive className="size-4 text-violet-300" />}
+              label={t.backupRestoreMapTitle}
+              value={t.backupRestoreMapBody}
+              s={s}
+            />
+            <StatusLine
+              icon={<CloudUpload className="size-4 text-sky-400" />}
+              label={t.backupDriveRestorePoints}
+              value={`${driveBackups.length} ${t.backupRestorePointShort}`}
+              s={s}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className={cn("rounded-xl border", s.panel)}>
+        <div className={cn("flex items-center justify-between border-b px-4 py-4 sm:px-5", s.panelBorder)}>
+          <h2 className={cn("flex items-center gap-2 text-base font-extrabold", s.title)}>
             <HardDrive className="size-4 text-violet-400" />
             {t.backupAvailable}
           </h2>
@@ -264,44 +312,32 @@ export default function BackupPage() {
             <Loader2 className="size-8 animate-spin text-violet-400" />
           </div>
         ) : backups.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-12">
-            <HardDrive className={cn("size-10", s.emptyIcon)} />
-            <p className={cn("text-sm font-semibold", s.muted)}>{t.backupEmpty}</p>
-          </div>
+          <EmptyState icon={<HardDrive className={cn("size-10", s.emptyIcon)} />} text={t.backupEmpty} s={s} />
         ) : (
-          <div className="max-h-72 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto">
             {backups.map((b) => (
               <div
                 key={b.date}
                 className={cn(
-                  "grid gap-3 px-4 py-4 border-b last:border-b-0 sm:grid-cols-[minmax(8rem,1fr)_auto_auto] sm:items-center sm:px-5",
+                  "grid gap-3 border-b px-4 py-4 last:border-b-0 sm:grid-cols-[minmax(8rem,1fr)_auto_auto] sm:items-center sm:px-5",
                   s.panelBorder
                 )}
               >
                 <div className="min-w-0">
                   <div className={cn("whitespace-nowrap text-sm font-extrabold", s.title)}>{b.date}</div>
+                  <div className={cn("mt-1 text-xs font-semibold", s.muted)}>{t.backupLocalSnapshot}</div>
                 </div>
 
                 <div className="grid gap-2 text-xs sm:flex sm:items-center sm:gap-4">
-                  <div className="flex items-center gap-1.5 whitespace-nowrap">
-                    <Database className={cn("size-3.5", s.muted)} />
-                    <span className={cn("font-bold", s.muted)}>db.sql {b.db_sql_size ?? b.db_size}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 whitespace-nowrap">
-                    <Database className={cn("size-3.5", s.muted)} />
-                    <span className={cn("font-bold", s.muted)}>db.json {b.db_json_size ?? "-"}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 whitespace-nowrap">
-                    <Images className={cn("size-3.5", s.muted)} />
-                    <span className={cn("font-bold", s.muted)}>{b.img_size}</span>
-                  </div>
+                  <FileMetric icon={<Database className="size-3.5" />} label={`db.sql ${b.db_sql_size ?? b.db_size}`} s={s} />
+                  <FileMetric icon={<FileText className="size-3.5" />} label={`db.json ${b.db_json_size ?? "-"}`} s={s} />
+                  <FileMetric icon={<Images className="size-3.5" />} label={b.img_size} s={s} />
                   {b.photo_files && b.photo_unique_blobs ? (
-                    <div className="flex items-center gap-1.5 whitespace-nowrap">
-                      <CloudUpload className={cn("size-3.5", s.muted)} />
-                      <span className={cn("font-bold", s.muted)}>
-                        {b.photo_files}/{b.photo_unique_blobs}
-                      </span>
-                    </div>
+                    <FileMetric
+                      icon={<Layers3 className="size-3.5" />}
+                      label={`${b.photo_files}/${b.photo_unique_blobs}`}
+                      s={s}
+                    />
                   ) : null}
                 </div>
 
@@ -325,12 +361,11 @@ export default function BackupPage() {
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Drive Backup list */}
-      <div className={cn("rounded-xl border", s.panel)}>
-        <div className={cn("flex items-center justify-between px-4 py-4 border-b sm:px-5", s.panelBorder)}>
-          <h2 className={cn("text-base font-extrabold flex items-center gap-2", s.title)}>
+      <section className={cn("rounded-xl border", s.panel)}>
+        <div className={cn("flex items-center justify-between border-b px-4 py-4 sm:px-5", s.panelBorder)}>
+          <h2 className={cn("flex items-center gap-2 text-base font-extrabold", s.title)}>
             <CloudUpload className="size-4 text-sky-400" />
             {t.backupDriveAvailable}
           </h2>
@@ -342,23 +377,28 @@ export default function BackupPage() {
             <Loader2 className="size-8 animate-spin text-sky-400" />
           </div>
         ) : driveBackups.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-12">
-            <CloudUpload className={cn("size-10", s.emptyIcon)} />
-            <p className={cn("text-sm font-semibold", s.muted)}>{t.backupDriveEmpty}</p>
-          </div>
+          <EmptyState icon={<CloudUpload className={cn("size-10", s.emptyIcon)} />} text={t.backupDriveEmpty} s={s} />
         ) : (
-          <div className="max-h-72 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto">
             {driveBackups.map((date) => (
               <div
                 key={date}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-4 border-b last:border-b-0 sm:px-5",
+                  "grid gap-3 border-b px-4 py-4 last:border-b-0 sm:grid-cols-[minmax(8rem,1fr)_auto_auto] sm:items-center sm:px-5",
                   s.panelBorder
                 )}
               >
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <CloudUpload className="size-3.5 shrink-0 text-sky-400" />
-                  <span className={cn("text-sm font-extrabold", s.title)}>{date}</span>
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <CloudUpload className="size-3.5 shrink-0 text-sky-400" />
+                    <span className={cn("truncate text-sm font-extrabold", s.title)}>{date}</span>
+                  </div>
+                  <div className={cn("mt-1 text-xs font-semibold", s.muted)}>{t.backupRestorePointShort}</div>
+                </div>
+                <div className="grid gap-2 text-xs sm:flex sm:items-center sm:gap-4">
+                  <FileMetric icon={<Database className="size-3.5" />} label="db.sql / db.json" s={s} />
+                  <FileMetric icon={<FileText className="size-3.5" />} label="manifest" s={s} />
+                  <FileMetric icon={<Images className="size-3.5" />} label={t.backupPhotoPoolShort} s={s} />
                 </div>
 
                 <button
@@ -366,8 +406,8 @@ export default function BackupPage() {
                   onClick={() => handleDeleteDrive(date)}
                   disabled={deletingDrive === date}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5",
-                    "text-xs font-extrabold transition shrink-0",
+                    "inline-flex w-fit items-center gap-1.5 rounded-lg border px-3 py-1.5",
+                    "text-xs font-extrabold transition sm:justify-self-end",
                     s.error, "opacity-70 hover:opacity-100 disabled:opacity-40"
                   )}
                 >
@@ -381,21 +421,90 @@ export default function BackupPage() {
             ))}
           </div>
         )}
-      </div>
+      </section>
+    </div>
+  );
+}
 
-      {/* How it works info box */}
-      <div className={cn("rounded-xl border p-4", s.subPanel)}>
-        <div className={cn("font-extrabold mb-3 text-sm", s.title)}>{t.backupHowTitle}</div>
-        <ul className={cn("grid gap-2 text-xs leading-5", s.muted)}>
-          {[t.backupHow1, t.backupHow2, t.backupHow3, t.backupHow4, t.backupHow5].map((item) => (
-            <li key={item} className="flex items-start gap-2">
-              <span className="mt-1.5 size-1.5 rounded-full bg-violet-400 shrink-0" />
-              {item}
-            </li>
-          ))}
-        </ul>
+function MetricBlock({
+  icon,
+  label,
+  value,
+  detail,
+  accent,
+  s,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  accent: string;
+  s: typeof DARK | typeof LIGHT;
+}) {
+  return (
+    <div className="min-w-0 p-4 sm:p-5">
+      <div className={cn("mb-2 flex items-center gap-2 text-xs font-bold", s.muted)}>
+        <span className={accent}>{icon}</span>
+        <span className="truncate">{label}</span>
       </div>
+      <div className={cn("truncate text-xl font-black leading-7", accent)}>{value}</div>
+      <div className={cn("mt-1 line-clamp-2 text-xs font-semibold leading-5", s.muted)}>{detail}</div>
+    </div>
+  );
+}
 
+function StatusLine({
+  icon,
+  label,
+  value,
+  s,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  s: typeof DARK | typeof LIGHT;
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0">{icon}</span>
+      <div className="min-w-0">
+        <div className={cn("text-xs font-black", s.title)}>{label}</div>
+        <div className={cn("mt-0.5 text-xs font-semibold leading-5", s.muted)}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function FileMetric({
+  icon,
+  label,
+  s,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  s: typeof DARK | typeof LIGHT;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 whitespace-nowrap">
+      <span className={cn("shrink-0", s.muted)}>{icon}</span>
+      <span className={cn("font-bold", s.muted)}>{label}</span>
+    </div>
+  );
+}
+
+function EmptyState({
+  icon,
+  text,
+  s,
+}: {
+  icon: React.ReactNode;
+  text: string;
+  s: typeof DARK | typeof LIGHT;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-12">
+      {icon}
+      <p className={cn("text-sm font-semibold", s.muted)}>{text}</p>
     </div>
   );
 }
