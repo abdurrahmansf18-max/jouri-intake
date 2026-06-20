@@ -1,9 +1,10 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ImagePlus, Layers3, Loader2, Search, Tag } from "lucide-react";
 import { useApp } from "../context";
-import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType, normalizeText, searchTokens } from "../i18n";
+import { COPY, cn, filterLabel, normalizeCategory, normalizeProductType } from "../i18n";
 import { DARK, LIGHT } from "../theme";
 import type { ProductRecord, StatusFilter } from "../types";
+import { searchProducts } from "../search";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
@@ -161,9 +162,8 @@ export default function ProductsPage() {
   // Filtre veya arama değişince sayfa 1'e dön
   useEffect(() => { setPage(1); }, [filter, search, categoryFilter, typeFilter, seasonFilter]);
 
-  const filtered = useMemo(() => {
-    const tokens = searchTokens(search);
-    return records.filter((r) => {
+  const searchResults = useMemo(() => {
+    const filterScoped = records.filter((r) => {
       if (filter !== "all" && r.status !== filter) return false;
       
       const cat = normalizeCategory(r.parsed?.categorySuggestion ?? "");
@@ -178,16 +178,16 @@ export default function ProductsPage() {
       if (seasonFilter === "unspecified" && season) return false;
       if (seasonFilter !== "all" && seasonFilter !== "unspecified" && season !== seasonFilter) return false;
 
-      if (tokens.length === 0) return true;
-      const p = r.parsed;
-      const haystack = normalizeText([
-        p.titleRaw, p.categorySuggestion,
-        p.colorRaw, p.sizesRaw, p.priceAmount, p.productTypeSuggestion, p.season,
-        r.notes, r.folderName, r.description,
-      ].join(" "));
-      return tokens.every((tok) => haystack.includes(tok));
+      return true;
     });
+    return searchProducts(filterScoped, search);
   }, [records, filter, search, categoryFilter, typeFilter, seasonFilter]);
+
+  const filtered = useMemo(() => searchResults.map((result) => result.record), [searchResults]);
+  const searchMatchesById = useMemo(
+    () => new Map(searchResults.map((result) => [result.record.id, result.matches])),
+    [searchResults],
+  );
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = useMemo(() => {
@@ -580,6 +580,7 @@ export default function ProductsPage() {
                 onEdit={() => openEdit(record.id)}
                 onReplace={replaceRecord}
                 searchQuery={search}
+                searchMatches={searchMatchesById.get(record.id) ?? []}
                 selectable={bulkMode}
                 selected={selectedIds.includes(record.id)}
                 onToggleSelect={(id, isSelected) => {

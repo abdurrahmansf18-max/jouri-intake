@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ import activity_logger
 import auth_service
 import file_manager
 import product_service
+import search_service
 import shopify
 from database import get_db
 from db_models import Product
@@ -18,6 +19,7 @@ from models import (
     BulkUpdateRequest,
     BulkShopifyPushRequest,
     ProductRecord,
+    ProductSearchResult,
     ProductUpdateRequest,
     StatusUpdateRequest,
     UpdateRelatedRequest,
@@ -42,6 +44,53 @@ def get_products(
 ):
     products = db.query(Product).order_by(Product.created_at.desc()).all()
     return [product_service.to_record(p) for p in products]
+
+
+@router.get("/api/products/search", response_model=list[ProductSearchResult])
+def search_products_endpoint(
+    _: Annotated[None, Depends(verify_access)],
+    q: Annotated[str, Query(max_length=200)] = "",
+    status: Annotated[str, Query()] = "all",
+    category: Annotated[str, Query()] = "all",
+    product_type: Annotated[str, Query(alias="productType")] = "all",
+    season: Annotated[str, Query()] = "all",
+    include_archive: Annotated[bool, Query(alias="includeArchive")] = False,
+    db: Session = Depends(get_db),
+):
+    products = db.query(Product).order_by(Product.created_at.desc()).all()
+    records = [product_service.to_record(p) for p in products]
+    filtered: list[ProductRecord] = []
+    normalized_category_filter = normalize_category(category)
+    normalized_type_filter = normalize_product_type(product_type)
+    normalized_season_filter = normalize_season(season)
+
+    for record in records:
+        if not include_archive and record.status == "sold_archive":
+            continue
+        if status != "all" and record.status != status:
+            continue
+
+        record_category = normalize_category(record.parsed.categorySuggestion)
+        if category == "uncategorized" and record_category:
+            continue
+        if category not in {"all", "uncategorized"} and record_category != normalized_category_filter:
+            continue
+
+        record_type = normalize_product_type(record.parsed.productTypeSuggestion)
+        if product_type == "untyped" and record_type:
+            continue
+        if product_type not in {"all", "untyped"} and record_type != normalized_type_filter:
+            continue
+
+        record_season = normalize_season(record.parsed.season)
+        if season == "unspecified" and record_season:
+            continue
+        if season not in {"all", "unspecified"} and record_season != normalized_season_filter:
+            continue
+
+        filtered.append(record)
+
+    return search_service.search_products(filtered, q, include_archive_fields=include_archive)
 
 
 @router.post("/api/products", response_model=ProductRecord)

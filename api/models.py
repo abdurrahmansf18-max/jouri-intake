@@ -88,6 +88,19 @@ class ProductRecord(BaseModel):
     shopify: ShopifySyncInfo = Field(default_factory=ShopifySyncInfo)
 
 
+class ProductSearchMatch(BaseModel):
+    key: str
+    label: str
+    value: str
+    score: int
+
+
+class ProductSearchResult(BaseModel):
+    record: ProductRecord
+    matches: list[ProductSearchMatch] = Field(default_factory=list)
+    score: int = 0
+
+
 class StatusUpdateRequest(BaseModel):
     status: ProductStatus
 

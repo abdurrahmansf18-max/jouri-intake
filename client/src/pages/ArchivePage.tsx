@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArchiveIcon, Loader2, Search } from "lucide-react";
 import { useApp } from "../context";
-import { COPY, cn, normalizeText, searchTokens } from "../i18n";
+import { COPY, cn } from "../i18n";
 import { DARK, LIGHT } from "../theme";
 import type { ProductRecord } from "../types";
+import { searchProducts } from "../search";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
@@ -36,16 +37,12 @@ export default function ArchivePage() {
   // Arama değişince sayfa 1'e dön
   useEffect(() => { setPage(1); }, [search]);
 
-  const filtered = useMemo(() => {
-    const tokens = searchTokens(search);
-    if (!tokens.length) return records;
-    return records.filter((r) => {
-      const p = r.parsed;
-      const soldSizeNames = r.soldSizes.map((ss) => ss.size).join(" ");
-      const hay = normalizeText([p.titleRaw, p.colorRaw, p.sizesRaw, p.priceAmount, r.notes, r.description, soldSizeNames].join(" "));
-      return tokens.every((tok) => hay.includes(tok));
-    });
-  }, [records, search]);
+  const searchResults = useMemo(() => searchProducts(records, search, true), [records, search]);
+  const filtered = useMemo(() => searchResults.map((result) => result.record), [searchResults]);
+  const searchMatchesById = useMemo(
+    () => new Map(searchResults.map((result) => [result.record.id, result.matches])),
+    [searchResults],
+  );
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = useMemo(() => {
@@ -105,6 +102,7 @@ export default function ArchivePage() {
                 showRestoreBtn={record.status === "sold_archive"}
                 showSoldSizes
                 searchQuery={search}
+                searchMatches={searchMatchesById.get(record.id) ?? []}
               />
             ))}
           </div>

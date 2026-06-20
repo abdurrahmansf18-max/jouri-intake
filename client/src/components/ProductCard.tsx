@@ -6,6 +6,7 @@ import { COPY, cn, statusLabel } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord, ProductStatus } from "../types";
 import { formatPrice } from "../format";
+import type { ProductSearchMatch } from "../search";
 
 interface Props {
   record: ProductRecord;
@@ -15,12 +16,13 @@ interface Props {
   showRestoreBtn?: boolean;
   showSoldSizes?: boolean;
   searchQuery?: string;
+  searchMatches?: ProductSearchMatch[];
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string, selected: boolean) => void;
 }
 
-export default function ProductCard({ record, onOpen, onEdit, onReplace, showRestoreBtn, showSoldSizes, searchQuery, selectable, selected, onToggleSelect }: Props) {
+export default function ProductCard({ record, onOpen, onEdit, onReplace, showRestoreBtn, showSoldSizes, searchQuery, searchMatches = [], selectable, selected, onToggleSelect }: Props) {
   const { locale, theme, showToast } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
@@ -95,6 +97,27 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
           </h3>
         ) : (
           <h3 className={cn("line-clamp-1 text-sm font-extrabold", s.muted)}>{record.folderName}</h3>
+        )}
+
+        {searchQuery?.trim() && searchMatches.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {searchMatches.map((match) => (
+              <span
+                key={match.key}
+                className={cn(
+                  "inline-flex max-w-full items-center gap-1 rounded-lg border border-violet-300/20 bg-violet-400/10 px-2 py-0.5 text-[10px] font-extrabold",
+                  theme === "dark" ? "text-violet-100" : "text-violet-800",
+                )}
+                title={`${searchMatchLabel(match.key, t)}: ${match.value}`}
+                dir="auto"
+              >
+                <span className={cn("shrink-0", theme === "dark" ? "text-violet-300" : "text-violet-700")}>{searchMatchLabel(match.key, t)}:</span>
+                <span className="min-w-0 truncate">
+                  <Highlight text={compactMatchValue(match.value)} query={searchQuery} />
+                </span>
+              </span>
+            ))}
+          </div>
         )}
 
         {/* Satılan bedenler (arşiv görünümünde) */}
@@ -176,7 +199,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <mark key={i} className="rounded-sm bg-yellow-400/35 text-yellow-100 px-px not-italic">
+          <mark key={i} className="rounded-sm bg-yellow-400/45 px-px text-inherit not-italic">
             {part}
           </mark>
         ) : (
@@ -185,6 +208,27 @@ function Highlight({ text, query }: { text: string; query: string }) {
       )}
     </>
   );
+}
+
+function compactMatchValue(value: string): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 80) return normalized;
+  return `${normalized.slice(0, 77)}...`;
+}
+
+function searchMatchLabel(key: string, t: Record<string, any>): string {
+  if (key === "title") return t.logFieldTitle;
+  if (key === "season") return (t as any).season || "Mevsim";
+  if (key === "category") return t.logFieldCategory;
+  if (key === "product_type") return t.logFieldProductType;
+  if (key === "color") return t.logFieldColor;
+  if (key === "german_color") return t.logFieldColor;
+  if (key === "sizes") return t.logFieldSize;
+  if (key === "price") return t.logFieldPrice;
+  if (key === "notes") return t.logFieldNotes;
+  if (key === "description") return t.description;
+  if (key === "sold_sizes") return t.logFieldSize;
+  return key;
 }
 
 export function statusBadge(status: ProductStatus, s: ThemeStyles) {

@@ -1,4 +1,5 @@
 import type { ActivityLog, AiImageGenerateRequest, ParsedProduct, ProductRecord, ProductStatus, SizeStock } from "./types";
+import type { ProductSearchResult } from "./search";
 
 // Kimlik doğrulama artık session cookie ile yapılıyor (TOTP)
 export function getStoredCode(): string { return ""; }
@@ -58,6 +59,23 @@ export async function verifyEditLock(code: string): Promise<boolean> {
 export async function fetchProducts(): Promise<ProductRecord[]> {
   const res = await fetch("/api/products", { headers: headers() });
   return handleResponse<ProductRecord[]>(res);
+}
+
+export async function searchProductsApi(params: {
+  q?: string;
+  status?: string;
+  category?: string;
+  productType?: string;
+  season?: string;
+  includeArchive?: boolean;
+}): Promise<ProductSearchResult[]> {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    search.set(key, String(value));
+  }
+  const res = await fetch(`/api/products/search?${search.toString()}`, { headers: headers() });
+  return handleResponse<ProductSearchResult[]>(res);
 }
 
 export type AiParseProvider = "gemini" | "gemma" | "parser";

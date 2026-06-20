@@ -131,7 +131,7 @@ export const COPY = {
     statusAiEnhanced: "AI Düzenlendi",
     statusPublished: "Yayınlandı",
     statusSoldArchive: "Satıldı",
-    searchPlaceholder: "İsim, renk, beden, fiyat veya not ara...",
+    searchPlaceholder: "İsim, mevsim, kategori, tip, renk, beden veya açıklama ara...",
     openDetail: "Detay",
     // Product detail
     productDetail: "Ürün Detayı",
@@ -591,7 +591,7 @@ export const COPY = {
     statusAiEnhanced: "معالج بالذكاء",
     statusPublished: "منشور",
     statusSoldArchive: "مباع",
-    searchPlaceholder: "ابحثي بالاسم أو اللون أو المقاس أو السعر أو الملاحظات...",
+    searchPlaceholder: "ابحثي بالاسم أو الموسم أو الفئة أو النوع أو اللون أو المقاس أو الوصف...",
     openDetail: "التفاصيل",
     // Product detail
     productDetail: "تفاصيل المنتج",
@@ -1089,6 +1089,7 @@ export function normalizeText(str: string): string {
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")       // Latin aksan işaretleri (ä→a, ö→o, ü→u)
     .replace(/[ً-ٰٟ]/g, "") // Arapça hareke (تشكيل)
+    .replace(/[ıİ]/g, "i")
     .replace(/[أإآٱ]/g, "ا")
     .replace(/[ىئ]/g, "ي")
     .replace(/ة/g, "ه")
