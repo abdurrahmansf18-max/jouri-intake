@@ -42,6 +42,11 @@ services:
       - SHOPIFY_VENDOR=Binbon Kids
       - PRODUCTS_BASE=/products_photo
       - BACKUP_TIMEZONE=Europe/Istanbul
+      - TOTP_SECRET=${TOTP_SECRET:-}
+      - USER_PASSWORD=${USER_PASSWORD:-}
+      - USER_PASSWORD_2=${USER_PASSWORD_2:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
+      - EDIT_LOCK_CODE=${EDIT_LOCK_CODE:-}
     volumes:
       - /home/ubuntu/jouri/products_photo:/products_photo
       - /home/ubuntu/jouri/backups:/backups

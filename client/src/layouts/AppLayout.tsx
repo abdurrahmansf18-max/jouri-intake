@@ -45,17 +45,17 @@ export default function AppLayout({ children, onLogout }: Props) {
     <div className={cn("min-h-screen flex flex-col", s.page)} dir={dir}>
       {/* ── Top Navbar ── */}
       <header className={cn("sticky top-0 z-40 border-b", s.header)}>
-        <div className="flex h-14 items-center gap-3 px-4 sm:px-5">
+        <div className="flex h-14 items-center gap-3 px-3 sm:px-5">
           {/* Logo */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div className={cn("flex size-8 items-center justify-center rounded-lg", s.logo)}>
               <PackageCheck className="size-4" />
             </div>
-            <span className={cn("text-base font-black tracking-tight", s.title)}>{t.appTitle}</span>
+            <span className={cn("max-w-[8rem] truncate text-base font-black tracking-tight sm:max-w-none", s.title)}>{t.appTitle}</span>
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-1.5 ms-auto">
+          <div className="ms-auto flex shrink-0 items-center gap-1.5">
             {/* Language toggle */}
             <div className={cn("hidden sm:inline-flex items-center gap-0.5 rounded-lg border p-1", s.controlGroup)}>
               <Languages className={cn("mx-1 size-3.5", s.muted)} />
@@ -80,6 +80,7 @@ export default function AppLayout({ children, onLogout }: Props) {
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className={cn("inline-flex size-8 items-center justify-center rounded-lg border transition", s.controlGroup, s.controlIdle)}
               title={theme === "dark" ? t.lightMode : t.darkMode}
+              aria-label={theme === "dark" ? t.lightMode : t.darkMode}
             >
               {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </button>
@@ -89,6 +90,7 @@ export default function AppLayout({ children, onLogout }: Props) {
               type="button"
               onClick={() => setLocale(locale === "tr" ? "ar" : "tr")}
               className={cn("sm:hidden inline-flex size-8 items-center justify-center rounded-lg border transition text-xs font-extrabold", s.controlGroup, s.controlIdle)}
+              aria-label="Toggle language"
             >
               {locale === "tr" ? "ع" : "TR"}
             </button>
@@ -100,6 +102,7 @@ export default function AppLayout({ children, onLogout }: Props) {
                 onClick={onLogout}
                 className={cn("inline-flex size-8 items-center justify-center rounded-lg border transition", s.controlGroup, s.controlIdle)}
                 title={t.logout}
+                aria-label={t.logout}
               >
                 <LogOut className="size-4" />
               </button>
