@@ -88,7 +88,6 @@ def product_search_fields(record: ProductRecord, include_archive_fields: bool = 
         SearchField("tags", "Tags", _join(parsed.tags), 55),
         SearchField("notes", "Notes", record.notes, 45),
         SearchField("description", "Description", record.description, 30),
-        SearchField("folder", "Folder", record.folderName, 15),
     ]
     if include_archive_fields:
         fields.append(

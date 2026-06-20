@@ -33,7 +33,6 @@ const FIELD_LABELS: Record<string, string> = {
   tags: "Tags",
   notes: "Notes",
   description: "Description",
-  folder: "Folder",
   sold_sizes: "Sold sizes",
 };
 
@@ -91,7 +90,6 @@ export function buildProductSearchFields(record: ProductRecord, includeArchiveFi
     { key: "tags", label: FIELD_LABELS.tags, value: cleanValue(p.tags), weight: 55 },
     { key: "notes", label: FIELD_LABELS.notes, value: cleanValue(record.notes), weight: 45 },
     { key: "description", label: FIELD_LABELS.description, value: cleanValue(record.description), weight: 30 },
-    { key: "folder", label: FIELD_LABELS.folder, value: cleanValue(record.folderName), weight: 15 },
   ];
 
   if (includeArchiveFields) {
