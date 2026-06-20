@@ -39,6 +39,11 @@ def auth_check(_: Annotated[None, Depends(verify_access)]):
     return {"authed": True}
 
 
+@router.get("/api/realtime/status")
+def realtime_status(_: Annotated[None, Depends(verify_access)]):
+    return {"connections": ws_manager.connection_count}
+
+
 @router.post("/api/auth/logout")
 def auth_logout(response: Response):
     response.delete_cookie(auth_service.AUTH_COOKIE_NAME, path="/")
@@ -74,4 +79,6 @@ async def websocket_endpoint(
         while True:
             await ws.receive_text()
     except WebSocketDisconnect:
-        ws_manager.disconnect(ws)
+        pass
+    finally:
+        await ws_manager.disconnect(ws)

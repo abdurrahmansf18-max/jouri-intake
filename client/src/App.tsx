@@ -3,7 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { checkAuth, clearCode, isAuthRequired, logout, storeCode, verifyCode } from "./api";
 import { AppContext, useToastState } from "./context";
-import { queryClient } from "./queries";
+import { queryClient, useProductCacheSync } from "./queries";
 import LoginGate from "./components/LoginGate";
 import AppLayout from "./layouts/AppLayout";
 import DashboardPage from "./pages/DashboardPage";
@@ -16,6 +16,11 @@ import type { Locale, Theme } from "./types";
 
 const LOCALE_KEY = "jouri-locale";
 const THEME_KEY = "jouri-theme";
+
+function ProductRealtimeSync() {
+  useProductCacheSync();
+  return null;
+}
 
 export default function App() {
   const [locale, setLocaleState] = useState<Locale>("ar");
@@ -103,6 +108,7 @@ export default function App() {
   return (
     <AppContext.Provider value={{ locale, setLocale, theme, setTheme, showToast }}>
       <QueryClientProvider client={queryClient}>
+        <ProductRealtimeSync />
         <BrowserRouter>
           <AppLayout onLogout={authRequired ? handleLogout : undefined}>
             <Routes>

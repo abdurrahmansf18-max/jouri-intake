@@ -8,7 +8,7 @@ import { searchProducts } from "../search";
 import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
-import { useProductCacheActions, useProductCacheSync, useProductsQuery } from "../queries";
+import { useProductCacheActions, useProductsQuery } from "../queries";
 
 const PAGE_SIZE = 30;
 
@@ -27,8 +27,6 @@ export default function ArchivePage() {
   const [page, setPage] = useState(1);
   const productsQuery = useProductsQuery();
   const cacheActions = useProductCacheActions();
-
-  useProductCacheSync();
 
   const allProducts = productsQuery.data ?? [];
   const records = useMemo(() => allProducts.filter(isArchived), [allProducts]);

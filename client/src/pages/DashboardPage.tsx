@@ -11,7 +11,7 @@ import {
 // API (Backend) ile iletişim kurmak için tanımladığımız fonksiyonları içeri aktarıyoruz.
 import { deleteLog, productImageUrl } from "../api";
 // Veritabanı sorgularını daha kolay yönetmek için React Query hook'larını içeri aktarıyoruz.
-import { queryKeys, useLogsQuery, useProductCacheSync, useProductsQuery } from "../queries";
+import { queryKeys, useLogsQuery, useProductsQuery } from "../queries";
 // Uygulamanın genel ayarlarını (dil, tema, bildirimler) almak için kullandığımız özel context.
 import { useApp } from "../context";
 // Çeviriler, class isimlerini birleştirme (cn) ve metin düzenleme (normalize) gibi yardımcı araçlar.
@@ -114,9 +114,6 @@ export default function DashboardPage() {
   const productsQuery = useProductsQuery();
   // API'den son 50 işlem kaydını (log) çekiyoruz
   const logsQuery = useLogsQuery(50);
-
-  // Başka sekmede veya cihazda ürün değişirse burayı otomatik güncellemek için arka plan senkronizasyonu
-  useProductCacheSync();
 
   // Çekilen verileri değişkene atıyoruz (Eğer henüz yükleniyorsa boş dizi [] atıyoruz)
   const products = productsQuery.data ?? [];
