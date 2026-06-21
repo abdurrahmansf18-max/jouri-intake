@@ -591,6 +591,8 @@ def _tags(product: Product) -> str:
         product.category,
         product.product_type,
         product.color_raw,
+        *_color_tags(product.color_raw),
+        *_age_tags(product),
         f"Season: {product.season}" if product.season else None,
         *(product.tags or []),
     ]
@@ -603,6 +605,153 @@ def _tags(product: Product) -> str:
         seen.add(value.lower())
         tags.append(value)
     return ", ".join(tags)
+
+
+def _color_tags(color_raw: str | None) -> list[str]:
+    colors = []
+    for part in re.split(r"[,/]+", color_raw or ""):
+        color = _normalize_color_tag(part)
+        if color and color not in colors:
+            colors.append(color)
+    return [f"Color: {color}" for color in colors]
+
+
+def _normalize_color_tag(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", (value or "").strip())
+    if not cleaned:
+        return ""
+    key = re.sub(r"[^a-z]+", " ", cleaned.lower()).strip()
+    if key in {"in image", "image", "unknown"}:
+        return ""
+
+    color_map = {
+        "grey": "Gray",
+        "gray": "Gray",
+        "navy blue": "Navy",
+        "dark blue with stripes": "Blue",
+        "green kiwi": "Kiwi",
+        "brown lace": "Brown",
+        "yellow lace": "Yellow",
+        "olive plaid": "Olive",
+        "soft peach": "Peach",
+    }
+    if key in color_map:
+        return color_map[key]
+
+    known = {
+        "beige": "Beige",
+        "black": "Black",
+        "blue": "Blue",
+        "brown": "Brown",
+        "burgundy": "Burgundy",
+        "caramel": "Caramel",
+        "coral": "Coral",
+        "fuchsia": "Fuchsia",
+        "gold": "Gold",
+        "green": "Green",
+        "honey": "Honey",
+        "kiwi": "Kiwi",
+        "lilac": "Lilac",
+        "maroon": "Maroon",
+        "melon": "Melon",
+        "navy": "Navy",
+        "olive": "Olive",
+        "orange": "Orange",
+        "pastel green": "Green",
+        "peach": "Peach",
+        "pink": "Pink",
+        "red": "Red",
+        "turquoise": "Turquoise",
+        "watermelon": "Watermelon",
+        "white": "White",
+        "yellow": "Yellow",
+    }
+    if key in known:
+        return known[key]
+
+    for token, label in known.items():
+        if re.search(rf"\b{re.escape(token)}\b", key):
+            return label
+    return ""
+
+
+def _age_tags(product: Product) -> list[str]:
+    groups = set()
+    sizes = _product_size_values(product)
+    context = " ".join([
+        product.category or "",
+        product.sizes_raw or "",
+        product.title_raw or "",
+        product.description or "",
+    ])
+    for size in sizes:
+        unit, start, end = _parse_age_size(size, context)
+        if not unit:
+            continue
+        if unit == "M":
+            if start <= 12:
+                groups.add("Age: 0-12 Months")
+            if end >= 12:
+                groups.add("Age: 1-3 Years")
+        elif unit == "Y":
+            if start <= 3 and end >= 1:
+                groups.add("Age: 1-3 Years")
+            if start <= 8 and end >= 4:
+                groups.add("Age: 4-8 Years")
+            if start <= 13 and end >= 9:
+                groups.add("Age: 9-13 Years")
+
+    order = [
+        "Age: 0-12 Months",
+        "Age: 1-3 Years",
+        "Age: 4-8 Years",
+        "Age: 9-13 Years",
+    ]
+    return [tag for tag in order if tag in groups]
+
+
+def _product_size_values(product: Product) -> list[str]:
+    values = []
+    for stock in product.size_stocks or []:
+        size = str((stock or {}).get("size") or "").strip()
+        if size:
+            values.append(size)
+    for size in re.split(r"[,/]+", product.sizes_raw or ""):
+        cleaned = size.strip()
+        if cleaned:
+            values.append(cleaned)
+    return values
+
+
+def _parse_age_size(size: str, context: str) -> tuple[str, float, float]:
+    cleaned = _clean_size_text(size)
+    cleaned = cleaned.replace("months", "m").replace("month", "m")
+    cleaned = cleaned.replace("years", "y").replace("year", "y")
+    cleaned = cleaned.replace("yrs", "y").replace("yr", "y")
+    cleaned = cleaned.replace("yas", "y").replace("yil", "y")
+    cleaned = re.sub(r"(?<=\d)\s+(?=[ym]\b)", "", cleaned)
+    cleaned = re.sub(r"(?<=\d)\.(?=\s*-)", "", cleaned)
+    cleaned = re.sub(r"(?<=-)\s*(\d+)\.", r"\1", cleaned)
+    context_key = _category_key(context)
+    default_unit = "M" if "baby" in context_key or "month" in context_key or re.search(r"\d+\s*m\b", cleaned) else "Y"
+
+    range_match = re.search(r"(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*([ym])?", cleaned)
+    single_match = re.search(r"(\d+(?:\.\d+)?)\s*([ym])?", cleaned)
+    if range_match:
+        start = float(range_match.group(1))
+        end = float(range_match.group(2))
+        unit = (range_match.group(3) or default_unit).upper()
+    elif single_match:
+        start = end = float(single_match.group(1))
+        unit = (single_match.group(2) or default_unit).upper()
+    else:
+        return "", 0, 0
+
+    if start > end:
+        start, end = end, start
+    if unit not in {"M", "Y"}:
+        return "", 0, 0
+    return unit, start, end
 
 
 def _price(amount: str) -> str:
