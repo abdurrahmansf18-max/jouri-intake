@@ -1,5 +1,6 @@
 import base64
 import html
+import json
 import os
 import re
 import time
@@ -91,6 +92,7 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
 
         refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
         category_result = await _sync_standard_category(session, credentials, product_id, product)
+        filter_result = await _sync_filter_metafields(session, credentials, product_id, product)
         image_result = await _upload_missing_images(session, credentials, product_id, refreshed["product"], product)
         final_product = await _request(session, credentials, "GET", f"products/{product_id}.json")
 
@@ -99,6 +101,7 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
             "created": created,
             "variants": variants_result,
             "category": category_result,
+            "filters": filter_result,
             "images": image_result,
         }
 
@@ -287,6 +290,59 @@ async def _sync_standard_category(
         "id": category.get("id") or category_id,
         "fullName": category.get("fullName") or "",
     }
+
+
+async def _sync_filter_metafields(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    shopify_product_id: str,
+    product: Product,
+) -> dict[str, Any]:
+    colors = _normalized_colors(product.color_raw)
+    if not colors:
+        return {"set": False, "reason": "no_color"}
+
+    mutation = """
+    mutation SetProductFilterMetafields($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields {
+          namespace
+          key
+          value
+        }
+        userErrors {
+          field
+          message
+          code
+        }
+      }
+    }
+    """
+    data = await _graphql_request(
+        session,
+        credentials,
+        mutation,
+        {
+            "metafields": [
+                {
+                    "ownerId": _shopify_product_gid(shopify_product_id),
+                    "namespace": "custom",
+                    "key": "filter_color",
+                    "type": "list.single_line_text_field",
+                    "value": json.dumps(colors),
+                }
+            ]
+        },
+    )
+    payload = (data.get("data") or {}).get("metafieldsSet") or {}
+    errors = payload.get("userErrors") or []
+    if errors:
+        message = "; ".join(
+            f"{'.'.join(map(str, err.get('field') or []))}: {err.get('message')}"
+            for err in errors
+        )
+        raise ShopifyPushError(f"Shopify filtre metafield kabul edilmedi: {message[:240]}")
+    return {"set": True, "colors": colors}
 
 
 def _standard_category_id(product: Product) -> str:
@@ -608,12 +664,16 @@ def _tags(product: Product) -> str:
 
 
 def _color_tags(color_raw: str | None) -> list[str]:
+    return [f"Color: {color}" for color in _normalized_colors(color_raw)]
+
+
+def _normalized_colors(color_raw: str | None) -> list[str]:
     colors = []
     for part in re.split(r"[,/]+", color_raw or ""):
         color = _normalize_color_tag(part)
         if color and color not in colors:
             colors.append(color)
-    return [f"Color: {color}" for color in colors]
+    return colors
 
 
 def _normalize_color_tag(value: str) -> str:
