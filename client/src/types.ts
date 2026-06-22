@@ -43,6 +43,8 @@ export interface SoldSizeEntry {
   size: string;
   soldAt: string;
   note: string;
+  source?: "manual" | "shopify" | string | null;
+  orderName?: string | null;
 }
 
 export interface SaleRecord {
@@ -50,13 +52,41 @@ export interface SaleRecord {
   quantity: number;
   size?: string | null;
   note: string;
+  source?: "manual" | "shopify" | string;
+  orderId?: string | null;
+  orderName?: string | null;
+  lineItemId?: string | null;
+}
+
+export interface ShopifyVariantLink {
+  size: string;
+  variantId: string;
+  inventoryItemId?: string | null;
+  sku?: string | null;
+}
+
+export interface ShopifyOrderHistoryEntry {
+  processedKey: string;
+  orderId: string;
+  orderName: string;
+  lineItemId: string;
+  variantId?: string | null;
+  size?: string | null;
+  quantity: number;
+  status: string;
+  message: string;
+  syncedAt: string;
 }
 
 export interface ShopifySyncInfo {
   productId?: string | null;
   handle?: string | null;
   syncedAt?: string | null;
+  lastInventorySyncAt?: string | null;
+  lastOrderSyncAt?: string | null;
   lastError?: string | null;
+  variants?: ShopifyVariantLink[];
+  orderHistory?: ShopifyOrderHistoryEntry[];
 }
 
 export interface ProductRecord {

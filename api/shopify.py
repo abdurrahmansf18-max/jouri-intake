@@ -100,10 +100,64 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
             "product": final_product["product"],
             "created": created,
             "variants": variants_result,
+            "variantLinks": variant_links_from_product(final_product["product"]),
             "category": category_result,
             "filters": filter_result,
             "images": image_result,
         }
+
+
+async def sync_existing_product_inventory(product: Product) -> dict[str, Any]:
+    """Update Shopify variant inventory for a product that is already linked."""
+    product_id = _stored_product_id(product)
+    if not product_id:
+        return {"skipped": True, "reason": "not_linked"}
+
+    config = _config()
+    timeout = aiohttp.ClientTimeout(total=120)
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        credentials = await _credentials(session, config)
+        existing_product = await _request(
+            session,
+            credentials,
+            "GET",
+            f"products/{product_id}.json",
+            allow_404=True,
+        )
+        if not existing_product:
+            raise ShopifyPushError("Shopify ürünü bulunamadı; stok senkronu yapılamadı.")
+
+        variants_result = await _sync_variants(
+            session,
+            credentials,
+            product_id,
+            existing_product["product"],
+            product,
+        )
+        refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
+        return {
+            "product": refreshed["product"],
+            "variants": variants_result,
+            "variantLinks": variant_links_from_product(refreshed["product"]),
+            "skipped": False,
+        }
+
+
+def variant_links_from_product(shopify_product: dict[str, Any]) -> list[dict[str, Any]]:
+    links: list[dict[str, Any]] = []
+    for variant in shopify_product.get("variants") or []:
+        size = str(variant.get("option1") or "One Size").strip() or "One Size"
+        variant_id = str(variant.get("id") or "").strip()
+        if not variant_id:
+            continue
+        links.append({
+            "size": size,
+            "variantId": variant_id,
+            "inventoryItemId": str(variant.get("inventory_item_id") or "").strip() or None,
+            "sku": str(variant.get("sku") or "").strip() or None,
+        })
+    return links
 
 
 def _config() -> ShopifyConfig:

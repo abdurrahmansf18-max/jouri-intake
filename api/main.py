@@ -8,6 +8,7 @@ import backup_routes
 import log_routes
 import parse_routes
 import product_routes
+import shopify_webhook_routes
 import startup_service
 
 
@@ -30,5 +31,6 @@ app.add_middleware(
 app.include_router(auth_routes.router)
 app.include_router(parse_routes.router)
 app.include_router(product_routes.router)
+app.include_router(shopify_webhook_routes.router)
 app.include_router(backup_routes.router)
 app.include_router(log_routes.router)

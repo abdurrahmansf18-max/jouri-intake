@@ -88,6 +88,9 @@ export const COPY = {
     logAddImages: (n: number) => `${n} görsel eklendi`,
     logAiGenerateImages: (n: number) => `${n} AI görsel eklendi`,
     logShopifyPush: "Shopify senkronu",
+    logShopifyStockSync: "Shopify stok senkronu",
+    logShopifyOrderSync: "Shopify siparişi işlendi",
+    logShopifyOrderSyncFailed: "Shopify sipariş senkron hatası",
     logResetSales: "Satış sıfırlandı",
     logUnknown: "İşlem yapıldı",
     // Pages
@@ -265,6 +268,11 @@ export const COPY = {
       ERR_SHOPIFY_CONFIG: "Shopify ayarları eksik. Store URL, Client ID, Client Secret ve izinler kontrol edilmeli.",
       ERR_SHOPIFY_FAILED: "Shopify gönderimi başarısız oldu.",
       ERR_SHOPIFY_STATUS_REQUIRED: "Shopify'a göndermek için ürün önce Yayınlandı durumunda olmalı.",
+      ERR_SHOPIFY_WEBHOOK_SECRET_MISSING: "Shopify webhook secret eksik. Sunucu ayarları kontrol edilmeli.",
+      ERR_SHOPIFY_WEBHOOK_SIGNATURE_MISSING: "Shopify webhook imzası eksik.",
+      ERR_SHOPIFY_WEBHOOK_SIGNATURE_INVALID: "Shopify webhook imzası geçersiz.",
+      ERR_SHOPIFY_WEBHOOK_INVALID_JSON: "Shopify webhook verisi okunamadı.",
+      ERR_SHOPIFY_ORDER_SYNC_FAILED: "Shopify sipariş senkronu başarısız oldu.",
       ERR_AI_IMAGE_NOT_CONFIGURED: "AI görsel sistemi henüz yapılandırılmamış. OPENAI_API_KEY eklenmeli.",
       ERR_AI_IMAGE_FAILED: "AI görsel üretimi başarısız oldu.",
       ERR_RATE_LIMITED: "Çok fazla deneme. Lütfen birkaç dakika bekle.",
@@ -454,7 +462,14 @@ export const COPY = {
     shopifyUpdateSuccess: "Shopify ürünü güncellendi.",
     shopifySynced: "Shopify eşleşmesi",
     shopifyLastSync: "Son Shopify senkronu",
+    shopifyLastInventorySync: "Son stok senkronu",
+    shopifyLastOrderSync: "Son sipariş senkronu",
     shopifyLastError: "Son Shopify hatası",
+    shopifyVariantLinks: "Shopify beden eşleşmeleri",
+    shopifyOrderHistory: "Shopify sipariş senkronları",
+    shopifyNoVariantLinks: "Varyant eşleşmesi henüz yok. Ürünü Shopify'da güncelle.",
+    saleSourceManual: "Panel",
+    saleSourceShopify: "Shopify",
     shopifyWillCreate: "Yeni taslak ürün oluşturulacak.",
     shopifyWillUpdate: "Mevcut Shopify taslağı güncellenecek.",
     shopifyImagesIncluded: (n: number) => `${n} AI görsel kontrol edilip eksikler yüklenecek`,
@@ -548,6 +563,9 @@ export const COPY = {
     logAddImages: (n: number) => `تمت إضافة ${n} صورة`,
     logAiGenerateImages: (n: number) => `تمت إضافة ${n} صورة بالذكاء الاصطناعي`,
     logShopifyPush: "مزامنة Shopify",
+    logShopifyStockSync: "مزامنة مخزون Shopify",
+    logShopifyOrderSync: "تمت معالجة طلب Shopify",
+    logShopifyOrderSyncFailed: "خطأ في مزامنة طلب Shopify",
     logResetSales: "تم تصفير المبيعات",
     logUnknown: "تمت العملية",
     // Pages
@@ -725,6 +743,11 @@ export const COPY = {
       ERR_SHOPIFY_CONFIG: "إعدادات Shopify ناقصة. تحققي من رابط المتجر و Client ID و Client Secret والصلاحيات.",
       ERR_SHOPIFY_FAILED: "فشل الإرسال إلى Shopify.",
       ERR_SHOPIFY_STATUS_REQUIRED: "يجب أن يكون المنتج في حالة منشور قبل إرساله إلى Shopify.",
+      ERR_SHOPIFY_WEBHOOK_SECRET_MISSING: "سر Webhook الخاص بـ Shopify غير موجود. يجب فحص إعدادات الخادم.",
+      ERR_SHOPIFY_WEBHOOK_SIGNATURE_MISSING: "توقيع Webhook من Shopify غير موجود.",
+      ERR_SHOPIFY_WEBHOOK_SIGNATURE_INVALID: "توقيع Webhook من Shopify غير صالح.",
+      ERR_SHOPIFY_WEBHOOK_INVALID_JSON: "تعذر قراءة بيانات Webhook من Shopify.",
+      ERR_SHOPIFY_ORDER_SYNC_FAILED: "فشلت مزامنة طلب Shopify.",
       ERR_AI_IMAGE_NOT_CONFIGURED: "نظام صور الذكاء الاصطناعي غير مفعّل بعد. يجب إضافة OPENAI_API_KEY.",
       ERR_AI_IMAGE_FAILED: "فشل إنشاء صور الذكاء الاصطناعي.",
       ERR_RATE_LIMITED: "محاولات كثيرة جداً. يرجى الانتظار بضع دقائق.",
@@ -914,7 +937,14 @@ export const COPY = {
     shopifyUpdateSuccess: "تم تحديث المنتج في Shopify.",
     shopifySynced: "ربط Shopify",
     shopifyLastSync: "آخر مزامنة Shopify",
+    shopifyLastInventorySync: "آخر مزامنة للمخزون",
+    shopifyLastOrderSync: "آخر مزامنة للطلب",
     shopifyLastError: "آخر خطأ Shopify",
+    shopifyVariantLinks: "ربط المقاسات في Shopify",
+    shopifyOrderHistory: "مزامنات طلبات Shopify",
+    shopifyNoVariantLinks: "لا يوجد ربط للمتغيرات بعد. حدّثي المنتج في Shopify.",
+    saleSourceManual: "اللوحة",
+    saleSourceShopify: "Shopify",
     shopifyWillCreate: "سيتم إنشاء مسودة منتج جديدة.",
     shopifyWillUpdate: "سيتم تحديث مسودة Shopify الحالية.",
     shopifyImagesIncluded: (n: number) => `سيتم فحص ${n} صورة AI ورفع الصور الناقصة`,
@@ -1126,6 +1156,10 @@ export function logActionLabel(action: string, locale: Locale, details?: Record<
     }
     case "mark_ai_image": return (t as any).logMarkAiImage || "AI Marked";
     case "shopify_push": return t.logShopifyPush;
+    case "shopify_stock_sync": return (t as any).logShopifyStockSync || t.logShopifyPush;
+    case "shopify_stock_sync_failed": return (t as any).logShopifyStockSync || t.logShopifyPush;
+    case "shopify_order_sync": return (t as any).logShopifyOrderSync || t.logShopifyPush;
+    case "shopify_order_sync_failed": return (t as any).logShopifyOrderSyncFailed || t.logShopifyPush;
     case "reset_sales": return t.logResetSales;
     default: return t.logUnknown;
   }

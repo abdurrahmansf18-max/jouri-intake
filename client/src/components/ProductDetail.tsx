@@ -745,6 +745,28 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <span>{new Date(record.shopify.syncedAt).toLocaleString(dateLocale)}</span>
                     </InfoRow>}
 
+                    {record.shopify?.lastInventorySyncAt && <InfoRow label={(t as any).shopifyLastInventorySync} s={s}>
+                      <span>{new Date(record.shopify.lastInventorySyncAt).toLocaleString(dateLocale)}</span>
+                    </InfoRow>}
+
+                    {record.shopify?.lastOrderSyncAt && <InfoRow label={(t as any).shopifyLastOrderSync} s={s}>
+                      <span>{new Date(record.shopify.lastOrderSyncAt).toLocaleString(dateLocale)}</span>
+                    </InfoRow>}
+
+                    {shopifySynced && <InfoRow label={(t as any).shopifyVariantLinks} s={s}>
+                      {(record.shopify?.variants ?? []).length > 0 ? (
+                        <span className="flex flex-wrap gap-1.5">
+                          {(record.shopify?.variants ?? []).map((variant) => (
+                            <span key={`${variant.variantId}-${variant.size}`} className={cn("rounded-md border px-2 py-0.5 text-[10px] font-bold", s.panelBorder)} dir="ltr">
+                              {variant.size}: #{variant.variantId}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className={cn("text-xs", s.muted)}>{(t as any).shopifyNoVariantLinks}</span>
+                      )}
+                    </InfoRow>}
+
                     {record.shopify?.lastError && <InfoRow label={t.shopifyLastError} s={s}>
                       <span className="text-red-400" dir="auto">{record.shopify.lastError}</span>
                     </InfoRow>}
@@ -1036,8 +1058,50 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                                 </span>
                               </>
                             )}
+                            <span className="text-violet-400">·</span>
+                            <span className={cn("rounded-md px-1.5 py-0.5 text-[10px]", sale.source === "shopify" ? "bg-emerald-400/10 text-emerald-400" : "bg-violet-400/10 text-violet-400")}>
+                              {sale.source === "shopify" ? (t as any).saleSourceShopify : (t as any).saleSourceManual}
+                            </span>
+                            {sale.orderName && (
+                              <>
+                                <span className="text-violet-400">·</span>
+                                <span dir="ltr">{sale.orderName}</span>
+                              </>
+                            )}
                           </div>
                           {sale.note && <div className={cn("mt-0.5", s.muted)} dir="auto">{sale.note}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {(record.shopify?.orderHistory ?? []).length > 0 && (
+                  <section className={cn("rounded-xl border p-4", s.subPanel)}>
+                    <h3 className={cn("mb-3 text-sm font-extrabold", s.title)}>{(t as any).shopifyOrderHistory}</h3>
+                    <div className="grid gap-2">
+                      {[...(record.shopify?.orderHistory ?? [])].reverse().slice(0, 8).map((entry) => (
+                        <div key={entry.processedKey} className={cn("rounded-lg border px-3 py-2 text-xs", s.panelBorder)}>
+                          <div className={cn("flex flex-wrap items-center gap-1 font-extrabold", s.title)}>
+                            <span dir="ltr">{entry.orderName || entry.orderId}</span>
+                            <span className="text-violet-400">·</span>
+                            <span>{entry.quantity} {t.soldQuantity.toLowerCase()}</span>
+                            {entry.size && (
+                              <>
+                                <span className="text-violet-400">·</span>
+                                <span className="inline-flex items-center gap-0.5 text-sky-400">
+                                  <Ruler className="size-2.5" />{entry.size}
+                                </span>
+                              </>
+                            )}
+                            <span className={cn("rounded-md px-1.5 py-0.5 text-[10px]", entry.status === "synced" ? "bg-emerald-400/10 text-emerald-400" : entry.status === "partial" ? "bg-amber-400/10 text-amber-400" : "bg-red-400/10 text-red-400")}>
+                              {entry.status}
+                            </span>
+                          </div>
+                          <div className={cn("mt-0.5", s.muted)} dir="auto">
+                            {new Date(entry.syncedAt).toLocaleString(dateLocale)}
+                            {entry.message ? ` · ${entry.message}` : ""}
+                          </div>
                         </div>
                       ))}
                     </div>

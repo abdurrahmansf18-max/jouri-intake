@@ -34,7 +34,11 @@ class Product(Base):
     shopify_product_id = Column(String, nullable=True)
     shopify_product_handle = Column(String, nullable=True)
     shopify_synced_at = Column(DateTime(timezone=True), nullable=True)
+    shopify_last_inventory_sync_at = Column(DateTime(timezone=True), nullable=True)
+    shopify_last_order_sync_at = Column(DateTime(timezone=True), nullable=True)
     shopify_last_error = Column(Text, nullable=True)
+    shopify_variants = Column(JSON, nullable=True, default=None)
+    shopify_order_history = Column(JSON, nullable=True, default=None)
 
 
 class ActivityLog(Base):

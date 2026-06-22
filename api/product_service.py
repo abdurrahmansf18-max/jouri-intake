@@ -54,7 +54,11 @@ def to_record(p: Product) -> ProductRecord:
             productId=p.shopify_product_id,
             handle=p.shopify_product_handle,
             syncedAt=p.shopify_synced_at.isoformat() if p.shopify_synced_at else None,
+            lastInventorySyncAt=p.shopify_last_inventory_sync_at.isoformat() if p.shopify_last_inventory_sync_at else None,
+            lastOrderSyncAt=p.shopify_last_order_sync_at.isoformat() if p.shopify_last_order_sync_at else None,
             lastError=p.shopify_last_error,
+            variants=list(p.shopify_variants or []),
+            orderHistory=list(p.shopify_order_history or []),
         ),
     )
 

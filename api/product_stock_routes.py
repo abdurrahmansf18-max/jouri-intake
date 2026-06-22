@@ -17,6 +17,7 @@ from models import (
     SellProductRequest,
 )
 from realtime import ws_manager
+from shopify_stock_sync import queue_shopify_stock_sync
 
 
 router = APIRouter()
@@ -60,6 +61,7 @@ def sell_product(
                 "size": body.size,
                 "soldAt": now.isoformat(),
                 "note": (body.note or "").strip(),
+                "source": "manual",
             })
             p.sold_sizes = sold_sizes_list
     else:
@@ -76,6 +78,7 @@ def sell_product(
             "quantity": sold_amount,
             "size": body.size or "",
             "note": (body.note or "").strip(),
+            "source": "manual",
         }
     ]
     p.sale_history = new_history[-200:]  # son 200 satış kaydını tut
@@ -93,12 +96,13 @@ def sell_product(
         db, "sell",
         product_id=p.id,
         product_title=p.title_raw,
-        details={"quantity": sold_amount, "note": body.note or ""},
+        details={"quantity": sold_amount, "size": body.size or "", "note": body.note or ""},
     )
     db.commit()
     db.refresh(p)
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    queue_shopify_stock_sync(background_tasks, p.id, "sell", p.shopify_product_id)
     return record
 
 
@@ -132,6 +136,8 @@ def reset_sales(
     db.refresh(p)
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    if body.stockQuantity is not None:
+        queue_shopify_stock_sync(background_tasks, p.id, "reset_sales", p.shopify_product_id)
     return record
 
 
@@ -172,6 +178,7 @@ def restore_product(
     db.refresh(p)
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    queue_shopify_stock_sync(background_tasks, p.id, "restore_product", p.shopify_product_id)
     return record
 
 
@@ -224,4 +231,5 @@ def restore_product_size(
     db.refresh(p)
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    queue_shopify_stock_sync(background_tasks, p.id, "restore_size", p.shopify_product_id)
     return record

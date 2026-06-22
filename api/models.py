@@ -19,6 +19,8 @@ class SoldSizeEntry(BaseModel):
     size: str
     soldAt: str
     note: str = ""
+    source: Optional[str] = None
+    orderName: Optional[str] = None
 
 
 class ParsedProduct(BaseModel):
@@ -48,6 +50,30 @@ class SaleRecord(BaseModel):
     quantity: int = 1
     size: Optional[str] = None
     note: str = ""
+    source: str = "manual"
+    orderId: Optional[str] = None
+    orderName: Optional[str] = None
+    lineItemId: Optional[str] = None
+
+
+class ShopifyVariantLink(BaseModel):
+    size: str
+    variantId: str
+    inventoryItemId: Optional[str] = None
+    sku: Optional[str] = None
+
+
+class ShopifyOrderHistoryEntry(BaseModel):
+    processedKey: str
+    orderId: str
+    orderName: str = ""
+    lineItemId: str
+    variantId: Optional[str] = None
+    size: Optional[str] = None
+    quantity: int = 0
+    status: str = "synced"
+    message: str = ""
+    syncedAt: str
 
 
 class ImageFolder(BaseModel):
@@ -64,7 +90,11 @@ class ShopifySyncInfo(BaseModel):
     productId: Optional[str] = None
     handle: Optional[str] = None
     syncedAt: Optional[str] = None
+    lastInventorySyncAt: Optional[str] = None
+    lastOrderSyncAt: Optional[str] = None
     lastError: Optional[str] = None
+    variants: list[ShopifyVariantLink] = Field(default_factory=list)
+    orderHistory: list[ShopifyOrderHistoryEntry] = Field(default_factory=list)
 
 
 class ProductRecord(BaseModel):

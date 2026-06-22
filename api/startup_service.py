@@ -59,13 +59,10 @@ def _import_from_filesystem(db: Session) -> int:
                         last_sold = datetime.fromisoformat(last_sold_raw)
                     except ValueError:
                         pass
-                shopify_raw = (data.get("shopify") or {}).get("syncedAt")
-                shopify_synced = None
-                if shopify_raw:
-                    try:
-                        shopify_synced = datetime.fromisoformat(shopify_raw)
-                    except ValueError:
-                        pass
+                shopify_data = data.get("shopify") or {}
+                shopify_synced = _parse_datetime(shopify_data.get("syncedAt"))
+                shopify_inventory_synced = _parse_datetime(shopify_data.get("lastInventorySyncAt"))
+                shopify_order_synced = _parse_datetime(shopify_data.get("lastOrderSyncAt"))
                 created_raw = data.get("createdAt", "")
                 try:
                     created_at = datetime.fromisoformat(created_raw)
@@ -94,16 +91,29 @@ def _import_from_filesystem(db: Session) -> int:
                     tags=parsed.get("tags", []),
                     images=data.get("images", []),
                     sale_history=data.get("saleHistory", []),
-                    shopify_product_id=(data.get("shopify") or {}).get("productId"),
-                    shopify_product_handle=(data.get("shopify") or {}).get("handle"),
+                    shopify_product_id=shopify_data.get("productId"),
+                    shopify_product_handle=shopify_data.get("handle"),
                     shopify_synced_at=shopify_synced,
-                    shopify_last_error=(data.get("shopify") or {}).get("lastError"),
+                    shopify_last_inventory_sync_at=shopify_inventory_synced,
+                    shopify_last_order_sync_at=shopify_order_synced,
+                    shopify_last_error=shopify_data.get("lastError"),
+                    shopify_variants=shopify_data.get("variants", []),
+                    shopify_order_history=shopify_data.get("orderHistory", []),
                 )
                 db.add(product)
                 imported += 1
             except Exception as exc:
                 print(f"[startup] Skipping {entry.name}: {exc}")
     return imported
+
+
+def _parse_datetime(value: str | None):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _migrate_size_stocks() -> None:
@@ -117,7 +127,11 @@ def _migrate_size_stocks() -> None:
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_product_id VARCHAR"))
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_product_handle VARCHAR"))
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_synced_at TIMESTAMP WITH TIME ZONE"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_last_inventory_sync_at TIMESTAMP WITH TIME ZONE"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_last_order_sync_at TIMESTAMP WITH TIME ZONE"))
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_last_error TEXT"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_variants JSON"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_order_history JSON"))
         db.commit()
 
         products = db.query(Product).filter(Product.size_stocks == None).all()  # noqa: E711

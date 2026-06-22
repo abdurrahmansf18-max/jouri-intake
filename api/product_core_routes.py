@@ -26,6 +26,7 @@ from models import (
 )
 from parser import normalize_category, normalize_product_type, normalize_season, parse_description
 from realtime import ws_manager
+from shopify_stock_sync import queue_shopify_stock_sync
 
 
 router = APIRouter()
@@ -234,6 +235,8 @@ def update_status(
     db.refresh(p)
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    if new_status == "sold_archive" or old_status == "sold_archive":
+        queue_shopify_stock_sync(background_tasks, p.id, "status_change", p.shopify_product_id)
     return record
 
 
@@ -258,6 +261,7 @@ def update_product(
     db: Session = Depends(get_db),
 ):
     p = product_service.get_or_404(db, product_id)
+    stock_changed = False
 
     # Değişiklikleri takip et
     changes: dict[str, dict] = {}
@@ -274,6 +278,7 @@ def update_product(
         p.notes = body.notes
     if body.sizeStocks is not None:
         new_ss = [ss.model_dump() for ss in body.sizeStocks]
+        stock_changed = True
         p.size_stocks = new_ss
         new_total = sum(ss.qty for ss in body.sizeStocks)
         track("stock", p.stock_quantity, new_total)
@@ -281,6 +286,7 @@ def update_product(
         p.sizes_raw = ", ".join(ss.size for ss in body.sizeStocks if ss.size)
     elif body.stockQuantity is not None:
         track("stock", p.stock_quantity, max(0, int(body.stockQuantity)))
+        stock_changed = True
         p.stock_quantity = max(0, int(body.stockQuantity))
     if body.parsed:
         pd = body.parsed
@@ -318,6 +324,8 @@ def update_product(
     db.refresh(p)
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    if stock_changed:
+        queue_shopify_stock_sync(background_tasks, p.id, "stock_update", p.shopify_product_id)
     return record
 
 
@@ -451,6 +459,8 @@ async def push_product_to_shopify(
         p.shopify_product_id = str(shopify_product.get("id") or "")
         p.shopify_product_handle = shopify_product.get("handle") or ""
         p.shopify_synced_at = datetime.now(timezone.utc)
+        p.shopify_last_inventory_sync_at = p.shopify_synced_at
+        p.shopify_variants = res.get("variantLinks") or []
         p.shopify_last_error = None
         activity_logger.log(
             db,
@@ -585,6 +595,8 @@ async def _bulk_push_to_shopify_impl(
             p.shopify_product_id = str(shopify_product.get("id") or "")
             p.shopify_product_handle = str(shopify_product.get("handle") or "")
             p.shopify_synced_at = datetime.now(timezone.utc)
+            p.shopify_last_inventory_sync_at = p.shopify_synced_at
+            p.shopify_variants = res.get("variantLinks") or []
             p.shopify_last_error = None
 
             activity_logger.log(
