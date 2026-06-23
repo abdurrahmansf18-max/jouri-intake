@@ -357,6 +357,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   function openAiImagePanel(img: SavedImage) {
     const sizeText = aiImageSizeText(record);
     setAiImageSource(img);
+    setManualAiPrompts(null);
     setAiImageForm({
       gender: inferAiAudience(record),
       age: inferAiAgeFromSizes(sizeText),
@@ -1315,26 +1316,26 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <div className="grid gap-2 sm:grid-cols-3">
                         <input
                           value={aiImageForm.gender}
-                          onChange={(e) => setAiImageForm((v) => ({ ...v, gender: e.target.value }))}
+                          onChange={(e) => { setManualAiPrompts(null); setAiImageForm((v) => ({ ...v, gender: e.target.value })); }}
                           placeholder={t.aiImageGenderPlaceholder}
                           className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
                         />
                         <input
                           value={aiImageForm.age}
-                          onChange={(e) => setAiImageForm((v) => ({ ...v, age: e.target.value }))}
+                          onChange={(e) => { setManualAiPrompts(null); setAiImageForm((v) => ({ ...v, age: e.target.value })); }}
                           placeholder={t.aiImageAgePlaceholder}
                           className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
                         />
                         <input
                           value={aiImageForm.size}
-                          onChange={(e) => setAiImageForm((v) => ({ ...v, size: e.target.value }))}
+                          onChange={(e) => { setManualAiPrompts(null); setAiImageForm((v) => ({ ...v, size: e.target.value })); }}
                           placeholder={t.aiImageSizePlaceholder}
                           className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
                         />
                       </div>
                       <textarea
                         value={aiImageForm.instructions}
-                        onChange={(e) => setAiImageForm((v) => ({ ...v, instructions: e.target.value }))}
+                        onChange={(e) => { setManualAiPrompts(null); setAiImageForm((v) => ({ ...v, instructions: e.target.value })); }}
                         placeholder={t.aiImageInstructionsPlaceholder}
                         className={cn("min-h-20 rounded-xl border px-3 py-2 text-sm leading-6 outline-none focus:ring-4", s.input)}
                         dir="auto"
@@ -1361,53 +1362,16 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           
                           <div className="grid gap-1">
                             <div className="flex items-center justify-between">
-                              <span className={cn("text-[10px] font-bold", s.muted)}>{(t as any).aiManualContext}</span>
-                              <button type="button" onClick={() => handleCopy(manualAiPrompts.productContext)}
+                              <span className={cn("text-[10px] font-bold", s.muted)}>
+                                {(t as any).aiManualMasterPrompt || "Master prompt"}
+                              </span>
+                              <button type="button" onClick={() => handleCopy(manualAiPrompts.masterPrompt || "")}
                                 className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
                                 <Copy className="size-3" /> {(t as any).btnCopy}
                               </button>
                             </div>
-                            <div className="max-h-24 overflow-y-auto rounded bg-black/10 p-2 text-[10px] font-mono whitespace-pre-wrap select-all">
-                              {manualAiPrompts.productContext}
-                            </div>
-                          </div>
-
-                          <div className="grid gap-1">
-                            <div className="flex items-center justify-between">
-                              <span className={cn("text-[10px] font-bold", s.muted)}>{(t as any).aiManualWorn}</span>
-                              <button type="button" onClick={() => handleCopy(manualAiPrompts.wornPrompt)}
-                                className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
-                                <Copy className="size-3" /> {(t as any).btnCopy}
-                              </button>
-                            </div>
-                            <div className="max-h-24 overflow-y-auto rounded bg-black/10 p-2 text-[10px] font-mono whitespace-pre-wrap select-all">
-                              {manualAiPrompts.wornPrompt}
-                            </div>
-                          </div>
-
-                          <div className="grid gap-1">
-                            <div className="flex items-center justify-between">
-                              <span className={cn("text-[10px] font-bold", s.muted)}>{(t as any).aiManualStudio}</span>
-                              <button type="button" onClick={() => handleCopy(manualAiPrompts.studioPrompt)}
-                                className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
-                                <Copy className="size-3" /> {(t as any).btnCopy}
-                              </button>
-                            </div>
-                            <div className="max-h-24 overflow-y-auto rounded bg-black/10 p-2 text-[10px] font-mono whitespace-pre-wrap select-all">
-                              {manualAiPrompts.studioPrompt}
-                            </div>
-                          </div>
-
-                          <div className="grid gap-1">
-                            <div className="flex items-center justify-between">
-                              <span className={cn("text-[10px] font-bold", s.muted)}>{(t as any).aiManualClean}</span>
-                              <button type="button" onClick={() => handleCopy(manualAiPrompts.cleanOriginalPrompt)}
-                                className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
-                                <Copy className="size-3" /> {(t as any).btnCopy}
-                              </button>
-                            </div>
-                            <div className="max-h-24 overflow-y-auto rounded bg-black/10 p-2 text-[10px] font-mono whitespace-pre-wrap select-all">
-                              {manualAiPrompts.cleanOriginalPrompt}
+                            <div className="max-h-72 overflow-y-auto rounded bg-black/10 p-3 text-[10px] font-mono leading-5 whitespace-pre-wrap select-all">
+                              {manualAiPrompts.masterPrompt}
                             </div>
                           </div>
                         </div>

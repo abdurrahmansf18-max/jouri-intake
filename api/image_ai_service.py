@@ -164,6 +164,55 @@ Strict rules:
 """.strip()
 
 
+def _manual_master_prompt(product: Any, request: AiImageGenerateRequest) -> str:
+    context = _product_context(product, request)
+    scene = _scene_guidance(product, request)
+    extra_context = "\n".join(
+        part for part in [
+            f"Season: {_value(product, 'season')}" if _value(product, "season") else "",
+            f"Description: {_value(product, 'description')}" if _value(product, "description") else "",
+            f"Internal notes: {_value(product, 'notes')}" if _value(product, "notes") else "",
+        ] if part
+    )
+
+    return f"""
+Use the uploaded product photo as the only visual source of truth. Create 3 separate ecommerce-ready images for the same product.
+
+Product context:
+{context}
+{extra_context}
+
+General scene guidance:
+{scene}
+
+Create exactly these 3 outputs:
+
+1. Lifestyle worn image
+- Show the same clothing worn by an age-appropriate child/person based on the product context.
+- Use a realistic, bright, clean ecommerce lifestyle setting.
+- Keep the model fully clothed, natural, and appropriate for the stated age/size.
+
+2. Studio product presentation
+- Show the most visible/important garment piece or pieces on a hanger or neat studio flat-lay.
+- If the product is a set, include matching pieces only when they are clearly visible in the source photo.
+- Use a simple neutral studio background with soft, clean lighting.
+- No person and no mannequin body.
+
+3. Clean original-style ecommerce image
+- Keep the original product arrangement and camera viewpoint recognizable.
+- Improve only presentation quality: cleaner lighting, sharper details, balanced crop, tidier background, and natural color accuracy.
+- Do not add a model, hanger, mannequin, accessories, labels, or extra objects.
+
+Strict rules for all 3 outputs:
+- Preserve the actual product exactly: colors, fabric texture, printed graphics, logo/text, patterns, buttons, trim, seams, and number of visible clothing pieces.
+- Do not invent new colors, slogans, logos, accessories, extra garments, or different styling.
+- Do not change the product type, fit, included pieces, graphics, or visible details.
+- No watermark, no price text, no promotional text, no fake brand labels.
+- The final images must feel honest and suitable for a European baby and kids clothing ecommerce store.
+- If any detail is unclear in the source image, keep it simple and avoid guessing.
+""".strip()
+
+
 def _size_stock_text(product: Any) -> str:
     size_stocks = _value(product, "size_stocks")
     if not size_stocks:
@@ -325,10 +374,8 @@ def _brief_error(exc: Exception) -> str:
     return text[:300] or exc.__class__.__name__
 
 def get_prompt_previews(product: Any, request: AiImageGenerateRequest) -> dict[str, str]:
-    """Returns the generated prompts that would be sent to the AI service."""
+    """Returns a single copy-ready prompt for manual AI image generation."""
     return {
         "productContext": _product_context(product, request),
-        "wornPrompt": _worn_prompt(product, request),
-        "studioPrompt": _studio_prompt(product, request),
-        "cleanOriginalPrompt": _clean_original_prompt(product, request),
+        "masterPrompt": _manual_master_prompt(product, request),
     }
