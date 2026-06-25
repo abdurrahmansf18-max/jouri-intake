@@ -133,16 +133,19 @@ def _studio_prompt(product: Any, request: AiImageGenerateRequest) -> str:
     context = _product_context(product, request)
     return f"""
 Use the uploaded product photo as the source of truth for the clothing.
-Create a clean ecommerce product presentation of the most visible/important garment piece or pieces, displayed on a hanger or neat studio flat-lay.
+Create a clean, modern ecommerce product presentation of the same garment displayed on a natural wooden clothing hanger.
 
 Product context:
 {context}
 
 Strict rules:
 - Preserve the actual product: colors, fabric look, printed graphics, logo/text, patterns, buttons, trim, and number of visible clothing pieces when they are clear.
-- If multiple pieces are shown, feature the clearest main piece and include matching pieces only when they are visibly part of the same set.
+- The natural wooden hanger is mandatory. Do not use plastic, metal, padded, wire, or invisible hangers, and do not use a flat-lay.
+- Use the correct wooden hanger for the garment: a child-sized shoulder hanger for tops, dresses, jackets, rompers, and jumpsuits; a wooden trouser hanger with discreet clips for pants, shorts, or skirts.
+- If the product is a multi-piece set, show every clearly included piece on its own matching wooden hanger and arrange the hangers together as one coordinated product presentation.
+- Hang the garment naturally without stretching, reshaping, shortening, widening, or hiding important details. Clips and hanger parts must not cover prints, logos, closures, trims, or construction details.
 - Do not invent new colors, slogans, logos, accessories, or extra garments.
-- Use a simple neutral studio background with good lighting.
+- Use a modern, uncluttered boutique or neutral studio background with soft natural lighting and accurate product color.
 - No person, no mannequin body, no watermark, no price text, no promotional text.
 """.strip()
 
@@ -168,7 +171,7 @@ Strict rules:
 def _manual_master_prompt(product: Any, request: AiImageGenerateRequest) -> str:
     context = _product_context(product, request)
     lifestyle_scene = _scene_guidance(product, request)
-    product_scene = _styled_product_scene_guidance(product, request)
+    hanger_scene = _wooden_hanger_scene_guidance(product, request)
     extra_context = "\n".join(
         part for part in [
             f"Season: {_value(product, 'season')}" if _value(product, "season") else "",
@@ -199,12 +202,15 @@ Create exactly these 3 outputs:
 - Keep the model fully clothed, natural, and appropriate for the stated age/size.
 - Keep the clothing clearly visible and make it the main subject.
 
-2. Styled product-only editorial image
-- Show the garment without a person in a realistic scene selected for this exact clothing type.
-- Use this product-specific presentation guidance: {product_scene}
-- If the product is a set, include matching pieces only when they are clearly visible in the source photo.
-- Do not default to a wooden hanger. Use a hanger only when it genuinely suits the product; otherwise use an appropriate styled flat-lay, folded display, clean bench, shelf, pedestal, textile surface, or boutique setting.
-- No person, mannequin body, or unrelated decorative clutter.
+2. Mandatory natural wooden-hanger product image
+- Show the garment without a person, displayed on a modern natural wooden clothing hanger. The wooden hanger is required and is not optional.
+- Use this product-specific hanger guidance: {hanger_scene}
+- Use the correct wooden hanger for the garment: a child-sized shoulder hanger for tops, dresses, jackets, rompers, and jumpsuits; a wooden trouser hanger with discreet clips for pants, shorts, or skirts.
+- If the product is a multi-piece set, show every clearly included piece on its own matching wooden hanger and arrange the hangers together as one coordinated product presentation.
+- Do not use plastic, metal, padded, wire, or invisible hangers. Do not use a flat-lay, folded display, mannequin, model, shelf-only display, or pedestal-only display.
+- Hang the clothing naturally. Do not stretch, reshape, shorten, widen, tighten, or hide any part of the product. The hanger and clips must not cover prints, logos, buttons, zippers, trims, seams, or other important details.
+- Use a modern, uncluttered boutique or neutral studio background with soft natural lighting, accurate colors, and realistic shadows.
+- No person, mannequin body, unrelated props, or decorative clutter.
 
 3. Premium catalogue and detail image
 - Create a clean ecommerce catalogue view that is visibly different from outputs 1 and 2.
@@ -371,7 +377,7 @@ def _scene_guidance(product: Any, request: AiImageGenerateRequest) -> str:
     )
 
 
-def _styled_product_scene_guidance(product: Any, request: AiImageGenerateRequest) -> str:
+def _wooden_hanger_scene_guidance(product: Any, request: AiImageGenerateRequest) -> str:
     text = " ".join(
         str(value or "")
         for value in [
@@ -386,38 +392,37 @@ def _styled_product_scene_guidance(product: Any, request: AiImageGenerateRequest
 
     if any(term in text for term in ["pajama", "pyjama", "sleep", "nightwear", "homewear", "بيجاما", "بجاما"]):
         return (
-            "Use a calm, daylit children's bedroom scene with the garment neatly styled on soft bedding "
-            "or a clean upholstered bench. Keep the presentation cozy but uncluttered."
+            "Hang each clearly included sleepwear piece on a matching natural wooden hanger against a calm, "
+            "daylit children's bedroom or boutique background. Keep the complete set visible and uncluttered."
         )
     if any(term in text for term in ["baby", "newborn", "infant", "bodysuit", "onesie", "romper", "بيبي", "رضيع", "افرول"]):
         return (
-            "Use a bright nursery or baby boutique setting with the garment safely arranged on a clean "
-            "padded textile surface, changing-table mat, shelf, or small pedestal."
+            "Use a small child-sized natural wooden shoulder hanger in a bright nursery or baby boutique setting. "
+            "Support the garment naturally so its real shape, fastening, legs, and sleeves remain clearly visible."
         )
     if any(term in text for term in ["set", "suit", "tracksuit", "two-piece", "three-piece", "طقم", "بدلة"]):
         return (
-            "Use a coordinated editorial flat-lay or low pedestal in a bright studio or boutique, arranging "
-            "every clearly included piece so the complete set is easy to understand."
+            "Place every clearly included garment piece on its own matching natural wooden hanger, using wooden "
+            "clip hangers for lower garments. Arrange all hangers together so the complete set is immediately clear."
         )
     if any(term in text for term in ["coat", "jacket", "vest", "outerwear", "winter", "parka", "معطف", "جاكيت", "سترة"]):
         return (
-            "Use a clean boutique entryway or wardrobe scene with the garment displayed on a bench, "
-            "pedestal, or suitable clothing stand. A hanger is optional, not required."
+            "Use a sturdy child-sized natural wooden shoulder hanger in a clean boutique wardrobe setting. "
+            "Keep the outerwear's true shoulders, length, volume, closures, and lining details visible."
         )
     if any(term in text for term in ["dress", "skirt", "دريس", "فستان", "تنورة"]):
         return (
-            "Use an elegant children's boutique or softly lit dressing-room scene, presenting the garment "
-            "on a clean pedestal, fabric-covered display surface, or tasteful clothing stand."
+            "Use an elegant child-sized natural wooden shoulder hanger for a dress, or a wooden clip hanger for "
+            "a skirt, in a softly lit children's boutique. Preserve the real drape, length, waist, and silhouette."
         )
     if any(term in text for term in ["short", "t-shirt", "shirt", "summer", "pants", "jeans", "شورت", "تيشيرت", "بنطلون"]):
         return (
-            "Use a bright lifestyle product scene on a clean bench, low display table, folded textile, "
-            "or minimal boutique shelf with natural daylight and a fresh everyday mood."
+            "Use a child-sized natural wooden shoulder hanger for the top and a matching wooden clip hanger for "
+            "pants, jeans, shorts, or skirts. Present the garment in a bright modern boutique with natural daylight."
         )
     return (
-        "Choose a realistic boutique or natural-light studio scene that matches the garment type. Present "
-        "the product on a clean surface, bench, shelf, pedestal, styled flat-lay, or suitable stand; do not "
-        "default to a wooden hanger."
+        "Use a child-sized natural wooden hanger that correctly supports this garment type. Present it in a "
+        "modern boutique or natural-light studio without changing its real proportions, drape, or visible details."
     )
 
 
