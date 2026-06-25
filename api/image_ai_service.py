@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
-from openai import AsyncOpenAI
+from openai import APIConnectionError, APIStatusError, AsyncOpenAI, AuthenticationError, RateLimitError
 
 from models import AiImageGenerateRequest
 
@@ -61,7 +61,8 @@ async def generate_product_images(
             raise
         except Exception as exc:
             print("[image_ai] OpenAI image generation failed:", _brief_error(exc))
-            raise HTTPException(status_code=502, detail={"code": "ERR_AI_IMAGE_FAILED"})
+            status_code, error_code = _classify_openai_error(exc)
+            raise HTTPException(status_code=status_code, detail={"code": error_code}) from exc
 
         if not response.data:
             raise HTTPException(status_code=502, detail={"code": "ERR_AI_IMAGE_FAILED"})
@@ -166,7 +167,8 @@ Strict rules:
 
 def _manual_master_prompt(product: Any, request: AiImageGenerateRequest) -> str:
     context = _product_context(product, request)
-    scene = _scene_guidance(product, request)
+    lifestyle_scene = _scene_guidance(product, request)
+    product_scene = _styled_product_scene_guidance(product, request)
     extra_context = "\n".join(
         part for part in [
             f"Season: {_value(product, 'season')}" if _value(product, "season") else "",
@@ -176,32 +178,39 @@ def _manual_master_prompt(product: Any, request: AiImageGenerateRequest) -> str:
     )
 
     return f"""
-Use the uploaded product photo as the only visual source of truth. Create 3 separate ecommerce-ready images for the same product.
+Use the uploaded product photo as the only visual source of truth. Create exactly 3 separate, ecommerce-ready image files for the same product.
+
+Output contract:
+- Return three independent images, not one combined image.
+- Do not create a collage, triptych, contact sheet, grid, split screen, before-and-after layout, or image containing multiple numbered panels.
+- Each output must use a clearly different setting, composition, camera distance, and presentation style.
+- Use the uploaded product photo as the reference for every output.
 
 Product context:
 {context}
 {extra_context}
 
-General scene guidance:
-{scene}
-
 Create exactly these 3 outputs:
 
 1. Lifestyle worn image
 - Show the same clothing worn by an age-appropriate child/person based on the product context.
-- Use a realistic, bright, clean ecommerce lifestyle setting.
+- Use this product-specific setting guidance: {lifestyle_scene}
+- Show a natural everyday moment rather than a stiff catalogue pose.
 - Keep the model fully clothed, natural, and appropriate for the stated age/size.
+- Keep the clothing clearly visible and make it the main subject.
 
-2. Studio product presentation
-- Show the most visible/important garment piece or pieces on a hanger or neat studio flat-lay.
+2. Styled product-only editorial image
+- Show the garment without a person in a realistic scene selected for this exact clothing type.
+- Use this product-specific presentation guidance: {product_scene}
 - If the product is a set, include matching pieces only when they are clearly visible in the source photo.
-- Use a simple neutral studio background with soft, clean lighting.
-- No person and no mannequin body.
+- Do not default to a wooden hanger. Use a hanger only when it genuinely suits the product; otherwise use an appropriate styled flat-lay, folded display, clean bench, shelf, pedestal, textile surface, or boutique setting.
+- No person, mannequin body, or unrelated decorative clutter.
 
-3. Clean original-style ecommerce image
-- Keep the original product arrangement and camera viewpoint recognizable.
-- Improve only presentation quality: cleaner lighting, sharper details, balanced crop, tidier background, and natural color accuracy.
-- Do not add a model, hanger, mannequin, accessories, labels, or extra objects.
+3. Premium catalogue and detail image
+- Create a clean ecommerce catalogue view that is visibly different from outputs 1 and 2.
+- Use a closer or alternate camera angle that clearly presents the garment's fabric, construction, print, trim, and important details while keeping the full product understandable.
+- Use a soft neutral studio or minimal boutique background with accurate color and natural shadows.
+- Do not add a model, hanger, mannequin, accessories, labels, or props that could be mistaken as included with the product.
 
 Strict rules for all 3 outputs:
 - Preserve the actual product exactly: colors, fabric texture, printed graphics, logo/text, patterns, buttons, trim, seams, and number of visible clothing pieces.
@@ -211,7 +220,6 @@ Strict rules for all 3 outputs:
 - The final images must feel honest and suitable for a European baby and kids clothing ecommerce store.
 - If any detail is unclear in the source image, keep it simple and avoid guessing.
 """.strip()
-
 
 def _size_stock_text(product: Any) -> str:
     size_stocks = _value(product, "size_stocks")
@@ -363,6 +371,56 @@ def _scene_guidance(product: Any, request: AiImageGenerateRequest) -> str:
     )
 
 
+def _styled_product_scene_guidance(product: Any, request: AiImageGenerateRequest) -> str:
+    text = " ".join(
+        str(value or "")
+        for value in [
+            _value(product, "title_raw"),
+            _value(product, "category"),
+            _value(product, "product_type"),
+            _value(product, "season"),
+            _value(product, "description"),
+            request.instructions,
+        ]
+    ).lower()
+
+    if any(term in text for term in ["pajama", "pyjama", "sleep", "nightwear", "homewear", "بيجاما", "بجاما"]):
+        return (
+            "Use a calm, daylit children's bedroom scene with the garment neatly styled on soft bedding "
+            "or a clean upholstered bench. Keep the presentation cozy but uncluttered."
+        )
+    if any(term in text for term in ["baby", "newborn", "infant", "bodysuit", "onesie", "romper", "بيبي", "رضيع", "افرول"]):
+        return (
+            "Use a bright nursery or baby boutique setting with the garment safely arranged on a clean "
+            "padded textile surface, changing-table mat, shelf, or small pedestal."
+        )
+    if any(term in text for term in ["set", "suit", "tracksuit", "two-piece", "three-piece", "طقم", "بدلة"]):
+        return (
+            "Use a coordinated editorial flat-lay or low pedestal in a bright studio or boutique, arranging "
+            "every clearly included piece so the complete set is easy to understand."
+        )
+    if any(term in text for term in ["coat", "jacket", "vest", "outerwear", "winter", "parka", "معطف", "جاكيت", "سترة"]):
+        return (
+            "Use a clean boutique entryway or wardrobe scene with the garment displayed on a bench, "
+            "pedestal, or suitable clothing stand. A hanger is optional, not required."
+        )
+    if any(term in text for term in ["dress", "skirt", "دريس", "فستان", "تنورة"]):
+        return (
+            "Use an elegant children's boutique or softly lit dressing-room scene, presenting the garment "
+            "on a clean pedestal, fabric-covered display surface, or tasteful clothing stand."
+        )
+    if any(term in text for term in ["short", "t-shirt", "shirt", "summer", "pants", "jeans", "شورت", "تيشيرت", "بنطلون"]):
+        return (
+            "Use a bright lifestyle product scene on a clean bench, low display table, folded textile, "
+            "or minimal boutique shelf with natural daylight and a fresh everyday mood."
+        )
+    return (
+        "Choose a realistic boutique or natural-light studio scene that matches the garment type. Present "
+        "the product on a clean surface, bench, shelf, pedestal, styled flat-lay, or suitable stand; do not "
+        "default to a wooden hanger."
+    )
+
+
 def _value(product: Any, field: str) -> Any:
     if isinstance(product, dict):
         return product.get(field, "")
@@ -372,6 +430,28 @@ def _value(product: Any, field: str) -> Any:
 def _brief_error(exc: Exception) -> str:
     text = str(exc).replace("\n", " ").strip()
     return text[:300] or exc.__class__.__name__
+
+
+def _classify_openai_error(exc: Exception) -> tuple[int, str]:
+    if isinstance(exc, AuthenticationError):
+        return 503, "ERR_AI_IMAGE_INVALID_KEY"
+    if isinstance(exc, RateLimitError):
+        text = _brief_error(exc).lower()
+        body = str(getattr(exc, "body", "") or "").lower()
+        if any(term in f"{text} {body}" for term in ["insufficient_quota", "billing", "credit", "quota"]):
+            return 402, "ERR_AI_IMAGE_QUOTA"
+        return 429, "ERR_AI_IMAGE_RATE_LIMITED"
+    if isinstance(exc, APIConnectionError):
+        return 503, "ERR_AI_IMAGE_UNAVAILABLE"
+    if isinstance(exc, APIStatusError):
+        if exc.status_code == 403:
+            return 503, "ERR_AI_IMAGE_ACCESS_DENIED"
+        if exc.status_code in {400, 404, 409, 422}:
+            return 422, "ERR_AI_IMAGE_INVALID_REQUEST"
+        if exc.status_code >= 500:
+            return 503, "ERR_AI_IMAGE_UNAVAILABLE"
+    return 502, "ERR_AI_IMAGE_FAILED"
+
 
 def get_prompt_previews(product: Any, request: AiImageGenerateRequest) -> dict[str, str]:
     """Returns a single copy-ready prompt for manual AI image generation."""
