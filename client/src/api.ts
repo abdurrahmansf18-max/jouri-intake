@@ -10,6 +10,10 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   return { ...extra };
 }
 
+function productBase(productId: string): string {
+  return `/api/products/${encodeURIComponent(productId)}`;
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let code = "ERR_GENERAL";
@@ -148,7 +152,7 @@ export async function createProduct(
 }
 
 export async function updateStatus(productId: string, status: ProductStatus): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${productId}/status`, {
+  const res = await fetch(`${productBase(productId)}/status`, {
     method: "PATCH",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ status }),
@@ -157,7 +161,7 @@ export async function updateStatus(productId: string, status: ProductStatus): Pr
 }
 
 export async function updateProduct(productId: string, update: ProductUpdate): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${productId}`, {
+  const res = await fetch(productBase(productId), {
     method: "PATCH",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify(update),
@@ -166,7 +170,7 @@ export async function updateProduct(productId: string, update: ProductUpdate): P
 }
 
 export async function sellProduct(productId: string, quantity = 1, size = "", note = ""): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${productId}/sell`, {
+  const res = await fetch(`${productBase(productId)}/sell`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ quantity, size: size || undefined, note }),
@@ -175,7 +179,7 @@ export async function sellProduct(productId: string, quantity = 1, size = "", no
 }
 
 export async function resetSales(productId: string, stockQuantity?: number): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${productId}/sales/reset`, {
+  const res = await fetch(`${productBase(productId)}/sales/reset`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ stockQuantity }),
@@ -184,7 +188,7 @@ export async function resetSales(productId: string, stockQuantity?: number): Pro
 }
 
 export async function updateRelatedProducts(productId: string, relatedIds: string[]): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${productId}/related`, {
+  const res = await fetch(`${productBase(productId)}/related`, {
     method: "PATCH",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ relatedIds }),
@@ -218,7 +222,7 @@ export async function getAiPrompts(
   age = "",
   size = ""
 ): Promise<Record<string, string>> {
-  const res = await fetch(`/api/products/${productId}/ai-prompts`, {
+  const res = await fetch(`${productBase(productId)}/ai-prompts`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ sourceFileName, instructions, gender, age, size }),
@@ -228,7 +232,7 @@ export async function getAiPrompts(
 
 
 export async function restoreSize(productId: string, size: string): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${productId}/restore-size`, {
+  const res = await fetch(`${productBase(productId)}/restore-size`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ size }),
@@ -237,7 +241,7 @@ export async function restoreSize(productId: string, size: string): Promise<Prod
 }
 
 export async function restoreProduct(productId: string, stockQuantity = 1): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${productId}/restore`, {
+  const res = await fetch(`${productBase(productId)}/restore`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ stockQuantity }),
@@ -248,7 +252,7 @@ export async function restoreProduct(productId: string, stockQuantity = 1): Prom
 export async function addProductImages(productId: string, files: File[]): Promise<ProductRecord> {
   const form = new FormData();
   files.forEach((f) => form.append("images", f));
-  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/images`, {
+  const res = await fetch(`${productBase(productId)}/images`, {
     method: "POST",
     headers: headers(),
     body: form,
@@ -257,7 +261,7 @@ export async function addProductImages(productId: string, files: File[]): Promis
 }
 
 export async function enhanceProductImage(productId: string, fileName: string, prompt?: string): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/images/ai-generate`, {
+  const res = await fetch(`${productBase(productId)}/images/ai-generate`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ sourceFileName: fileName, instructions: prompt || "" }),
@@ -269,7 +273,7 @@ export async function generateAiProductImages(
   productId: string,
   request: AiImageGenerateRequest,
 ): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/images/ai-generate`, {
+  const res = await fetch(`${productBase(productId)}/images/ai-generate`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify(request),
@@ -278,7 +282,7 @@ export async function generateAiProductImages(
 }
 
 export async function pushToShopify(productId: string): Promise<ProductRecord> {
-  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/shopify-push`, {
+  const res = await fetch(`${productBase(productId)}/shopify-push`, {
     method: "POST",
     headers: headers(),
   });
@@ -286,7 +290,7 @@ export async function pushToShopify(productId: string): Promise<ProductRecord> {
 }
 
 export async function rewriteDescription(productId: string): Promise<{ description: string }> {
-  const res = await fetch(`/api/products/${encodeURIComponent(productId)}/rewrite-description`, {
+  const res = await fetch(`${productBase(productId)}/rewrite-description`, {
     method: "POST",
     headers: headers(),
   });
@@ -299,7 +303,7 @@ export async function deleteProductImage(
   fileName: string,
 ): Promise<ProductRecord> {
   const res = await fetch(
-    `/api/products/${encodeURIComponent(productId)}/images/${kind}/${encodeURIComponent(fileName)}`,
+    `${productBase(productId)}/images/${kind}/${encodeURIComponent(fileName)}`,
     { method: "DELETE", headers: headers() },
   );
   return handleResponse<ProductRecord>(res);
@@ -307,7 +311,7 @@ export async function deleteProductImage(
 
 export async function markProductImageAsAi(productId: string, fileName: string): Promise<ProductRecord> {
   const res = await fetch(
-    `/api/products/${encodeURIComponent(productId)}/images/originals/${encodeURIComponent(fileName)}/mark-ai`,
+    `${productBase(productId)}/images/originals/${encodeURIComponent(fileName)}/mark-ai`,
     { method: "PATCH", headers: headers() },
   );
   return handleResponse<ProductRecord>(res);
@@ -315,10 +319,11 @@ export async function markProductImageAsAi(productId: string, fileName: string):
 
 
 export async function deleteProduct(productId: string): Promise<void> {
-  const res = await fetch(`/api/products/${productId}`, {
+  const res = await fetch(productBase(productId), {
     method: "DELETE",
     headers: headers(),
   });
+  if (res.status === 404) return;
   await handleResponse<{ ok: boolean }>(res);
 }
 
@@ -443,5 +448,5 @@ export function productImageUrl(
 ): string {
   // Öncelik sırası: açık kind parametresi > folder alanı > ai_ prefix tespiti > varsayılan thumbnails
   const resolvedKind = kind ?? folder ?? (fileName.startsWith("ai_") || fileName.startsWith("ai-") ? "enhanced" : "thumbnails");
-  return `/api/products/${encodeURIComponent(productId)}/images/${resolvedKind}/${encodeURIComponent(fileName)}`;
+  return `${productBase(productId)}/images/${resolvedKind}/${encodeURIComponent(fileName)}`;
 }

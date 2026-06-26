@@ -21,6 +21,7 @@ from parser import normalize_category, normalize_product_type
 def to_record(p: Product) -> ProductRecord:
     folder_path = Path(p.folder_path)
     image_folders = file_manager.build_image_folders(folder_path, p.folder_name, p.status)
+    images = _existing_images(p)
     return ProductRecord(
         id=p.id,
         createdAt=p.created_at.isoformat(),
@@ -40,7 +41,7 @@ def to_record(p: Product) -> ProductRecord:
             sizesRaw=p.sizes_raw,
             tags=p.tags or [],
         ),
-        images=[SavedImage(**img) for img in (p.images or [])],
+        images=[SavedImage(**img) for img in images],
         status=ProductStatus(p.status),
         notes=p.notes or "",
         stockQuantity=max(0, p.stock_quantity),
@@ -61,6 +62,22 @@ def to_record(p: Product) -> ProductRecord:
             orderHistory=list(p.shopify_order_history or []),
         ),
     )
+
+
+def _existing_images(p: Product) -> list[dict]:
+    images: list[dict] = []
+    for image in p.images or []:
+        item = dict(image)
+        file_name = str(item.get("fileName") or "")
+        folder = str(item.get("folder") or "originals")
+        if not file_name:
+            continue
+        try:
+            file_manager.resolve_image_path(p.folder_path, folder, file_name)
+        except FileNotFoundError:
+            continue
+        images.append(item)
+    return images
 
 
 def get_or_404(db: Session, product_id: str) -> Product:
