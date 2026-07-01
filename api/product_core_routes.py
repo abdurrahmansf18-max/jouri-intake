@@ -473,6 +473,7 @@ async def push_product_to_shopify(
                 "handle": p.shopify_product_handle,
                 "images": res.get("images"),
                 "variants": res.get("variants"),
+                "inventory": res.get("inventory"),
             },
         )
         db.commit()
@@ -610,6 +611,7 @@ async def _bulk_push_to_shopify_impl(
                     "handle": p.shopify_product_handle,
                     "images": res.get("images"),
                     "variants": res.get("variants"),
+                    "inventory": res.get("inventory"),
                 },
             )
             db.commit()

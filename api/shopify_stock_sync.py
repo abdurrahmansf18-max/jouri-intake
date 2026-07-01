@@ -44,7 +44,11 @@ async def sync_shopify_stock_after_change(product_id: str, reason: str) -> None:
                 "shopify_stock_sync",
                 product_id=product.id,
                 product_title=product.title_raw,
-                details={"reason": reason, "variants": result.get("variants")},
+                details={
+                    "reason": reason,
+                    "variants": result.get("variants"),
+                    "inventory": result.get("inventory"),
+                },
             )
             db.commit()
         except Exception as exc:

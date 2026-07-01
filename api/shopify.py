@@ -91,6 +91,7 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
             variants_result = {"created": len(create_payload["variants"]), "updated": 0, "disabled": 0}
 
         refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
+        inventory_result = await _sync_inventory_levels(session, credentials, refreshed["product"], product)
         category_result = await _sync_standard_category(session, credentials, product_id, product)
         filter_result = await _sync_filter_metafields(session, credentials, product_id, product)
         image_result = await _upload_missing_images(session, credentials, product_id, refreshed["product"], product)
@@ -100,6 +101,7 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
             "product": final_product["product"],
             "created": created,
             "variants": variants_result,
+            "inventory": inventory_result,
             "variantLinks": variant_links_from_product(final_product["product"]),
             "category": category_result,
             "filters": filter_result,
@@ -136,10 +138,13 @@ async def sync_existing_product_inventory(product: Product) -> dict[str, Any]:
             product,
         )
         refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
+        inventory_result = await _sync_inventory_levels(session, credentials, refreshed["product"], product)
+        final_product = await _request(session, credentials, "GET", f"products/{product_id}.json")
         return {
-            "product": refreshed["product"],
+            "product": final_product["product"],
             "variants": variants_result,
-            "variantLinks": variant_links_from_product(refreshed["product"]),
+            "inventory": inventory_result,
+            "variantLinks": variant_links_from_product(final_product["product"]),
             "skipped": False,
         }
 
@@ -595,6 +600,104 @@ async def _sync_variants(
     return {"created": created, "updated": updated, "disabled": disabled, "deleted": deleted}
 
 
+async def _sync_inventory_levels(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    shopify_product: dict[str, Any],
+    product: Product,
+) -> dict[str, int]:
+    """Set real Shopify inventory levels from the local size stock source of truth."""
+    variants = shopify_product.get("variants") or []
+    desired_by_key = {
+        _size_key(str(variant.get("option1") or "One Size")): max(0, int(variant.get("inventory_quantity") or 0))
+        for variant in _local_variants(product)
+    }
+    inventory_item_ids = [
+        str(variant.get("inventory_item_id") or "").strip()
+        for variant in variants
+        if str(variant.get("inventory_item_id") or "").strip()
+    ]
+    levels_by_item = await _inventory_levels_by_item(session, credentials, inventory_item_ids)
+
+    set_count = unchanged = skipped = cleared = 0
+    for variant in variants:
+        inventory_item_id = str(variant.get("inventory_item_id") or "").strip()
+        option = str(variant.get("option1") or "One Size").strip() or "One Size"
+        if not inventory_item_id:
+            skipped += 1
+            continue
+
+        desired = desired_by_key.get(_size_key(option))
+        if desired is None:
+            if option and option != "Default Title":
+                desired = 0
+            else:
+                skipped += 1
+                continue
+
+        levels = levels_by_item.get(inventory_item_id) or []
+        if not levels:
+            skipped += 1
+            continue
+
+        for index, level in enumerate(levels):
+            location_id = level.get("location_id")
+            if not location_id:
+                skipped += 1
+                continue
+            next_available = desired if index == 0 else 0
+            if level.get("available") == next_available:
+                unchanged += 1
+                continue
+            await _request(
+                session,
+                credentials,
+                "POST",
+                "inventory_levels/set.json",
+                {
+                    "location_id": location_id,
+                    "inventory_item_id": inventory_item_id,
+                    "available": next_available,
+                },
+            )
+            set_count += 1
+            if index > 0:
+                cleared += 1
+
+    return {"set": set_count, "unchanged": unchanged, "skipped": skipped, "clearedExtraLocations": cleared}
+
+
+async def _inventory_levels_by_item(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    inventory_item_ids: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    levels_by_item: dict[str, list[dict[str, Any]]] = {}
+    unique_ids = []
+    seen = set()
+    for item_id in inventory_item_ids:
+        if item_id and item_id not in seen:
+            seen.add(item_id)
+            unique_ids.append(item_id)
+
+    for chunk in _chunks(unique_ids, 50):
+        data = await _request(
+            session,
+            credentials,
+            "GET",
+            f"inventory_levels.json?inventory_item_ids={','.join(chunk)}",
+        )
+        for level in (data or {}).get("inventory_levels") or []:
+            item_id = str(level.get("inventory_item_id") or "").strip()
+            if item_id:
+                levels_by_item.setdefault(item_id, []).append(level)
+    return levels_by_item
+
+
+def _chunks(values: list[str], size: int) -> list[list[str]]:
+    return [values[index:index + size] for index in range(0, len(values), size)]
+
+
 def _best_existing_variant(candidates: list[dict[str, Any]], local_size: str) -> dict[str, Any] | None:
     if not candidates:
         return None
@@ -905,7 +1008,7 @@ def _image_limit() -> int:
 def _summarize_shopify_error(status: int, text: str) -> str:
     compact = " ".join((text or "").split())
     if status in {401, 403}:
-        return "Shopify yetkisi reddedildi. Client ID/secret veya ürün yazma izinlerini kontrol et."
+        return "Shopify yetkisi reddedildi. Client ID/secret ve ürün/envanter yazma izinlerini kontrol et."
     if status == 404:
         return "Shopify ürünü bulunamadı; yeniden oluşturma gerekebilir."
     if status == 422:
