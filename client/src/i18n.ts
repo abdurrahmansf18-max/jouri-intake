@@ -88,6 +88,7 @@ export const COPY = {
     logAddImages: (n: number) => `${n} görsel eklendi`,
     logAiGenerateImages: (n: number) => `${n} AI görsel eklendi`,
     logShopifyPush: "Shopify senkronu",
+    logShopifyMetadataSync: "Shopify ürün bilgisi senkronu",
     logShopifyStockSync: "Shopify stok senkronu",
     logShopifyOrderSync: "Shopify siparişi işlendi",
     logShopifyOrderSyncFailed: "Shopify sipariş senkron hatası",
@@ -95,7 +96,7 @@ export const COPY = {
     logUnknown: "İşlem yapıldı",
     // Pages
     productsTitle: "Ürünler",
-    archiveTitle: "Satıldı Arşivi",
+    archiveTitle: "Satış Arşivi",
     addProductTitle: "Yeni Ürün Ekle",
     // Product form
     statusOpen: "Kayıt açık",
@@ -245,6 +246,7 @@ export const COPY = {
     allSizesOutOfStock: "Tüm bedenler tükendi — stok yok.",
     soldSizesLabel: "Satılan bedenler",
     partiallySold: "Kısmen satıldı",
+    soldSizeChip: (size: string) => `Satılan: ${size}`,
     restoreSizeBtn: "Geri Al",
     toastSizeRestored: "Beden tekrar satışa alındı.",
     restoreStockNote: "Stok bedenler arasında eşit dağıtılır, sonra düzenleyebilirsin.",
@@ -315,7 +317,8 @@ export const COPY = {
     btnCopy: "Kopyala",
     copied: "Kopyalandı!",
     // Backup page
-    archiveCount: (n: number) => `${n} ürün arşivde`,
+    archiveCount: (n: number) => `${n} satış kaydı`,
+    archiveSummary: (full: number, partial: number) => `${full} tam satıldı · ${partial} kısmi satış`,
     navBackup: "Yedekler",
     backupTitle: "Yedekleme Durumu",
     backupLastRun: "Son yedekleme",
@@ -570,6 +573,7 @@ export const COPY = {
     logAddImages: (n: number) => `تمت إضافة ${n} صورة`,
     logAiGenerateImages: (n: number) => `تمت إضافة ${n} صورة بالذكاء الاصطناعي`,
     logShopifyPush: "مزامنة Shopify",
+    logShopifyMetadataSync: "مزامنة بيانات المنتج في Shopify",
     logShopifyStockSync: "مزامنة مخزون Shopify",
     logShopifyOrderSync: "تمت معالجة طلب Shopify",
     logShopifyOrderSyncFailed: "خطأ في مزامنة طلب Shopify",
@@ -727,6 +731,7 @@ export const COPY = {
     processingAi: (curr: number, total: number, name: string) => `جاري المعالجة: ${curr} / ${total} (${name})`,
     soldSizesLabel: "المقاسات المباعة",
     partiallySold: "مباع جزئياً",
+    soldSizeChip: (size: string) => `مباع: ${size}`,
     restoreSizeBtn: "إرجاع",
     toastSizeRestored: "تم إرجاع المقاس للبيع.",
     restoreStockNote: "سيتم توزيع المخزون بالتساوي على المقاسات، ويمكنك تعديله لاحقاً.",
@@ -797,7 +802,8 @@ export const COPY = {
     btnCopy: "نسخ",
     copied: "تم النسخ!",
     // Backup page
-    archiveCount: (n: number) => `${n} منتج في الأرشيف`,
+    archiveCount: (n: number) => `${n} سجل بيع`,
+    archiveSummary: (full: number, partial: number) => `${full} مباع بالكامل · ${partial} بيع جزئي`,
     navBackup: "النسخ الاحتياطية",
     backupTitle: "حالة النسخ الاحتياطي",
     backupLastRun: "آخر نسخ احتياطي",
@@ -1170,6 +1176,8 @@ export function logActionLabel(action: string, locale: Locale, details?: Record<
     }
     case "mark_ai_image": return (t as any).logMarkAiImage || "AI Marked";
     case "shopify_push": return t.logShopifyPush;
+    case "shopify_metadata_sync": return (t as any).logShopifyMetadataSync || t.logShopifyPush;
+    case "shopify_metadata_sync_failed": return (t as any).logShopifyMetadataSync || t.logShopifyPush;
     case "shopify_stock_sync": return (t as any).logShopifyStockSync || t.logShopifyPush;
     case "shopify_stock_sync_failed": return (t as any).logShopifyStockSync || t.logShopifyPush;
     case "shopify_order_sync": return (t as any).logShopifyOrderSync || t.logShopifyPush;

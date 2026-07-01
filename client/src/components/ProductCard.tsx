@@ -44,6 +44,11 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
   }
 
   const p = record.parsed;
+  const isPartialSoldArchive = Boolean(showSoldSizes && record.status !== "sold_archive" && record.soldSizes.length > 0);
+  const statusText = isPartialSoldArchive ? t.partiallySold : statusLabel(record.status, locale);
+  const statusClass = isPartialSoldArchive
+    ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
+    : statusBadge(record.status, s);
 
   return (
     <article
@@ -127,7 +132,7 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
               <span key={ss.size}
                 className="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-400 ring-1 ring-amber-400/25">
                 <Ruler className="size-2.5" />
-                {ss.size}
+                {t.soldSizeChip(ss.size)}
               </span>
             ))}
           </div>
@@ -140,8 +145,8 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
               {formatPrice(p.priceAmount, p.currency)}
             </span>
           ) : <span />}
-          <span className={cn("rounded-lg border px-2 py-0.5 text-[10px] font-black", statusBadge(record.status, s))}>
-            {statusLabel(record.status, locale)}
+          <span className={cn("rounded-lg border px-2 py-0.5 text-[10px] font-black", statusClass)}>
+            {statusText}
           </span>
         </div>
 

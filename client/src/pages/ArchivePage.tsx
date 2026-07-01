@@ -30,6 +30,8 @@ export default function ArchivePage() {
 
   const allProducts = productsQuery.data ?? [];
   const records = useMemo(() => allProducts.filter(isArchived), [allProducts]);
+  const fullSoldCount = useMemo(() => records.filter((record) => record.status === "sold_archive").length, [records]);
+  const partialSoldCount = records.length - fullSoldCount;
   const loading = productsQuery.isLoading;
 
   // Arama değişince sayfa 1'e dön
@@ -73,6 +75,11 @@ export default function ArchivePage() {
         <p className={cn("text-sm font-medium", s.muted)}>
           {t.archiveCount(records.length)}
         </p>
+        {records.length > 0 && (
+          <p className={cn("text-xs font-semibold", s.muted)}>
+            {t.archiveSummary(fullSoldCount, partialSoldCount)}
+          </p>
+        )}
       </div>
 
       <label className={cn("flex min-h-11 items-center gap-2 rounded-xl border px-3", s.input)}>

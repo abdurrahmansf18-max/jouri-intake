@@ -48,7 +48,7 @@ class ShopifyConfig:
 _TOKEN_CACHE: dict[str, dict[str, Any]] = {}
 
 
-async def push_to_shopify(product: Product) -> dict[str, Any]:
+async def push_to_shopify(product: Product, related_products: list[Product] | None = None) -> dict[str, Any]:
     config = _config()
     timeout = aiohttp.ClientTimeout(total=600)
 
@@ -93,7 +93,7 @@ async def push_to_shopify(product: Product) -> dict[str, Any]:
         refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
         inventory_result = await _sync_inventory_levels(session, credentials, refreshed["product"], product)
         category_result = await _sync_standard_category(session, credentials, product_id, product)
-        filter_result = await _sync_filter_metafields(session, credentials, product_id, product)
+        filter_result = await _sync_filter_metafields(session, credentials, product_id, product, related_products)
         image_result = await _upload_missing_images(session, credentials, product_id, refreshed["product"], product)
         final_product = await _request(session, credentials, "GET", f"products/{product_id}.json")
 
@@ -147,6 +147,30 @@ async def sync_existing_product_inventory(product: Product) -> dict[str, Any]:
             "variantLinks": variant_links_from_product(final_product["product"]),
             "skipped": False,
         }
+
+
+async def sync_existing_product_metafields(product: Product, related_products: list[Product] | None = None) -> dict[str, Any]:
+    product_id = _stored_product_id(product)
+    if not product_id:
+        return {"skipped": True, "reason": "not_linked"}
+
+    config = _config()
+    timeout = aiohttp.ClientTimeout(total=120)
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        credentials = await _credentials(session, config)
+        existing_product = await _request(
+            session,
+            credentials,
+            "GET",
+            f"products/{product_id}.json",
+            allow_404=True,
+        )
+        if not existing_product:
+            raise ShopifyPushError("Shopify ürünü bulunamadı; metafield senkronu yapılamadı.")
+
+        filter_result = await _sync_filter_metafields(session, credentials, product_id, product, related_products)
+        return {"filters": filter_result, "skipped": False}
 
 
 def variant_links_from_product(shopify_product: dict[str, Any]) -> list[dict[str, Any]]:
@@ -356,10 +380,37 @@ async def _sync_filter_metafields(
     credentials: ShopifyCredentials,
     shopify_product_id: str,
     product: Product,
+    related_products: list[Product] | None = None,
 ) -> dict[str, Any]:
     colors = _normalized_colors(product.color_raw)
-    if not colors:
-        return {"set": False, "reason": "no_color"}
+    metafields: list[dict[str, Any]] = []
+
+    if colors:
+        metafields.append({
+            "ownerId": _shopify_product_gid(shopify_product_id),
+            "namespace": "custom",
+            "key": "filter_color",
+            "type": "list.single_line_text_field",
+            "value": json.dumps(colors),
+        })
+
+    related_gids: list[str] = []
+    if related_products is not None:
+        related_gids = [
+            _shopify_product_gid(str(related.shopify_product_id))
+            for related in related_products
+            if str(related.shopify_product_id or "").strip()
+        ]
+        metafields.append({
+            "ownerId": _shopify_product_gid(shopify_product_id),
+            "namespace": "custom",
+            "key": "related_products",
+            "type": "list.product_reference",
+            "value": json.dumps(related_gids),
+        })
+
+    if not metafields:
+        return {"set": False, "reason": "no_metafields"}
 
     mutation = """
     mutation SetProductFilterMetafields($metafields: [MetafieldsSetInput!]!) {
@@ -381,17 +432,7 @@ async def _sync_filter_metafields(
         session,
         credentials,
         mutation,
-        {
-            "metafields": [
-                {
-                    "ownerId": _shopify_product_gid(shopify_product_id),
-                    "namespace": "custom",
-                    "key": "filter_color",
-                    "type": "list.single_line_text_field",
-                    "value": json.dumps(colors),
-                }
-            ]
-        },
+        {"metafields": metafields},
     )
     payload = (data.get("data") or {}).get("metafieldsSet") or {}
     errors = payload.get("userErrors") or []
@@ -401,7 +442,7 @@ async def _sync_filter_metafields(
             for err in errors
         )
         raise ShopifyPushError(f"Shopify filtre metafield kabul edilmedi: {message[:240]}")
-    return {"set": True, "colors": colors}
+    return {"set": True, "colors": colors, "relatedProducts": len(related_gids)}
 
 
 def _standard_category_id(product: Product) -> str:

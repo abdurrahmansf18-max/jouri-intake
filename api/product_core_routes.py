@@ -26,7 +26,7 @@ from models import (
 )
 from parser import normalize_category, normalize_product_type, normalize_season, parse_description
 from realtime import ws_manager
-from shopify_stock_sync import queue_shopify_stock_sync
+from shopify_stock_sync import queue_shopify_metadata_sync, queue_shopify_stock_sync
 
 
 router = APIRouter()
@@ -36,6 +36,15 @@ _ACTIVE_STATUS_RANK = {
     "ai_enhanced": 1,
     "published": 2,
 }
+
+
+def _load_shopify_related_products(db: Session, product: Product) -> list[Product]:
+    ids = [rid for rid in (product.related_products or []) if rid and rid != product.id]
+    if not ids:
+        return []
+    products = db.query(Product).filter(Product.id.in_(ids)).all()
+    by_id = {related.id: related for related in products if (related.shopify_product_id or "").strip()}
+    return [by_id[rid] for rid in ids if rid in by_id]
 
 
 @router.get("/api/products", response_model=list[ProductRecord])
@@ -427,7 +436,9 @@ def update_related_products(
     for aff in affected:
         aff_rec = product_service.to_record(aff)
         background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": aff_rec.model_dump(mode="json")})
+        queue_shopify_metadata_sync(background_tasks, aff.id, "related_products_update", aff.shopify_product_id)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    queue_shopify_metadata_sync(background_tasks, p.id, "related_products_update", p.shopify_product_id)
 
     return record
 
@@ -454,7 +465,7 @@ async def push_product_to_shopify(
         raise HTTPException(status_code=400, detail={"code": "ERR_SHOPIFY_STATUS_REQUIRED"})
 
     try:
-        res = await shopify.push_to_shopify(p)
+        res = await shopify.push_to_shopify(p, related_products=_load_shopify_related_products(db, p))
         shopify_product = res.get("product") or {}
         p.shopify_product_id = str(shopify_product.get("id") or "")
         p.shopify_product_handle = shopify_product.get("handle") or ""
@@ -591,7 +602,7 @@ async def _bulk_push_to_shopify_impl(
             continue
 
         try:
-            res = await shopify.push_to_shopify(p)
+            res = await shopify.push_to_shopify(p, related_products=_load_shopify_related_products(db, p))
             shopify_product = res.get("product") or {}
             p.shopify_product_id = str(shopify_product.get("id") or "")
             p.shopify_product_handle = str(shopify_product.get("handle") or "")
