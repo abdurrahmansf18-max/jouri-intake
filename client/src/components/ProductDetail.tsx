@@ -29,12 +29,17 @@ type Draft = {
   titleRaw: string;
   categorySuggestion: string; productTypeSuggestion: string;
   priceAmount: string;
+  compareAtPriceAmount: string;
+  discountNote: string;
   colorRaw: string; colorGermanSuggestion: string;
   season: string;
   notes: string; description: string;
   restoreStock: string;
   saleQuantity: string; saleNote: string;
   saleSize: string;
+  isDiscounted: boolean;
+  isFinalSale: boolean;
+  isLimitedTimeDeal: boolean;
 };
 
 function recordToDraft(r: ProductRecord): Draft {
@@ -43,6 +48,8 @@ function recordToDraft(r: ProductRecord): Draft {
     categorySuggestion: r.parsed.categorySuggestion,
     productTypeSuggestion: r.parsed.productTypeSuggestion,
     priceAmount: r.parsed.priceAmount,
+    compareAtPriceAmount: r.compareAtPriceAmount || "",
+    discountNote: r.discountNote || "",
     colorRaw: r.parsed.colorRaw,
     colorGermanSuggestion: r.parsed.colorGermanSuggestion,
     season: r.parsed.season || "",
@@ -52,6 +59,9 @@ function recordToDraft(r: ProductRecord): Draft {
     saleQuantity: "1",
     saleNote: "",
     saleSize: "",
+    isDiscounted: Boolean(r.isDiscounted),
+    isFinalSale: Boolean(r.isFinalSale),
+    isLimitedTimeDeal: Boolean(r.isLimitedTimeDeal),
   };
 }
 
@@ -214,6 +224,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   useEffect(() => () => { imagePreviews.forEach((p) => URL.revokeObjectURL(p.url)); }, [imagePreviews]);
 
   function patch(key: keyof Draft, val: string) { setDraft((d) => ({ ...d, [key]: val })); }
+  function patchBool(key: keyof Draft, val: boolean) { setDraft((d) => ({ ...d, [key]: val })); }
   function num(val: string, fb: number) { const n = parseInt(val, 10); return Number.isFinite(n) ? n : fb; }
   function statusCanMoveWithoutUnlock(from: ProductStatus, to: ProductStatus) {
     const fromRank = ACTIVE_STATUSES.indexOf(from);
@@ -236,6 +247,11 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     try {
       let updated = await updateProduct(record.id, {
         notes: draft.notes,
+        isDiscounted: draft.isDiscounted,
+        compareAtPriceAmount: draft.compareAtPriceAmount,
+        discountNote: draft.discountNote,
+        isFinalSale: draft.isFinalSale,
+        isLimitedTimeDeal: draft.isLimitedTimeDeal,
         description: draft.description,
         sizeStocks: validSizes.length > 0 ? validSizes : undefined,
         parsed: {
@@ -246,6 +262,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           currency: "EUR",
           colorRaw: draft.colorRaw,
           colorGermanSuggestion: draft.colorGermanSuggestion,
+          season: draft.season,
         },
       });
 
@@ -632,6 +649,23 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     {/* Fiyat */}
                     {p.priceAmount && <InfoRow label={t.price} s={s}>
                       <span className="font-black text-emerald-400">{formatPrice(p.priceAmount, p.currency)}</span>
+                    </InfoRow>}
+
+                    {record.isDiscounted && <InfoRow label={(t as any).campaignInfoTitle} s={s}>
+                      <span className="grid gap-1 text-xs">
+                        <span className="inline-flex flex-wrap items-center gap-1.5">
+                          <Tag className="size-3 text-amber-400" />
+                          <strong className="text-amber-400">{(t as any).discountedProduct}</strong>
+                          {record.compareAtPriceAmount && (
+                            <span className={cn("line-through", s.muted)}>
+                              {formatPrice(record.compareAtPriceAmount, p.currency)}
+                            </span>
+                          )}
+                          {record.isLimitedTimeDeal && <span className="rounded-md bg-orange-400/15 px-1.5 py-0.5 text-[10px] font-black text-orange-400">{(t as any).weeklyDealShort}</span>}
+                          {record.isFinalSale && <span className="rounded-md bg-red-400/15 px-1.5 py-0.5 text-[10px] font-black text-red-400">{(t as any).finalSaleShort}</span>}
+                        </span>
+                        {record.discountNote && <span className={cn("leading-5", s.muted)} dir="auto">{record.discountNote}</span>}
+                      </span>
                     </InfoRow>}
 
                     {/* Orijinal ad */}
@@ -1170,6 +1204,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   <div className="grid gap-3 sm:grid-cols-2">
                     <DetailField label={t.rawTitle}            s={s} value={draft.titleRaw}              onChange={(v) => patch("titleRaw", v)} />
                     <DetailField label={t.price}               s={s} value={draft.priceAmount}            onChange={(v) => patch("priceAmount", v)} prefix="€" inputDir="ltr" />
+                    <DetailField label={(t as any).compareAtPrice} s={s} value={draft.compareAtPriceAmount} onChange={(v) => patch("compareAtPriceAmount", v)} prefix="€" inputDir="ltr" />
                     <DetailField label={t.color}               s={s} value={draft.colorRaw}               onChange={(v) => patch("colorRaw", v)} />
                     <label className="grid gap-1.5">
                       <span className={cn("text-xs font-black", s.strong)}>{(t as any).season || "Mevsim"}</span>
@@ -1182,6 +1217,71 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     </label>
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />
                     <DetailField label={t.productType}         s={s} value={draft.productTypeSuggestion}  onChange={(v) => patch("productTypeSuggestion", v)} />
+                  </div>
+
+                  <div className={cn("mt-4 rounded-xl border p-3", s.panelBorder)}>
+                    <h4 className={cn("mb-2 flex items-center gap-2 text-xs font-black", s.strong)}>
+                      <Tag className="size-3.5 text-amber-400" />
+                      {(t as any).campaignInfoTitle}
+                    </h4>
+                    <div className="grid gap-2">
+                      <label className={cn("flex items-start gap-2 rounded-lg border p-3 text-xs", s.panelBorder)}>
+                        <input
+                          type="checkbox"
+                          checked={draft.isDiscounted}
+                          onChange={(e) => {
+                            patchBool("isDiscounted", e.target.checked);
+                            if (!e.target.checked) {
+                              setDraft((d) => ({ ...d, isFinalSale: false, isLimitedTimeDeal: false }));
+                            }
+                          }}
+                          className="mt-0.5"
+                        />
+                        <span className="grid gap-0.5">
+                          <strong className={s.title}>{(t as any).discountedProduct}</strong>
+                          <span className={s.muted}>{(t as any).discountedProductHelp}</span>
+                        </span>
+                      </label>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <label className={cn("flex items-start gap-2 rounded-lg border p-3 text-xs", s.panelBorder, !draft.isDiscounted && "opacity-50")}>
+                          <input
+                            type="checkbox"
+                            disabled={!draft.isDiscounted}
+                            checked={draft.isLimitedTimeDeal}
+                            onChange={(e) => patchBool("isLimitedTimeDeal", e.target.checked)}
+                            className="mt-0.5"
+                          />
+                          <span className="grid gap-0.5">
+                            <strong className={s.title}>{(t as any).includeWeeklyDeals}</strong>
+                            <span className={s.muted}>{(t as any).includeWeeklyDealsHelp}</span>
+                          </span>
+                        </label>
+                        <label className={cn("flex items-start gap-2 rounded-lg border p-3 text-xs", s.panelBorder, !draft.isDiscounted && "opacity-50")}>
+                          <input
+                            type="checkbox"
+                            disabled={!draft.isDiscounted}
+                            checked={draft.isFinalSale}
+                            onChange={(e) => patchBool("isFinalSale", e.target.checked)}
+                            className="mt-0.5"
+                          />
+                          <span className="grid gap-0.5">
+                            <strong className={s.title}>{(t as any).finalSale}</strong>
+                            <span className={s.muted}>{(t as any).finalSaleHelp}</span>
+                          </span>
+                        </label>
+                      </div>
+                      <label className={cn("grid gap-1.5", !draft.isDiscounted && "opacity-50")}>
+                        <span className={cn("text-xs font-black", s.strong)}>{(t as any).discountNote}</span>
+                        <textarea
+                          disabled={!draft.isDiscounted}
+                          className={cn("min-h-20 w-full rounded-xl border px-3 py-3 text-sm leading-6 outline-none focus:ring-4 disabled:cursor-not-allowed", s.input)}
+                          value={draft.discountNote}
+                          onChange={(e) => patch("discountNote", e.target.value)}
+                          placeholder={(t as any).discountNotePlaceholder}
+                          dir="auto"
+                        />
+                      </label>
+                    </div>
                   </div>
 
                   {/* Beden + stok editörü */}

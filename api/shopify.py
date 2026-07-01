@@ -130,6 +130,13 @@ async def sync_existing_product_inventory(product: Product) -> dict[str, Any]:
         if not existing_product:
             raise ShopifyPushError("Shopify ürünü bulunamadı; stok senkronu yapılamadı.")
 
+        await _request(
+            session,
+            credentials,
+            "PUT",
+            f"products/{product_id}.json",
+            {"product": _product_payload(product, include_create_only=False)},
+        )
         variants_result = await _sync_variants(
             session,
             credentials,
@@ -139,11 +146,13 @@ async def sync_existing_product_inventory(product: Product) -> dict[str, Any]:
         )
         refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
         inventory_result = await _sync_inventory_levels(session, credentials, refreshed["product"], product)
+        filter_result = await _sync_filter_metafields(session, credentials, product_id, product, None)
         final_product = await _request(session, credentials, "GET", f"products/{product_id}.json")
         return {
             "product": final_product["product"],
             "variants": variants_result,
             "inventory": inventory_result,
+            "filters": filter_result,
             "variantLinks": variant_links_from_product(final_product["product"]),
             "skipped": False,
         }
@@ -394,6 +403,16 @@ async def _sync_filter_metafields(
             "value": json.dumps(colors),
         })
 
+    discount_notice = _discount_notice(product)
+    if discount_notice:
+        metafields.append({
+            "ownerId": _shopify_product_gid(shopify_product_id),
+            "namespace": "custom",
+            "key": "discount_notice",
+            "type": "single_line_text_field",
+            "value": discount_notice,
+        })
+
     related_gids: list[str] = []
     if related_products is not None:
         related_gids = [
@@ -535,6 +554,7 @@ def _shopify_product_gid(shopify_product_id: str) -> str:
 
 def _local_variants(product: Product) -> list[dict[str, Any]]:
     price = _price(product.price_amount)
+    compare_at_price = _compare_at_price(product)
     stocks = list(product.size_stocks or [])
     if not stocks:
         sizes = [s.strip() for s in (product.sizes_raw or "").split(",") if s.strip()]
@@ -556,6 +576,7 @@ def _local_variants(product: Product) -> list[dict[str, Any]]:
         variants.append({
             "option1": size,
             "price": price,
+            "compare_at_price": compare_at_price,
             "inventory_management": "shopify",
             "inventory_policy": "deny",
             "inventory_quantity": qty,
@@ -564,6 +585,7 @@ def _local_variants(product: Product) -> list[dict[str, Any]]:
     return variants or [{
         "option1": "One Size",
         "price": price,
+        "compare_at_price": compare_at_price,
         "inventory_management": "shopify",
         "inventory_policy": "deny",
         "inventory_quantity": max(0, int(product.stock_quantity or 0)),
@@ -848,6 +870,9 @@ def _tags(product: Product) -> str:
         *_color_tags(product.color_raw),
         *_age_tags(product),
         f"Season: {product.season}" if product.season else None,
+        "Discounted" if product.is_discounted else None,
+        "Final Sale" if product.is_final_sale else None,
+        "Limited-Time Deal" if product.is_limited_time_deal else None,
         *(product.tags or []),
     ]
     seen: set[str] = set()
@@ -1020,6 +1045,37 @@ def _price(amount: str) -> str:
         return "0.00"
     value = max(0.0, float(match.group(0)))
     return f"{value:.2f}"
+
+
+def _price_float(amount: str) -> float:
+    try:
+        return float(_price(amount))
+    except Exception:
+        return 0.0
+
+
+def _compare_at_price(product: Product) -> str | None:
+    if not product.is_discounted:
+        return None
+    compare_at = _price_float(product.compare_at_price_amount)
+    price = _price_float(product.price_amount)
+    if compare_at <= 0 or compare_at <= price:
+        return None
+    return f"{compare_at:.2f}"
+
+
+def _discount_notice(product: Product) -> str:
+    if not product.is_discounted:
+        return ""
+    note = " ".join((product.discount_note or "").split())
+    if note:
+        return note[:255]
+    if product.is_final_sale:
+        return (
+            "Reduced special-condition item. Voluntary exchanges are excluded where permitted by law; "
+            "your statutory consumer rights remain unaffected."
+        )
+    return "Reduced item. Please review the photos, description and size options before ordering."
 
 
 def _handle(product: Product) -> str:

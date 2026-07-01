@@ -189,6 +189,11 @@ async def create_product(
         season=parsed.season,
         sizes_raw=parsed.sizesRaw,
         tags=parsed.tags,
+        is_discounted=False,
+        compare_at_price_amount="",
+        discount_note="",
+        is_final_sale=False,
+        is_limited_time_deal=False,
         images=[img.model_dump() for img in saved_images],
         sale_history=[],
         size_stocks=size_stocks_data,
@@ -271,6 +276,7 @@ def update_product(
 ):
     p = product_service.get_or_404(db, product_id)
     stock_changed = False
+    shopify_catalog_changed = False
 
     # Değişiklikleri takip et
     changes: dict[str, dict] = {}
@@ -282,9 +288,32 @@ def update_product(
     if body.description is not None:
         track("description", p.description, body.description)
         p.description = body.description
+        shopify_catalog_changed = True
     if body.notes is not None:
         track("notes", p.notes, body.notes)
         p.notes = body.notes
+    if body.isDiscounted is not None:
+        track("is_discounted", p.is_discounted, body.isDiscounted)
+        p.is_discounted = bool(body.isDiscounted)
+        shopify_catalog_changed = True
+    if body.compareAtPriceAmount is not None:
+        compare_at = body.compareAtPriceAmount.strip()
+        track("compare_at_price", p.compare_at_price_amount, compare_at)
+        p.compare_at_price_amount = compare_at
+        shopify_catalog_changed = True
+    if body.discountNote is not None:
+        discount_note = body.discountNote.strip()
+        track("discount_note", p.discount_note, discount_note)
+        p.discount_note = discount_note
+        shopify_catalog_changed = True
+    if body.isFinalSale is not None:
+        track("is_final_sale", p.is_final_sale, body.isFinalSale)
+        p.is_final_sale = bool(body.isFinalSale)
+        shopify_catalog_changed = True
+    if body.isLimitedTimeDeal is not None:
+        track("is_limited_time_deal", p.is_limited_time_deal, body.isLimitedTimeDeal)
+        p.is_limited_time_deal = bool(body.isLimitedTimeDeal)
+        shopify_catalog_changed = True
     if body.sizeStocks is not None:
         new_ss = [ss.model_dump() for ss in body.sizeStocks]
         stock_changed = True
@@ -298,6 +327,7 @@ def update_product(
         stock_changed = True
         p.stock_quantity = max(0, int(body.stockQuantity))
     if body.parsed:
+        shopify_catalog_changed = True
         pd = body.parsed
         if pd.titleRaw is not None:
             track("title", p.title_raw, pd.titleRaw); p.title_raw = pd.titleRaw
@@ -333,8 +363,8 @@ def update_product(
     db.refresh(p)
     record = product_service.to_record(p)
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
-    if stock_changed:
-        queue_shopify_stock_sync(background_tasks, p.id, "stock_update", p.shopify_product_id)
+    if stock_changed or shopify_catalog_changed:
+        queue_shopify_stock_sync(background_tasks, p.id, "product_update", p.shopify_product_id)
     return record
 
 

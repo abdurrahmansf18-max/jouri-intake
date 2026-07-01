@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Text, DateTime, JSON
+from sqlalchemy import Boolean, Column, String, Integer, Text, DateTime, JSON
 from database import Base
 
 
@@ -26,6 +26,11 @@ class Product(Base):
     color_german = Column(String, nullable=False, default="")
     sizes_raw = Column(String, nullable=False, default="")
     tags = Column(JSON, nullable=False, default=list)
+    is_discounted = Column(Boolean, nullable=False, default=False)
+    compare_at_price_amount = Column(String, nullable=False, default="")
+    discount_note = Column(Text, nullable=False, default="")
+    is_final_sale = Column(Boolean, nullable=False, default=False)
+    is_limited_time_deal = Column(Boolean, nullable=False, default=False)
     images = Column(JSON, nullable=False, default=list)
     sale_history = Column(JSON, nullable=False, default=list)
     size_stocks = Column(JSON, nullable=True, default=None)

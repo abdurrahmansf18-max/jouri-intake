@@ -108,6 +108,11 @@ class ProductRecord(BaseModel):
     images: list[SavedImage]
     status: ProductStatus = ProductStatus.pending
     notes: str = ""
+    isDiscounted: bool = False
+    compareAtPriceAmount: str = ""
+    discountNote: str = ""
+    isFinalSale: bool = False
+    isLimitedTimeDeal: bool = False
     stockQuantity: int = 1
     soldQuantity: int = 0
     lastSoldAt: Optional[str] = None
@@ -159,6 +164,11 @@ class ParsedProductUpdate(BaseModel):
 
 class ProductUpdateRequest(BaseModel):
     notes: Optional[str] = None
+    isDiscounted: Optional[bool] = None
+    compareAtPriceAmount: Optional[str] = None
+    discountNote: Optional[str] = None
+    isFinalSale: Optional[bool] = None
+    isLimitedTimeDeal: Optional[bool] = None
     stockQuantity: Optional[int] = None
     description: Optional[str] = None
     sizeStocks: Optional[list[SizeStock]] = None

@@ -100,6 +100,11 @@ export interface ProductRecord {
   images: SavedImage[];
   status: ProductStatus;
   notes: string;
+  isDiscounted: boolean;
+  compareAtPriceAmount: string;
+  discountNote: string;
+  isFinalSale: boolean;
+  isLimitedTimeDeal: boolean;
   stockQuantity: number;
   soldQuantity: number;
   lastSoldAt?: string | null;

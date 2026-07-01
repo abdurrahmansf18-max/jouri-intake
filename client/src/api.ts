@@ -110,6 +110,11 @@ export async function parseProductText(text: string, imageFile?: File): Promise<
 
 export interface ProductUpdate {
   notes?: string;
+  isDiscounted?: boolean;
+  compareAtPriceAmount?: string;
+  discountNote?: string;
+  isFinalSale?: boolean;
+  isLimitedTimeDeal?: boolean;
   stockQuantity?: number;
   description?: string;
   sizeStocks?: SizeStock[];

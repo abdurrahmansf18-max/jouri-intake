@@ -59,6 +59,7 @@ async def sync_shopify_stock_after_change(product_id: str, reason: str) -> None:
                     "reason": reason,
                     "variants": result.get("variants"),
                     "inventory": result.get("inventory"),
+                    "filters": result.get("filters"),
                 },
             )
             db.commit()

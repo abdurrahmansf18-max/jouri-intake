@@ -89,6 +89,11 @@ def _import_from_filesystem(db: Session) -> int:
                     color_german=parsed.get("colorGermanSuggestion", ""),
                     sizes_raw=parsed.get("sizesRaw", ""),
                     tags=parsed.get("tags", []),
+                    is_discounted=bool(data.get("isDiscounted", False)),
+                    compare_at_price_amount=data.get("compareAtPriceAmount", ""),
+                    discount_note=data.get("discountNote", ""),
+                    is_final_sale=bool(data.get("isFinalSale", False)),
+                    is_limited_time_deal=bool(data.get("isLimitedTimeDeal", False)),
                     images=data.get("images", []),
                     sale_history=data.get("saleHistory", []),
                     shopify_product_id=shopify_data.get("productId"),
@@ -132,6 +137,11 @@ def _migrate_size_stocks() -> None:
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_last_error TEXT"))
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_variants JSON"))
         db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS shopify_order_history JSON"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS is_discounted BOOLEAN NOT NULL DEFAULT FALSE"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS compare_at_price_amount VARCHAR NOT NULL DEFAULT ''"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_note TEXT NOT NULL DEFAULT ''"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS is_final_sale BOOLEAN NOT NULL DEFAULT FALSE"))
+        db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS is_limited_time_deal BOOLEAN NOT NULL DEFAULT FALSE"))
         db.commit()
 
         products = db.query(Product).filter(Product.size_stocks == None).all()  # noqa: E711
