@@ -140,6 +140,8 @@ export default function DashboardPage() {
     // Bugüne kadar satılmış olan toplam ürün adedi (Tüm ürünlerdeki "soldQuantity" toplamı)
     totalSold: products.reduce((n, p) => n + Math.max(0, p.soldQuantity), 0),
   };
+  const partialSoldCount = products.filter((p) => p.status !== "sold_archive" && p.soldSizes.length > 0).length;
+  const salesArchiveCount = counts.sold_archive + partialSoldCount;
 
   // Aktif ürünlerin fotoğraflarının kaç tanesi orijinal, kaç tanesi Yapay Zeka tarafından işlenmiş sayıyoruz
   const imageStats = active.reduce(
@@ -419,13 +421,11 @@ export default function DashboardPage() {
 
       {/* ── 4. ARŞİV SAYACI ── */}
       {/* Sadece sistemde arşivlenmiş ürün varsa bu bölümü gösterir */}
-      {counts.sold_archive > 0 && (
+      {salesArchiveCount > 0 && (
         <div className={cn("flex items-center gap-3 rounded-xl border px-4 py-3", "bg-slate-400/5 border-slate-400/20")}>
           <ArchiveIcon className="size-4 text-slate-400 shrink-0" />
           <span className={cn("text-sm font-bold", s.muted)}>
-            {locale === "ar"
-              ? `${counts.sold_archive} منتج في أرشيف المبيعات`
-              : `${counts.sold_archive} ürün satıldı-arşivde`}
+            {t.dashSalesArchiveSummary(salesArchiveCount, counts.sold_archive, partialSoldCount)}
           </span>
         </div>
       )}
