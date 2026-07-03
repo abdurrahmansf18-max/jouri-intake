@@ -896,7 +896,9 @@ def _guess_product_type(description: str) -> str:
         return "Dress"
     if has_set:
         return "Set"
-    if re.search(r"(?:بلوزة|blouse|top)", description, re.IGNORECASE):
+    if re.search(r"(?:بلوزة|blouse)", description, re.IGNORECASE):
+        return "Blouse"
+    if re.search(r"(?:\btop\b)", description, re.IGNORECASE):
         return "Top"
     if re.search(r"(?:بنطلون|pants|trousers)", description, re.IGNORECASE):
         return "Pants"
@@ -958,7 +960,8 @@ def _is_mini_baby_text(text: str) -> bool:
 def _known_piece_words(text: str) -> list[str]:
     pieces = []
     piece_patterns = [
-        (r"(?:بلوزة|blouse|top)", "Top"),
+        (r"(?:بلوزة|blouse)", "Blouse"),
+        (r"(?:\btop\b)", "Top"),
         (r"(?:تيشيرت|تيشرت|تشيرت|t-?shirt)", "T-Shirt"),
         (r"(?:بنطلون|pants|trousers)", "Pants"),
         (r"(?:شورت|shorts?)", "Shorts"),

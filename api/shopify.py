@@ -403,6 +403,14 @@ async def _sync_filter_metafields(
             "value": json.dumps(colors),
         })
 
+    metafields.append({
+        "ownerId": _shopify_product_gid(shopify_product_id),
+        "namespace": "custom",
+        "key": "discount_compare_at_price_cents",
+        "type": "number_integer",
+        "value": str(_compare_at_price_cents(product)),
+    })
+
     discount_notice = _discount_notice(product)
     if discount_notice:
         metafields.append({
@@ -482,7 +490,7 @@ def _standard_category_id(product: Product) -> str:
         return "gid://shopify/TaxonomyCategory/aa-1-17-4"
     if "tshirt" in product_type or "tee" in product_type:
         return "gid://shopify/TaxonomyCategory/aa-1-25-9-7" if child else "gid://shopify/TaxonomyCategory/aa-1-13-8"
-    if "shirt" in product_type:
+    if "shirt" in product_type or "blouse" in product_type or product_type == "top":
         return "gid://shopify/TaxonomyCategory/aa-1-25-9-6" if child else "gid://shopify/TaxonomyCategory/aa-1-13"
     if "dress" in product_type:
         return "gid://shopify/TaxonomyCategory/aa-1-25-3" if child else "gid://shopify/TaxonomyCategory/aa-1-4"
@@ -1062,6 +1070,16 @@ def _compare_at_price(product: Product) -> str | None:
     if compare_at <= 0 or compare_at <= price:
         return None
     return f"{compare_at:.2f}"
+
+
+def _compare_at_price_cents(product: Product) -> int:
+    compare_at = _compare_at_price(product)
+    if not compare_at:
+        return 0
+    try:
+        return max(0, int(round(float(compare_at) * 100)))
+    except Exception:
+        return 0
 
 
 def _discount_notice(product: Product) -> str:
