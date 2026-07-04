@@ -169,6 +169,8 @@ export default function DashboardPage() {
     lowStock: active.filter((p) => p.stockQuantity > 0 && p.stockQuantity <= 2).length,
     // Stoku tamamen tükenmiş olan aktif ürünler
     outOfStock: active.filter((p) => p.stockQuantity === 0).length,
+    // Yayında olup henüz Shopify'e gönderilmemiş ürünler
+    publishedUnsynced: active.filter((p) => p.status === "published" && !p.shopify?.productId).length,
   };
 
   // Ürün başına ortalama düşen fotoğraf sayısı (1 ondalık haneye kadar, Örn: 3.2)
@@ -202,7 +204,7 @@ export default function DashboardPage() {
   const hasAttention = attention.noPrice > 0 || attention.noImages > 0
     || smart.noCategory > 0 || smart.noProductType > 0
     || smart.lowStock > 0 || smart.outOfStock > 0
-    || smart.aiReadyPending > 0;
+    || smart.aiReadyPending > 0 || smart.publishedUnsynced > 0;
 
   // Sisteme en son eklenen 6 ürünü tarihlerine göre azalan şekilde (en yeniler en başta) sıralayıp alıyoruz. (Arşivdekiler hariç)
   const recentProducts = [...active]
@@ -447,6 +449,7 @@ export default function DashboardPage() {
           {smart.aiReadyPending > 0 && <AttentionRow icon={<PackageCheck className="size-4 text-blue-400" />} text={t.dashAiReadyPendingText(smart.aiReadyPending)} s={s} />}
           {smart.lowStock > 0 && <AttentionRow icon={<Box className="size-4 text-amber-400" />} text={t.dashLowStockText(smart.lowStock)} s={s} />}
           {smart.outOfStock > 0 && <AttentionRow icon={<PackageX className="size-4 text-red-400" />} text={t.dashOutOfStockText(smart.outOfStock)} s={s} />}
+          {smart.publishedUnsynced > 0 && <AttentionRow icon={<ShoppingBag className="size-4 text-amber-400" />} text={t.dashPublishedUnsynced(smart.publishedUnsynced)} s={s} />}
         </div>
       </div>
       )}

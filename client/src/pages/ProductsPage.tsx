@@ -23,6 +23,7 @@ export default function ProductsPage() {
   const s = theme === "dark" ? DARK : LIGHT;
 
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [onlyUnsynced, setOnlyUnsynced] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -60,6 +61,7 @@ export default function ProductsPage() {
     published: records.filter((r) => r.status === "published").length,
     sold_archive: 0,
   };
+  const unsyncedPublishedCount = records.filter((r) => r.status === "published" && !r.shopify?.productId).length;
 
   const statusRecords = useMemo(
     () => records.filter((r) => filter === "all" || r.status === filter),
@@ -158,12 +160,13 @@ export default function ProductsPage() {
   }, [recordsForSeasonCounts]);
 
   // Filtre veya arama değişince sayfa 1'e dön
-  useEffect(() => { setPage(1); }, [filter, search, categoryFilter, typeFilter, seasonFilter]);
+  useEffect(() => { setPage(1); }, [filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter]);
 
   const searchResults = useMemo(() => {
     const filterScoped = records.filter((r) => {
       if (filter !== "all" && r.status !== filter) return false;
-      
+      if (onlyUnsynced && (r.status !== "published" || r.shopify?.productId)) return false;
+
       const cat = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (categoryFilter === "uncategorized" && cat) return false;
       if (categoryFilter !== "all" && categoryFilter !== "uncategorized" && cat !== categoryFilter) return false;
@@ -179,7 +182,7 @@ export default function ProductsPage() {
       return true;
     });
     return searchProducts(filterScoped, search);
-  }, [records, filter, search, categoryFilter, typeFilter, seasonFilter]);
+  }, [records, filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter]);
 
   const filtered = useMemo(() => searchResults.map((result) => result.record), [searchResults]);
   const searchMatchesById = useMemo(
@@ -252,6 +255,15 @@ export default function ProductsPage() {
                   </span>
                 </button>
               ))}
+              <button type="button" onClick={() => setOnlyUnsynced((v) => !v)}
+                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition",
+                  onlyUnsynced ? s.filterActive : s.filterIdle)}>
+                {t.filterUnsynced}
+                <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black",
+                  onlyUnsynced ? "bg-white/20" : "bg-amber-400/20 text-amber-400")}>
+                  {unsyncedPublishedCount}
+                </span>
+              </button>
             </div>
             <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
               <Search className="size-4 shrink-0 text-violet-400" />

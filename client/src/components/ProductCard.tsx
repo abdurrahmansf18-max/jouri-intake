@@ -150,6 +150,15 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
           </span>
         </div>
 
+        {/* Yayında ama Shopify'e gönderilmemiş ürün uyarısı */}
+        {record.status === "published" && !record.shopify?.productId && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-400 ring-1 ring-amber-400/25">
+              {t.cardNotOnShopify}
+            </span>
+          </div>
+        )}
+
         {/* Alt satır: detay göstergesi + düzenle/geri al butonu */}
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className={cn(
