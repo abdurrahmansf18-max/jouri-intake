@@ -16,6 +16,7 @@ from database import get_db
 from db_models import Product
 from dependencies import verify_access
 from models import (
+    BulkStatusRequest,
     BulkUpdateRequest,
     BulkShopifyPushRequest,
     ProductRecord,
@@ -226,19 +227,7 @@ def update_status(
     if _status_change_requires_unlock(old_status, new_status) and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
         raise HTTPException(status_code=403, detail={"code": "ERR_EDIT_LOCK_REQUIRED"})
 
-    if old_status != new_status:
-        new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, new_status)
-        p.folder_path = new_path
-        p.images = file_manager.rebase_image_relative_paths(p.images, p.folder_name, new_status)
-
-    p.status = new_status
-    if new_status == "sold_archive":
-        p.stock_quantity = 0
-        if p.size_stocks:
-            p.size_stocks = [{"size": ss["size"], "qty": 0} for ss in p.size_stocks]
-    else:
-        p.stock_quantity = max(1, p.stock_quantity)
-
+    _apply_status_change(p, new_status)
     activity_logger.log(
         db, "status_change",
         product_id=p.id,
@@ -252,6 +241,63 @@ def update_status(
     if new_status == "sold_archive" or old_status == "sold_archive":
         queue_shopify_stock_sync(background_tasks, p.id, "status_change", p.shopify_product_id)
     return record
+
+
+@router.patch("/api/products/bulk/status", response_model=list[ProductRecord])
+def bulk_update_status(
+    body: BulkStatusRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    jouri_edit_unlock: Annotated[str | None, Cookie()] = None,
+    db: Session = Depends(get_db),
+):
+    new_status = body.status.value
+    products = db.query(Product).filter(Product.id.in_(body.productIds)).all()
+    updated: list[Product] = []
+    skipped_ids: list[str] = []
+
+    for p in products:
+        old_status = p.status
+        if old_status == new_status:
+            continue
+        if _status_change_requires_unlock(old_status, new_status) and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
+            skipped_ids.append(p.id)
+            continue
+        _apply_status_change(p, new_status)
+        activity_logger.log(
+            db, "status_change",
+            product_id=p.id,
+            product_title=p.title_raw,
+            details={"from": old_status, "to": new_status},
+        )
+        updated.append(p)
+
+    db.commit()
+    records = []
+    for p in updated:
+        db.refresh(p)
+        record = product_service.to_record(p)
+        records.append(record)
+        background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+        if new_status == "sold_archive":
+            queue_shopify_stock_sync(background_tasks, p.id, "status_change", p.shopify_product_id)
+    return records
+
+
+def _apply_status_change(p: Product, new_status: str) -> None:
+    old_status = p.status
+    if old_status != new_status:
+        new_path = file_manager.move_product_folder(p.folder_path, p.folder_name, new_status)
+        p.folder_path = new_path
+        p.images = file_manager.rebase_image_relative_paths(p.images, p.folder_name, new_status)
+
+    p.status = new_status
+    if new_status == "sold_archive":
+        p.stock_quantity = 0
+        if p.size_stocks:
+            p.size_stocks = [{"size": ss["size"], "qty": 0} for ss in p.size_stocks]
+    else:
+        p.stock_quantity = max(1, p.stock_quantity)
 
 
 def _status_change_requires_unlock(old_status: str, new_status: str) -> bool:

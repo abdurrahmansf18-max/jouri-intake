@@ -219,6 +219,15 @@ export async function bulkPushToShopify(ids: string[]): Promise<{ success: boole
   return handleResponse<{ success: boolean; results: any[] }>(res);
 }
 
+export async function bulkUpdateStatus(ids: string[], status: ProductStatus): Promise<ProductRecord[]> {
+  const res = await fetch("/api/products/bulk/status", {
+    method: "PATCH",
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ productIds: ids, status }),
+  });
+  return handleResponse<ProductRecord[]>(res);
+}
+
 export async function getAiPrompts(
   productId: string,
   sourceFileName: string,

@@ -184,6 +184,11 @@ class BulkShopifyPushRequest(BaseModel):
     productIds: list[str]
 
 
+class BulkStatusRequest(BaseModel):
+    productIds: list[str]
+    status: ProductStatus
+
+
 class SellProductRequest(BaseModel):
     quantity: int = 1
     size: Optional[str] = None

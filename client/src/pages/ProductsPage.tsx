@@ -10,7 +10,7 @@ import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
 import { PromptModal } from "../components/PromptModal";
 import { useProductCacheActions, useProductsQuery } from "../queries";
-import { bulkUpdateProducts, bulkPushToShopify } from "../api";
+import { bulkUpdateProducts, bulkUpdateStatus, bulkPushToShopify } from "../api";
 
 const PAGE_SIZE = 30;
 
@@ -34,6 +34,7 @@ export default function ProductsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushProgress, setPushProgress] = useState<string | null>(null);
+  const [statusBulkLoading, setStatusBulkLoading] = useState<"ai_enhanced" | "published" | null>(null);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
@@ -206,6 +207,25 @@ export default function ProductsPage() {
   function removeRecord(id: string) {
     cacheActions.removeProduct(id);
     if (selectedId === id) setSelectedId(null);
+  }
+
+  async function handleBulkStatusChange(status: "ai_enhanced" | "published") {
+    setStatusBulkLoading(status);
+    try {
+      const updatedRecords = await bulkUpdateStatus(selectedIds, status);
+      const skipped = selectedIds.length - updatedRecords.length;
+      showToast(
+        skipped > 0
+          ? t.bulkStatusPartial(updatedRecords.length, skipped)
+          : t.bulkStatusSuccess(updatedRecords.length),
+        skipped > 0 ? "error" : "success",
+      );
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (e) {
+      showToast(t.errors.ERR_GENERAL, "error");
+    } finally {
+      setStatusBulkLoading(null);
+    }
   }
 
   function openView(id: string) { setSelectedId(id); setDetailMode("view"); }
@@ -566,6 +586,32 @@ export default function ProductsPage() {
                   }}
                 >
                   <span className="block min-w-0 text-center leading-tight">{t.bulkEditSelected(selectedIds.length)}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={statusBulkLoading !== null}
+                  className={cn(
+                    "min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
+                    statusBulkLoading !== null ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-500"
+                  )}
+                  onClick={() => handleBulkStatusChange("ai_enhanced")}
+                >
+                  <span className="block min-w-0 text-center leading-tight">
+                    {statusBulkLoading === "ai_enhanced" ? t.bulkStatusWorking : t.bulkMarkAiEnhanced(selectedIds.length)}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={statusBulkLoading !== null}
+                  className={cn(
+                    "min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
+                    statusBulkLoading !== null ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500"
+                  )}
+                  onClick={() => handleBulkStatusChange("published")}
+                >
+                  <span className="block min-w-0 text-center leading-tight">
+                    {statusBulkLoading === "published" ? t.bulkStatusWorking : t.bulkMarkPublished(selectedIds.length)}
+                  </span>
                 </button>
               </div>
             )}
