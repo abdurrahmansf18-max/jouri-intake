@@ -13,7 +13,7 @@ from models import AiImageGenerateRequest
 
 
 OPENAI_IMAGE_MODEL = os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-1.5")
-OPENAI_IMAGE_SIZE = os.environ.get("OPENAI_IMAGE_SIZE", "1024x1024")
+OPENAI_IMAGE_SIZE = os.environ.get("OPENAI_IMAGE_SIZE", "1024x1536")
 OPENAI_IMAGE_QUALITY = os.environ.get("OPENAI_IMAGE_QUALITY", "medium")
 
 
@@ -97,10 +97,13 @@ def _product_context(product: Any, request: AiImageGenerateRequest) -> str:
             f"Category/audience: {_value(product, 'category')}" if _value(product, "category") else "",
             f"Product type: {_value(product, 'product_type')}" if _value(product, "product_type") else "",
             f"Color: {_value(product, 'color_raw')}" if _value(product, "color_raw") else "",
+            f"Season: {_value(product, 'season')}" if _value(product, "season") else "",
             f"Age/size: {size_text}" if size_text else "",
             "Size notation: M means months, Y means years. For example 12M is 12 months, 3Y is 3 years, and 3-6M is 3 to 6 months. Plain numbers such as 24 or 30 are clothing size labels, not ages. Only standard EU children's clothing sizes like 50-164 may be used as approximate age guidance.",
             f"Gender/audience note: {audience_text}" if audience_text else "",
             f"Age note: {age_text}" if age_text else "",
+            f"Description: {_value(product, 'description')}" if _value(product, "description") else "",
+            f"Internal notes: {_value(product, 'notes')}" if _value(product, "notes") else "",
             f"Extra user instruction: {request.instructions.strip()}" if request.instructions.strip() else "",
         ] if part
     )
@@ -172,13 +175,6 @@ def _manual_master_prompt(product: Any, request: AiImageGenerateRequest) -> str:
     context = _product_context(product, request)
     lifestyle_scene = _scene_guidance(product, request)
     hanger_scene = _wooden_hanger_scene_guidance(product, request)
-    extra_context = "\n".join(
-        part for part in [
-            f"Season: {_value(product, 'season')}" if _value(product, "season") else "",
-            f"Description: {_value(product, 'description')}" if _value(product, "description") else "",
-            f"Internal notes: {_value(product, 'notes')}" if _value(product, "notes") else "",
-        ] if part
-    )
 
     return f"""
 Use the uploaded product photo as the only visual source of truth. Create exactly 3 separate, ecommerce-ready image files for the same product.
@@ -191,7 +187,6 @@ Output contract:
 
 Product context:
 {context}
-{extra_context}
 
 Create exactly these 3 outputs:
 
