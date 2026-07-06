@@ -37,11 +37,16 @@ async def generate_product_images(
         raise HTTPException(status_code=503, detail={"code": "ERR_AI_IMAGE_NOT_CONFIGURED"})
 
     client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    audience = (request.gender.strip() or _infer_audience(product)).strip().lower()
     prompts = [
-        ("ai-model-worn.jpg", _worn_prompt(product, request)),
         ("ai-studio-hanger.jpg", _studio_prompt(product, request)),
         ("ai-original-clean.jpg", _clean_original_prompt(product, request)),
     ]
+    if audience != "baby":
+        # Baby category skips the worn/model shot: it doesn't fit babies well, and
+        # AI providers apply stricter, less predictable safety handling to images
+        # depicting infants being "worn"/modeled.
+        prompts.insert(0, ("ai-model-worn.jpg", _worn_prompt(product, request)))
 
     generated: list[GeneratedAiImage] = []
     for file_name, prompt in prompts:
