@@ -211,38 +211,6 @@ async def create_product(
     return product_service.to_record(product)
 
 
-@router.patch("/api/products/{product_id}/status", response_model=ProductRecord)
-def update_status(
-    product_id: str,
-    body: StatusUpdateRequest,
-    background_tasks: BackgroundTasks,
-    _: Annotated[None, Depends(verify_access)],
-    jouri_edit_unlock: Annotated[str | None, Cookie()] = None,
-    db: Session = Depends(get_db),
-):
-    p = product_service.get_or_404(db, product_id)
-    old_status = p.status
-    new_status = body.status.value
-
-    if _status_change_requires_unlock(old_status, new_status) and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
-        raise HTTPException(status_code=403, detail={"code": "ERR_EDIT_LOCK_REQUIRED"})
-
-    _apply_status_change(p, new_status)
-    activity_logger.log(
-        db, "status_change",
-        product_id=p.id,
-        product_title=p.title_raw,
-        details={"from": old_status, "to": new_status},
-    )
-    db.commit()
-    db.refresh(p)
-    record = product_service.to_record(p)
-    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
-    if new_status == "sold_archive" or old_status == "sold_archive":
-        queue_shopify_stock_sync(background_tasks, p.id, "status_change", p.shopify_product_id)
-    return record
-
-
 @router.patch("/api/products/bulk/status", response_model=list[ProductRecord])
 def bulk_update_status(
     body: BulkStatusRequest,
@@ -282,6 +250,38 @@ def bulk_update_status(
         if new_status == "sold_archive":
             queue_shopify_stock_sync(background_tasks, p.id, "status_change", p.shopify_product_id)
     return records
+
+
+@router.patch("/api/products/{product_id}/status", response_model=ProductRecord)
+def update_status(
+    product_id: str,
+    body: StatusUpdateRequest,
+    background_tasks: BackgroundTasks,
+    _: Annotated[None, Depends(verify_access)],
+    jouri_edit_unlock: Annotated[str | None, Cookie()] = None,
+    db: Session = Depends(get_db),
+):
+    p = product_service.get_or_404(db, product_id)
+    old_status = p.status
+    new_status = body.status.value
+
+    if _status_change_requires_unlock(old_status, new_status) and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
+        raise HTTPException(status_code=403, detail={"code": "ERR_EDIT_LOCK_REQUIRED"})
+
+    _apply_status_change(p, new_status)
+    activity_logger.log(
+        db, "status_change",
+        product_id=p.id,
+        product_title=p.title_raw,
+        details={"from": old_status, "to": new_status},
+    )
+    db.commit()
+    db.refresh(p)
+    record = product_service.to_record(p)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
+    if new_status == "sold_archive" or old_status == "sold_archive":
+        queue_shopify_stock_sync(background_tasks, p.id, "status_change", p.shopify_product_id)
+    return record
 
 
 def _apply_status_change(p: Product, new_status: str) -> None:
