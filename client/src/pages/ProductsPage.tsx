@@ -64,6 +64,13 @@ export default function ProductsPage() {
   };
   const unsyncedPublishedCount = records.filter((r) => r.status === "published" && !r.shopify?.productId).length;
 
+  // Toplu işlem butonları sadece seçili filtrede anlamlı olan durumlarda görünsün.
+  // "Şopify'e Gönderilmedi" açıkken görünür kayıtlar zaten hep published'tır.
+  const effectiveBulkStatus = onlyUnsynced ? "published" : filter;
+  const showBulkShopifyPush = effectiveBulkStatus === "published" || effectiveBulkStatus === "all";
+  const showBulkMarkAiEnhanced = effectiveBulkStatus === "pending" || effectiveBulkStatus === "all";
+  const showBulkMarkPublished = effectiveBulkStatus === "pending" || effectiveBulkStatus === "ai_enhanced" || effectiveBulkStatus === "all";
+
   const statusRecords = useMemo(
     () => records.filter((r) => filter === "all" || r.status === filter),
     [records, filter],
@@ -516,6 +523,7 @@ export default function ProductsPage() {
             </div>
             {bulkMode && selectedIds.length > 0 && (
               <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto">
+                {showBulkShopifyPush && (
                 <button
                   type="button"
                   disabled={pushLoading}
@@ -560,6 +568,7 @@ export default function ProductsPage() {
                 >
                   <span className="block min-w-0 text-center leading-tight">{pushProgress ? pushProgress : t.shopifyBtn}</span>
                 </button>
+                )}
                 <button
                   type="button"
                   className="min-h-11 min-w-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-black text-white hover:bg-violet-500 sm:col-span-2 lg:col-span-1"
@@ -587,6 +596,7 @@ export default function ProductsPage() {
                 >
                   <span className="block min-w-0 text-center leading-tight">{t.bulkEditSelected(selectedIds.length)}</span>
                 </button>
+                {showBulkMarkAiEnhanced && (
                 <button
                   type="button"
                   disabled={statusBulkLoading !== null}
@@ -600,6 +610,8 @@ export default function ProductsPage() {
                     {statusBulkLoading === "ai_enhanced" ? t.bulkStatusWorking : t.bulkMarkAiEnhanced(selectedIds.length)}
                   </span>
                 </button>
+                )}
+                {showBulkMarkPublished && (
                 <button
                   type="button"
                   disabled={statusBulkLoading !== null}
@@ -613,6 +625,7 @@ export default function ProductsPage() {
                     {statusBulkLoading === "published" ? t.bulkStatusWorking : t.bulkMarkPublished(selectedIds.length)}
                   </span>
                 </button>
+                )}
               </div>
             )}
           </div>
