@@ -67,9 +67,13 @@ export default function ProductsPage() {
   // Toplu işlem butonları sadece seçili filtrede anlamlı olan durumlarda görünsün.
   // "Şopify'e Gönderilmedi" açıkken görünür kayıtlar zaten hep published'tır.
   const effectiveBulkStatus = onlyUnsynced ? "published" : filter;
-  const showBulkShopifyPush = effectiveBulkStatus === "published" || effectiveBulkStatus === "all";
-  const showBulkMarkAiEnhanced = effectiveBulkStatus === "pending" || effectiveBulkStatus === "all";
-  const showBulkMarkPublished = effectiveBulkStatus === "pending" || effectiveBulkStatus === "ai_enhanced" || effectiveBulkStatus === "all";
+  const showBulkEditSeason = effectiveBulkStatus !== "published";
+  const showBulkShopifyPush = effectiveBulkStatus === "published";
+  const showBulkMarkAiEnhanced = effectiveBulkStatus === "pending";
+  const showBulkMarkPublished = effectiveBulkStatus === "ai_enhanced";
+  const selectedAlreadySynced = selectedIds.length > 0 && selectedIds.every(
+    (id) => Boolean(records.find((r) => r.id === id)?.shopify?.productId)
+  );
 
   const statusRecords = useMemo(
     () => records.filter((r) => filter === "all" || r.status === filter),
@@ -566,9 +570,12 @@ export default function ProductsPage() {
                     setTimeout(() => window.location.reload(), 1500);
                   }}
                 >
-                  <span className="block min-w-0 text-center leading-tight">{pushProgress ? pushProgress : t.shopifyBtn}</span>
+                  <span className="block min-w-0 text-center leading-tight">
+                    {pushProgress ? pushProgress : (selectedAlreadySynced ? t.shopifyUpdateBtn : t.shopifyBtn)}
+                  </span>
                 </button>
                 )}
+                {showBulkEditSeason && (
                 <button
                   type="button"
                   className="min-h-11 min-w-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-black text-white hover:bg-violet-500 sm:col-span-2 lg:col-span-1"
@@ -596,6 +603,7 @@ export default function ProductsPage() {
                 >
                   <span className="block min-w-0 text-center leading-tight">{t.bulkEditSelected(selectedIds.length)}</span>
                 </button>
+                )}
                 {showBulkMarkAiEnhanced && (
                 <button
                   type="button"
