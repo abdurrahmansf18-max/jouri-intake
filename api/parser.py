@@ -581,8 +581,6 @@ def _guess_season(description: str, product_type: str = "") -> str:
         return "Winter"
     if product_type == "Shorts":
         return "Summer"
-    if product_type in {"Pajamas", "Set", "T-Shirt", "T-Shirt Set", "Shirt", "Blouse", "Pants"}:
-        return "Spring"
     return ""
 
 
