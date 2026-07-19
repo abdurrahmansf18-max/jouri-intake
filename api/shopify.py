@@ -391,20 +391,27 @@ async def _sync_filter_metafields(
     product: Product,
     related_products: list[Product] | None = None,
 ) -> dict[str, Any]:
-    colors = _normalized_colors(product.color_raw)
+    owner_id = _shopify_product_gid(shopify_product_id)
+    filter_values = {
+        "filter_color": _normalized_colors(product.color_raw),
+        "filter_gender": _filter_gender_values(product),
+        "filter_age_range": _filter_age_range_values(product),
+        "filter_season": _filter_season_values(product),
+        "filter_offer": _filter_offer_values(product),
+    }
     metafields: list[dict[str, Any]] = []
 
-    if colors:
+    for key, values in filter_values.items():
         metafields.append({
-            "ownerId": _shopify_product_gid(shopify_product_id),
+            "ownerId": owner_id,
             "namespace": "custom",
-            "key": "filter_color",
+            "key": key,
             "type": "list.single_line_text_field",
-            "value": json.dumps(colors),
+            "value": json.dumps(values),
         })
 
     metafields.append({
-        "ownerId": _shopify_product_gid(shopify_product_id),
+        "ownerId": owner_id,
         "namespace": "custom",
         "key": "discount_compare_at_price_cents",
         "type": "number_integer",
@@ -414,7 +421,7 @@ async def _sync_filter_metafields(
     discount_notice = _discount_notice(product)
     if discount_notice:
         metafields.append({
-            "ownerId": _shopify_product_gid(shopify_product_id),
+            "ownerId": owner_id,
             "namespace": "custom",
             "key": "discount_notice",
             "type": "single_line_text_field",
@@ -429,7 +436,7 @@ async def _sync_filter_metafields(
             if str(related.shopify_product_id or "").strip()
         ]
         metafields.append({
-            "ownerId": _shopify_product_gid(shopify_product_id),
+            "ownerId": owner_id,
             "namespace": "custom",
             "key": "related_products",
             "type": "list.product_reference",
@@ -469,7 +476,7 @@ async def _sync_filter_metafields(
             for err in errors
         )
         raise ShopifyPushError(f"Shopify filtre metafield kabul edilmedi: {message[:240]}")
-    return {"set": True, "colors": colors, "relatedProducts": len(related_gids)}
+    return {"set": True, **filter_values, "relatedProducts": len(related_gids)}
 
 
 def _standard_category_id(product: Product) -> str:
@@ -999,6 +1006,52 @@ def _age_tags(product: Product) -> list[str]:
         "Age: 9-13 Years",
     ]
     return [tag for tag in order if tag in groups]
+
+
+def _filter_gender_values(product: Product) -> list[str]:
+    text = _category_key(" ".join([
+        product.category or "",
+        product.title_raw or "",
+        product.product_type or "",
+        " ".join(product.tags or []),
+    ]))
+    values = []
+    if re.search(r"\bboys?\b|\bmale\b", text):
+        values.append("Boys")
+    if re.search(r"\bgirls?\b|\bfemale\b", text):
+        values.append("Girls")
+    return values
+
+
+def _filter_age_range_values(product: Product) -> list[str]:
+    return [tag.replace("Age: ", "", 1) for tag in _age_tags(product)]
+
+
+def _filter_season_values(product: Product) -> list[str]:
+    text = _category_key(" ".join([
+        product.season or "",
+        " ".join(product.tags or []),
+    ]))
+    values = []
+    for token, label in [
+        ("spring", "Spring"),
+        ("summer", "Summer"),
+        ("winter", "Winter"),
+    ]:
+        if re.search(rf"\b{token}\b", text):
+            values.append(label)
+    return values
+
+
+def _filter_offer_values(product: Product) -> list[str]:
+    values = []
+    if product.is_limited_time_deal:
+        values.append("Limited-Time Deal")
+    if product.is_discounted:
+        values.append("Discounted")
+    if product.is_final_sale:
+        values.append("Final Sale")
+    return values
 
 
 def _product_size_values(product: Product) -> list[str]:
