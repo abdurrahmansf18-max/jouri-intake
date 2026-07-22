@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -27,6 +28,7 @@ from models import (
 )
 from parser import normalize_category, normalize_product_type, normalize_season, parse_description
 from realtime import ws_manager
+from size_utils import normalize_size_stock_list, normalize_size_values
 from shopify_stock_sync import queue_shopify_metadata_sync, queue_shopify_stock_sync
 
 
@@ -137,6 +139,17 @@ async def create_product(
             size_stocks_data = json.loads(sizeStocksJson)
         except Exception:
             raise HTTPException(status_code=422, detail={"code": "ERR_SIZE_REQUIRED"})
+    if not size_stocks_data or not any(int(ss.get("qty", 0)) >= 1 for ss in size_stocks_data):
+        raise HTTPException(status_code=422, detail={"code": "ERR_SIZE_REQUIRED"})
+    size_stocks_data = normalize_size_stock_list(
+        size_stocks_data,
+        " ".join([
+            titleRaw or "",
+            categorySuggestion or "",
+            productTypeSuggestion or "",
+            description or "",
+        ]),
+    )
     if not size_stocks_data or not any(int(ss.get("qty", 0)) >= 1 for ss in size_stocks_data):
         raise HTTPException(status_code=422, detail={"code": "ERR_SIZE_REQUIRED"})
 
@@ -361,13 +374,16 @@ def update_product(
         p.is_limited_time_deal = bool(body.isLimitedTimeDeal)
         shopify_catalog_changed = True
     if body.sizeStocks is not None:
-        new_ss = [ss.model_dump() for ss in body.sizeStocks]
+        new_ss = normalize_size_stock_list(
+            [ss.model_dump() for ss in body.sizeStocks],
+            _size_context_for_product(p),
+        )
         stock_changed = True
         p.size_stocks = new_ss
-        new_total = sum(ss.qty for ss in body.sizeStocks)
+        new_total = sum(int(ss.get("qty") or 0) for ss in new_ss)
         track("stock", p.stock_quantity, new_total)
         p.stock_quantity = new_total
-        p.sizes_raw = ", ".join(ss.size for ss in body.sizeStocks if ss.size)
+        p.sizes_raw = ", ".join(str(ss.get("size") or "") for ss in new_ss if ss.get("size"))
     elif body.stockQuantity is not None:
         track("stock", p.stock_quantity, max(0, int(body.stockQuantity)))
         stock_changed = True
@@ -395,7 +411,12 @@ def update_product(
             season = normalize_season(pd.season)
             track("season", p.season, season); p.season = season
         if pd.sizesRaw is not None:
-            track("sizes", p.sizes_raw, pd.sizesRaw); p.sizes_raw = pd.sizesRaw
+            normalized_sizes = normalize_size_values(
+                [s.strip() for s in re.split(r"[,/]+", pd.sizesRaw) if s.strip()],
+                _size_context_for_product(p, pd.sizesRaw),
+            )
+            sizes_raw = ", ".join(normalized_sizes) if normalized_sizes else pd.sizesRaw
+            track("sizes", p.sizes_raw, sizes_raw); p.sizes_raw = sizes_raw
         if pd.tags is not None:
             p.tags = pd.tags
 
@@ -649,6 +670,18 @@ def bulk_update_products(
         background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
         
     return result
+
+
+def _size_context_for_product(product: Product, extra: str = "") -> str:
+    return " ".join([
+        product.category or "",
+        product.product_type or "",
+        product.title_raw or "",
+        product.sizes_raw or "",
+        product.description or "",
+        " ".join(product.tags or []),
+        extra or "",
+    ])
 
 
 async def _bulk_push_to_shopify_impl(

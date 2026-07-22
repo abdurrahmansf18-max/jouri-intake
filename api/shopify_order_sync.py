@@ -8,6 +8,7 @@ import activity_logger
 import file_manager
 import product_service
 from db_models import Product
+from size_utils import size_key as canonical_size_key
 from realtime import ws_manager
 
 
@@ -306,17 +307,7 @@ def _id_key(value: str) -> str:
 
 
 def _size_key(size: str) -> str:
-    cleaned = (size or "").strip().lower()
-    cleaned = cleaned.replace("ı", "i").replace("İ", "i")
-    cleaned = cleaned.replace("ş", "s").replace("ğ", "g").replace("ü", "u").replace("ö", "o").replace("ç", "c")
-    cleaned = re.sub(r"\b(years?|yrs?|yas|yaş)\b", "y", cleaned)
-    cleaned = re.sub(r"\b(months?|mos?|ay)\b", "m", cleaned)
-    cleaned = re.sub(r"\b(one size|onesize|tek beden|standard)\b", "onesize", cleaned)
-    cleaned = re.sub(r"(\d+)\s*-\s*(\d+)\s*y\b", r"\1-\2y", cleaned)
-    cleaned = re.sub(r"(\d+)\s*-\s*(\d+)\s*m\b", r"\1-\2m", cleaned)
-    cleaned = re.sub(r"(\d+)\s*y\b", r"\1y", cleaned)
-    cleaned = re.sub(r"(\d+)\s*m\b", r"\1m", cleaned)
-    return re.sub(r"[^a-z0-9]+", "", cleaned) or "onesize"
+    return canonical_size_key(size)
 
 
 def _int(value: Any, default: int) -> int:

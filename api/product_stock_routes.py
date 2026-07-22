@@ -17,6 +17,7 @@ from models import (
     SellProductRequest,
 )
 from realtime import ws_manager
+from size_utils import normalize_size_label, size_key
 from shopify_stock_sync import queue_shopify_stock_sync
 
 
@@ -40,25 +41,30 @@ def sell_product(
         # Beden bazlı stok takibi
         if not body.size:
             raise HTTPException(status_code=400, detail={"code": "ERR_SIZE_REQUIRED"})
-        size_entry = next((ss for ss in size_stocks if ss["size"] == body.size), None)
+        requested_key = size_key(body.size)
+        size_entry = next((ss for ss in size_stocks if size_key(str(ss.get("size") or "")) == requested_key), None)
         if not size_entry:
             raise HTTPException(status_code=400, detail={"code": "ERR_SIZE_NOT_FOUND"})
         if size_entry["qty"] <= 0:
             raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
+        selected_size = str(size_entry.get("size") or body.size).strip()
         sold_amount = min(quantity, size_entry["qty"])
         new_size_stocks = [
-            {"size": ss["size"], "qty": ss["qty"] - sold_amount if ss["size"] == body.size else ss["qty"]}
+            {
+                "size": ss["size"],
+                "qty": ss["qty"] - sold_amount if size_key(str(ss.get("size") or "")) == requested_key else ss["qty"],
+            }
             for ss in size_stocks
         ]
         p.size_stocks = new_size_stocks
         next_stock = sum(ss["qty"] for ss in new_size_stocks)
 
         # Beden tamamen bitti → sold_sizes'a ekle / güncelle
-        sold_qty_after = next((ss["qty"] for ss in new_size_stocks if ss["size"] == body.size), 0)
+        sold_qty_after = next((ss["qty"] for ss in new_size_stocks if size_key(str(ss.get("size") or "")) == requested_key), 0)
         if sold_qty_after == 0:
-            sold_sizes_list = [s for s in (p.sold_sizes or []) if s["size"] != body.size]
+            sold_sizes_list = [s for s in (p.sold_sizes or []) if size_key(str(s.get("size") or "")) != requested_key]
             sold_sizes_list.append({
-                "size": body.size,
+                "size": selected_size,
                 "soldAt": now.isoformat(),
                 "note": (body.note or "").strip(),
                 "source": "manual",
@@ -76,7 +82,7 @@ def sell_product(
         {
             "soldAt": now.isoformat(),
             "quantity": sold_amount,
-            "size": body.size or "",
+            "size": selected_size if size_stocks else (body.size or ""),
             "note": (body.note or "").strip(),
             "source": "manual",
         }
@@ -96,7 +102,7 @@ def sell_product(
         db, "sell",
         product_id=p.id,
         product_title=p.title_raw,
-        details={"quantity": sold_amount, "size": body.size or "", "note": body.note or ""},
+        details={"quantity": sold_amount, "size": selected_size if size_stocks else (body.size or ""), "note": body.note or ""},
     )
     db.commit()
     db.refresh(p)
@@ -192,20 +198,29 @@ def restore_product_size(
 ):
     """Satılan belirli bir bedeni geri alır (iade)."""
     p = product_service.get_or_404(db, product_id)
-    size_name = body.size.strip()
+    size_name = normalize_size_label(body.size.strip(), f"{p.category} {p.title_raw} {p.sizes_raw}") or body.size.strip()
+    requested_key = size_key(size_name)
 
     sold = list(p.sold_sizes or [])
-    if not any(s["size"] == size_name for s in sold):
+    matched_sold = next((s for s in sold if size_key(str(s.get("size") or "")) == requested_key), None)
+    if not matched_sold:
         raise HTTPException(status_code=404, detail={"code": "ERR_SIZE_NOT_FOUND"})
+    size_name = str(matched_sold.get("size") or size_name)
 
     # sold_sizes'tan kaldır — yeni dict objeleri oluştur (SQLAlchemy JSON mutation tuzağından kaçın)
-    p.sold_sizes = [{"size": s["size"], "soldAt": s["soldAt"], "note": s.get("note", "")} for s in sold if s["size"] != size_name]
+    p.sold_sizes = [
+        {"size": s["size"], "soldAt": s["soldAt"], "note": s.get("note", "")}
+        for s in sold
+        if size_key(str(s.get("size") or "")) != requested_key
+    ]
 
     # sizeStocks'a 1 adet olarak geri ekle — sell endpoint gibi yeni dict objeleri yarat
     current_stocks = list(p.size_stocks or [])
-    size_exists = any(s["size"] == size_name for s in current_stocks)
+    size_exists = any(size_key(str(s.get("size") or "")) == requested_key for s in current_stocks)
     stocks = [
-        {"size": s["size"], "qty": s["qty"] + 1} if s["size"] == size_name else {"size": s["size"], "qty": s["qty"]}
+        {"size": s["size"], "qty": s["qty"] + 1}
+        if size_key(str(s.get("size") or "")) == requested_key
+        else {"size": s["size"], "qty": s["qty"]}
         for s in current_stocks
     ]
     if not size_exists:

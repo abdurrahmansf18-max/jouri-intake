@@ -13,6 +13,12 @@ from dotenv import load_dotenv
 
 import file_manager
 from db_models import Product
+from size_utils import (
+    normalize_size_label,
+    normalize_size_stock_list,
+    normalize_size_values,
+    size_key as canonical_size_key,
+)
 
 
 try:
@@ -570,16 +576,20 @@ def _shopify_product_gid(shopify_product_id: str) -> str:
 def _local_variants(product: Product) -> list[dict[str, Any]]:
     price = _price(product.price_amount)
     compare_at_price = _compare_at_price(product)
-    stocks = list(product.size_stocks or [])
+    context = _size_context(product)
+    stocks = normalize_size_stock_list(product.size_stocks or [], context)
     if not stocks:
-        sizes = [s.strip() for s in (product.sizes_raw or "").split(",") if s.strip()]
+        sizes = normalize_size_values(
+            [s.strip() for s in re.split(r"[,/]+", product.sizes_raw or "") if s.strip()],
+            context,
+        )
         qty = max(0, int(product.stock_quantity or 0))
         stocks = [{"size": s, "qty": qty} for s in sizes] or [{"size": "One Size", "qty": qty}]
 
     variants = []
     seen: set[str] = set()
     for stock in stocks:
-        size = str(stock.get("size") or "One Size").strip() or "One Size"
+        size = normalize_size_label(str(stock.get("size") or "One Size"), context) or "One Size"
         size_key = _size_key(size)
         if size_key in seen:
             continue
@@ -615,20 +625,21 @@ async def _sync_variants(
     shopify_product: dict[str, Any],
     product: Product,
 ) -> dict[str, int]:
+    context = _size_context(product)
     existing = shopify_product.get("variants") or []
     existing_by_key: dict[str, list[dict[str, Any]]] = {}
     for variant in existing:
-        key = _size_key(str(variant.get("option1") or "").strip())
+        key = _size_key_in_context(str(variant.get("option1") or "").strip(), context)
         if key:
             existing_by_key.setdefault(key, []).append(variant)
 
     local_variants = _local_variants(product)
-    local_keys = {_size_key(v["option1"]) for v in local_variants}
+    local_keys = {_size_key_in_context(v["option1"], context) for v in local_variants}
     used_existing_ids: set[str] = set()
     updated = created = disabled = deleted = 0
 
     for variant in local_variants:
-        key = _size_key(variant["option1"])
+        key = _size_key_in_context(variant["option1"], context)
         candidates = existing_by_key.get(key) or []
         current = _best_existing_variant(candidates, variant["option1"])
         if current:
@@ -645,7 +656,7 @@ async def _sync_variants(
         if current_id in used_existing_ids:
             continue
         option = str(current.get("option1") or "").strip()
-        option_key = _size_key(option)
+        option_key = _size_key_in_context(option, context)
         if option_key in local_keys:
             try:
                 await _request(session, credentials, "DELETE", f"variants/{current['id']}.json")
@@ -686,8 +697,9 @@ async def _sync_inventory_levels(
 ) -> dict[str, int]:
     """Set real Shopify inventory levels from the local size stock source of truth."""
     variants = shopify_product.get("variants") or []
+    context = _size_context(product)
     desired_by_key = {
-        _size_key(str(variant.get("option1") or "One Size")): max(0, int(variant.get("inventory_quantity") or 0))
+        _size_key_in_context(str(variant.get("option1") or "One Size"), context): max(0, int(variant.get("inventory_quantity") or 0))
         for variant in _local_variants(product)
     }
     inventory_item_ids = [
@@ -705,7 +717,7 @@ async def _sync_inventory_levels(
             skipped += 1
             continue
 
-        desired = desired_by_key.get(_size_key(option))
+        desired = desired_by_key.get(_size_key_in_context(option, context))
         if desired is None:
             if option and option != "Default Title":
                 desired = 0
@@ -787,18 +799,11 @@ def _best_existing_variant(candidates: list[dict[str, Any]], local_size: str) ->
 
 
 def _size_key(size: str) -> str:
-    cleaned = _clean_size_text(size)
-    if not cleaned:
-        return "onesize"
+    return canonical_size_key(size)
 
-    cleaned = re.sub(r"\b(years?|yrs?|yas|yaş)\b", "y", cleaned)
-    cleaned = re.sub(r"\b(months?|mos?|ay)\b", "m", cleaned)
-    cleaned = re.sub(r"\b(one size|onesize|tek beden|standard)\b", "onesize", cleaned)
-    cleaned = re.sub(r"(\d+)\s*-\s*(\d+)\s*y\b", r"\1-\2y", cleaned)
-    cleaned = re.sub(r"(\d+)\s*-\s*(\d+)\s*m\b", r"\1-\2m", cleaned)
-    cleaned = re.sub(r"(\d+)\s*y\b", r"\1y", cleaned)
-    cleaned = re.sub(r"(\d+)\s*m\b", r"\1m", cleaned)
-    return re.sub(r"[^a-z0-9]+", "", cleaned) or "onesize"
+
+def _size_key_in_context(size: str, context: str) -> str:
+    return canonical_size_key(normalize_size_label(size, context) or size)
 
 
 def _clean_size_text(size: str) -> str:
@@ -1064,7 +1069,18 @@ def _product_size_values(product: Product) -> list[str]:
         cleaned = size.strip()
         if cleaned:
             values.append(cleaned)
-    return values
+    return normalize_size_values(values, _size_context(product))
+
+
+def _size_context(product: Product) -> str:
+    return " ".join([
+        product.category or "",
+        product.product_type or "",
+        product.title_raw or "",
+        product.sizes_raw or "",
+        product.description or "",
+        " ".join(product.tags or []),
+    ])
 
 
 def _parse_age_size(size: str, context: str) -> tuple[str, float, float]:

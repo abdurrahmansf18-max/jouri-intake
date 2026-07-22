@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy import text
@@ -7,11 +8,13 @@ from sqlalchemy.orm import Session
 import file_manager
 from database import SessionLocal
 from db_models import Product
+from size_utils import normalize_size_label, normalize_size_stock_list, normalize_size_values
 
 
 def run_startup_tasks() -> None:
     _startup_migrate()
     _migrate_size_stocks()
+    _normalize_existing_sizes()
 
 
 def _startup_migrate() -> None:
@@ -166,3 +169,67 @@ def _migrate_size_stocks() -> None:
         db.rollback()
     finally:
         db.close()
+
+
+def _normalize_existing_sizes() -> None:
+    db = SessionLocal()
+    changed = 0
+    try:
+        products = db.query(Product).all()
+        for p in products:
+            context = _size_context_for_product(p)
+            next_stocks = normalize_size_stock_list(p.size_stocks or [], context)
+            if next_stocks and next_stocks != (p.size_stocks or []):
+                p.size_stocks = next_stocks
+                changed += 1
+
+            raw_sizes = [s.strip() for s in re.split(r"[,/]+", p.sizes_raw or "") if s.strip()]
+            next_sizes = normalize_size_values(raw_sizes, context)
+            next_sizes_raw = ", ".join(next_sizes)
+            if next_sizes_raw and next_sizes_raw != (p.sizes_raw or ""):
+                p.sizes_raw = next_sizes_raw
+                changed += 1
+
+            next_sold_sizes = []
+            sold_changed = False
+            for entry in p.sold_sizes or []:
+                label = normalize_size_label(str((entry or {}).get("size") or ""), context)
+                next_entry = {**entry, "size": label or str((entry or {}).get("size") or "")}
+                if next_entry != entry:
+                    sold_changed = True
+                next_sold_sizes.append(next_entry)
+            if sold_changed:
+                p.sold_sizes = next_sold_sizes
+                changed += 1
+
+            next_variant_links = []
+            variant_changed = False
+            for link in p.shopify_variants or []:
+                label = normalize_size_label(str((link or {}).get("size") or ""), context)
+                next_link = {**link, "size": label or str((link or {}).get("size") or "")}
+                if next_link != link:
+                    variant_changed = True
+                next_variant_links.append(next_link)
+            if variant_changed:
+                p.shopify_variants = next_variant_links
+                changed += 1
+
+        if changed:
+            db.commit()
+        print(f"[startup] size normalization done ({changed} product fields updated).")
+    except Exception as exc:
+        print(f"[startup] size normalization warning: {exc}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def _size_context_for_product(product: Product) -> str:
+    return " ".join([
+        product.category or "",
+        product.product_type or "",
+        product.title_raw or "",
+        product.sizes_raw or "",
+        product.description or "",
+        " ".join(product.tags or []),
+    ])

@@ -4,6 +4,7 @@ import json
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from models import ParsedProduct
+from size_utils import normalize_size_label
 
 load_dotenv()
 
@@ -699,6 +700,7 @@ def _normalize_sizes(value: str, default_suffix: str = "") -> list[str]:
             cleaned = f"{cleaned}{suffix}"
         else:
             cleaned = _expand_age_suffix(cleaned.upper())
+        cleaned = normalize_size_label(cleaned, context=f"{value} {default_suffix}") or cleaned
         if cleaned not in sizes:
             sizes.append(cleaned)
     return sizes
