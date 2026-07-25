@@ -582,6 +582,7 @@ async def push_product_to_shopify(
                 "images": res.get("images"),
                 "variants": res.get("variants"),
                 "inventory": res.get("inventory"),
+                "googleShopping": res.get("googleShopping"),
             },
         )
         db.commit()
@@ -732,6 +733,7 @@ async def _bulk_push_to_shopify_impl(
                     "images": res.get("images"),
                     "variants": res.get("variants"),
                     "inventory": res.get("inventory"),
+                    "googleShopping": res.get("googleShopping"),
                 },
             )
             db.commit()

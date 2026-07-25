@@ -100,6 +100,7 @@ async def push_to_shopify(product: Product, related_products: list[Product] | No
         inventory_result = await _sync_inventory_levels(session, credentials, refreshed["product"], product)
         category_result = await _sync_standard_category(session, credentials, product_id, product)
         filter_result = await _sync_filter_metafields(session, credentials, product_id, product, related_products)
+        google_result = await _sync_google_shopping_metafields(session, credentials, refreshed["product"], product)
         image_result = await _upload_missing_images(session, credentials, product_id, refreshed["product"], product)
         final_product = await _request(session, credentials, "GET", f"products/{product_id}.json")
 
@@ -111,6 +112,7 @@ async def push_to_shopify(product: Product, related_products: list[Product] | No
             "variantLinks": variant_links_from_product(final_product["product"]),
             "category": category_result,
             "filters": filter_result,
+            "googleShopping": google_result,
             "images": image_result,
         }
 
@@ -153,12 +155,14 @@ async def sync_existing_product_inventory(product: Product) -> dict[str, Any]:
         refreshed = await _request(session, credentials, "GET", f"products/{product_id}.json")
         inventory_result = await _sync_inventory_levels(session, credentials, refreshed["product"], product)
         filter_result = await _sync_filter_metafields(session, credentials, product_id, product, None)
+        google_result = await _sync_google_shopping_metafields(session, credentials, refreshed["product"], product)
         final_product = await _request(session, credentials, "GET", f"products/{product_id}.json")
         return {
             "product": final_product["product"],
             "variants": variants_result,
             "inventory": inventory_result,
             "filters": filter_result,
+            "googleShopping": google_result,
             "variantLinks": variant_links_from_product(final_product["product"]),
             "skipped": False,
         }
@@ -185,7 +189,8 @@ async def sync_existing_product_metafields(product: Product, related_products: l
             raise ShopifyPushError("Shopify ürünü bulunamadı; metafield senkronu yapılamadı.")
 
         filter_result = await _sync_filter_metafields(session, credentials, product_id, product, related_products)
-        return {"filters": filter_result, "skipped": False}
+        google_result = await _sync_google_shopping_metafields(session, credentials, existing_product["product"], product)
+        return {"filters": filter_result, "googleShopping": google_result, "skipped": False}
 
 
 def variant_links_from_product(shopify_product: dict[str, Any]) -> list[dict[str, Any]]:
@@ -485,6 +490,173 @@ async def _sync_filter_metafields(
     return {"set": True, **filter_values, "relatedProducts": len(related_gids)}
 
 
+async def _sync_google_shopping_metafields(
+    session: aiohttp.ClientSession,
+    credentials: ShopifyCredentials,
+    shopify_product: dict[str, Any],
+    product: Product,
+) -> dict[str, Any]:
+    """Write Google Shopping attributes where Shopify's Google feed can read them.
+
+    The Google & YouTube channel and several Shopify feed tools use the
+    mm-google-shopping namespace for Merchant Center attributes. We write both
+    product and variant owners so size variants inherit the same audience/color
+    data without relying on manual edits in Shopify Admin.
+    """
+    product_id = str(shopify_product.get("id") or "").strip()
+    if not product_id:
+        return {"set": False, "reason": "missing_product_id"}
+
+    attributes = _google_shopping_attributes(product)
+    if not attributes:
+        return {"set": False, "reason": "no_attributes"}
+
+    owner_ids = [_shopify_product_gid(product_id)]
+    for variant in shopify_product.get("variants") or []:
+        variant_id = str(variant.get("id") or "").strip()
+        if variant_id:
+            owner_ids.append(f"gid://shopify/ProductVariant/{variant_id}")
+
+    metafields: list[dict[str, Any]] = []
+    for owner_id in owner_ids:
+        for key, value in attributes.items():
+            metafields.append({
+                "ownerId": owner_id,
+                "namespace": "mm-google-shopping",
+                "key": key,
+                "type": "single_line_text_field",
+                "value": value,
+            })
+
+    mutation = """
+    mutation SetGoogleShoppingMetafields($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields {
+          namespace
+          key
+          value
+        }
+        userErrors {
+          field
+          message
+          code
+        }
+      }
+    }
+    """
+    saved_count = 0
+    for chunk in _chunks(metafields, 25):
+        data = await _graphql_request(
+            session,
+            credentials,
+            mutation,
+            {"metafields": chunk},
+        )
+        payload = (data.get("data") or {}).get("metafieldsSet") or {}
+        errors = payload.get("userErrors") or []
+        if errors:
+            message = "; ".join(
+                f"{'.'.join(map(str, err.get('field') or []))}: {err.get('message')}"
+                for err in errors
+            )
+            raise ShopifyPushError(f"Shopify Google metafield kabul edilmedi: {message[:240]}")
+        saved_count += len(payload.get("metafields") or chunk)
+
+    return {
+        "set": True,
+        **attributes,
+        "owners": len(owner_ids),
+        "metafields": saved_count,
+    }
+
+
+def _google_shopping_attributes(product: Product) -> dict[str, str]:
+    attributes = {
+        "age_group": _google_age_group(product),
+        "gender": _google_gender(product),
+        "color": _google_color(product),
+    }
+    return {key: value for key, value in attributes.items() if value}
+
+
+def _google_age_group(product: Product) -> str:
+    """Return one Google Merchant age_group value for the product.
+
+    Google accepts one age_group per product/variant. When a product spans more
+    than one internal age bucket, use the oldest relevant bucket so the offer is
+    not advertised to a younger audience than its available sizes.
+    """
+    context = _size_context(product)
+    groups: set[str] = set()
+    for size in _product_size_values(product):
+        unit, start, end = _parse_age_size(size, context)
+        if not unit:
+            continue
+        max_years = end / 12 if unit == "M" else end
+        min_years = start / 12 if unit == "M" else start
+
+        if max_years <= 0.25:
+            groups.add("newborn")
+        elif max_years <= 1:
+            groups.add("infant")
+        elif min_years < 4 and max_years <= 5:
+            groups.add("toddler")
+        else:
+            groups.add("kids")
+
+    for value in ["kids", "toddler", "infant", "newborn"]:
+        if value in groups:
+            return value
+
+    text = _match_text(
+        product.category,
+        product.product_type,
+        product.title_raw,
+        product.sizes_raw,
+        product.description,
+        " ".join(product.tags or []),
+    )
+    if _has_any_word(text, ["newborn"]):
+        return "newborn"
+    if _has_any_word(text, ["baby", "infant"]):
+        return "infant"
+    if _has_any_word(text, ["toddler"]):
+        return "toddler"
+    if _has_any_word(text, ["boys", "boy", "girls", "girl", "kids", "children", "child", "junior", "juniors"]):
+        return "kids"
+    return "kids" if _is_child_product(product) else ""
+
+
+def _google_gender(product: Product) -> str:
+    values = set(_filter_gender_values(product))
+    if values == {"Boys"}:
+        return "male"
+    if values == {"Girls"}:
+        return "female"
+    if values:
+        return "unisex"
+
+    text = _match_text(product.category, product.title_raw, product.product_type, " ".join(product.tags or []))
+    if _has_any_word(text, ["unisex"]):
+        return "unisex"
+    return "unisex"
+
+
+def _google_color(product: Product) -> str:
+    colors = _normalized_colors(product.color_raw)
+    if colors:
+        return "/".join(colors[:3])
+
+    parts = [
+        re.sub(r"[^A-Za-z0-9 ]+", " ", part).strip()
+        for part in re.split(r"[,/]+", product.color_raw or "")
+    ]
+    fallback = [re.sub(r"\s+", " ", part).title() for part in parts if part and part.lower() not in {"unknown", "image"}]
+    if fallback:
+        return "/".join(fallback[:3])[:100]
+    return ""
+
+
 def _standard_category_id(product: Product) -> str:
     override = _category_override(product)
     if override:
@@ -567,6 +739,21 @@ def _category_key(value: str | None) -> str:
     raw = raw.replace("إ", "ا").replace("أ", "ا").replace("آ", "ا").replace("ٱ", "ا")
     raw = raw.replace("ى", "ي").replace("ئ", "ي").replace("ة", "ه")
     return re.sub(r"[^a-z0-9\u0600-\u06ff]+", "", raw)
+
+
+def _match_text(*values: str | None) -> str:
+    raw = " ".join(str(value or "") for value in values).lower()
+    raw = raw.replace("إ", "ا").replace("أ", "ا").replace("آ", "ا").replace("ٱ", "ا")
+    raw = raw.replace("ى", "ي").replace("ئ", "ي").replace("ة", "ه")
+    return re.sub(r"[^a-z0-9\u0600-\u06ff]+", " ", raw)
+
+
+def _has_any_word(text: str, words: list[str]) -> bool:
+    return any(re.search(rf"(^|\s){re.escape(word.lower())}($|\s)", text) for word in words)
+
+
+def _chunks(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]:
+    return [items[index:index + size] for index in range(0, len(items), size)]
 
 
 def _shopify_product_gid(shopify_product_id: str) -> str:
@@ -1014,16 +1201,16 @@ def _age_tags(product: Product) -> list[str]:
 
 
 def _filter_gender_values(product: Product) -> list[str]:
-    text = _category_key(" ".join([
+    text = _match_text(
         product.category or "",
         product.title_raw or "",
         product.product_type or "",
         " ".join(product.tags or []),
-    ]))
+    )
     values = []
-    if re.search(r"\bboys?\b|\bmale\b", text):
+    if _has_any_word(text, ["boy", "boys", "male", "ولادي"]):
         values.append("Boys")
-    if re.search(r"\bgirls?\b|\bfemale\b", text):
+    if _has_any_word(text, ["girl", "girls", "female", "بناتي"]):
         values.append("Girls")
     return values
 
@@ -1033,17 +1220,17 @@ def _filter_age_range_values(product: Product) -> list[str]:
 
 
 def _filter_season_values(product: Product) -> list[str]:
-    text = _category_key(" ".join([
+    text = _match_text(
         product.season or "",
         " ".join(product.tags or []),
-    ]))
+    )
     values = []
     for token, label in [
         ("spring", "Spring"),
         ("summer", "Summer"),
         ("winter", "Winter"),
     ]:
-        if re.search(rf"\b{token}\b", text):
+        if _has_any_word(text, [token]):
             values.append(label)
     return values
 
