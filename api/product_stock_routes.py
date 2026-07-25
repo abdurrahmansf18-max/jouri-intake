@@ -17,7 +17,7 @@ from models import (
     SellProductRequest,
 )
 from realtime import ws_manager
-from size_utils import normalize_size_label, size_key
+from size_utils import normalize_size_label, normalize_size_stock_list, size_key
 from shopify_stock_sync import queue_shopify_stock_sync
 
 
@@ -34,7 +34,8 @@ def sell_product(
 ):
     p = product_service.get_or_404(db, product_id)
     quantity = max(1, int(body.quantity))
-    size_stocks = list(p.size_stocks or [])
+    size_stocks = _normalize_product_size_state(p)
+    selected_size = ""
     now = datetime.now(timezone.utc)
 
     if size_stocks:
@@ -128,7 +129,8 @@ def reset_sales(
     if body.stockQuantity is not None:
         p.stock_quantity = max(0, int(body.stockQuantity))
         if p.size_stocks:
-            sizes = [ss["size"] for ss in p.size_stocks]
+            current_stocks = _normalize_product_size_state(p)
+            sizes = [str(ss.get("size") or "") for ss in current_stocks if ss.get("size")]
             total = p.stock_quantity
             per_size = total // len(sizes) if sizes else 0
             remainder = total % len(sizes) if sizes else 0
@@ -136,6 +138,8 @@ def reset_sales(
                 {"size": s, "qty": per_size + (1 if i < remainder else 0)}
                 for i, s in enumerate(sizes)
             ]
+            p.size_stocks = normalize_size_stock_list(p.size_stocks, _size_context_for_product(p))
+            p.sizes_raw = ", ".join(str(ss.get("size") or "") for ss in p.size_stocks if ss.get("size"))
 
     activity_logger.log(db, "reset_sales", product_id=p.id, product_title=p.title_raw)
     db.commit()
@@ -165,7 +169,8 @@ def restore_product(
 
     # Stoku mevcut bedenler arasında eşit dağıt
     if p.size_stocks:
-        sizes = [ss["size"] for ss in p.size_stocks]
+        current_stocks = _normalize_product_size_state(p)
+        sizes = [str(ss.get("size") or "") for ss in current_stocks if ss.get("size")]
         total = p.stock_quantity
         per_size = total // len(sizes)
         remainder = total % len(sizes)
@@ -173,6 +178,8 @@ def restore_product(
             {"size": s, "qty": per_size + (1 if i < remainder else 0)}
             for i, s in enumerate(sizes)
         ]
+        p.size_stocks = normalize_size_stock_list(p.size_stocks, _size_context_for_product(p))
+        p.sizes_raw = ", ".join(str(ss.get("size") or "") for ss in p.size_stocks if ss.get("size"))
 
     activity_logger.log(
         db, "restore",
@@ -209,13 +216,19 @@ def restore_product_size(
 
     # sold_sizes'tan kaldır — yeni dict objeleri oluştur (SQLAlchemy JSON mutation tuzağından kaçın)
     p.sold_sizes = [
-        {"size": s["size"], "soldAt": s["soldAt"], "note": s.get("note", "")}
+        {
+            "size": s["size"],
+            "soldAt": s["soldAt"],
+            "note": s.get("note", ""),
+            "source": s.get("source", "manual"),
+            **({"orderName": s.get("orderName")} if s.get("orderName") else {}),
+        }
         for s in sold
         if size_key(str(s.get("size") or "")) != requested_key
     ]
 
     # sizeStocks'a 1 adet olarak geri ekle — sell endpoint gibi yeni dict objeleri yarat
-    current_stocks = list(p.size_stocks or [])
+    current_stocks = _normalize_product_size_state(p)
     size_exists = any(size_key(str(s.get("size") or "")) == requested_key for s in current_stocks)
     stocks = [
         {"size": s["size"], "qty": s["qty"] + 1}
@@ -225,9 +238,9 @@ def restore_product_size(
     ]
     if not size_exists:
         stocks.append({"size": size_name, "qty": 1})
-    p.size_stocks = stocks
-    p.stock_quantity = sum(s["qty"] for s in stocks)
-    p.sizes_raw = ", ".join(s["size"] for s in stocks if s.get("size"))
+    p.size_stocks = normalize_size_stock_list(stocks, _size_context_for_product(p, size_name))
+    p.stock_quantity = sum(int(s.get("qty") or 0) for s in p.size_stocks)
+    p.sizes_raw = ", ".join(str(s.get("size") or "") for s in p.size_stocks if s.get("size"))
 
     # sold_archive ise → stok gelince pending'e döndür
     if p.status == "sold_archive" and p.stock_quantity > 0:
@@ -248,3 +261,26 @@ def restore_product_size(
     background_tasks.add_task(ws_manager.broadcast, {"type": "product_updated", "product": record.model_dump(mode="json")})
     queue_shopify_stock_sync(background_tasks, p.id, "restore_size", p.shopify_product_id)
     return record
+
+
+def _normalize_product_size_state(product) -> list[dict[str, int | str]]:
+    """Keep saved size labels canonical before stock math touches Shopify variants."""
+    normalized = normalize_size_stock_list(product.size_stocks or [], _size_context_for_product(product))
+    current = list(product.size_stocks or [])
+    if normalized != current:
+        product.size_stocks = normalized
+        product.sizes_raw = ", ".join(str(ss.get("size") or "") for ss in normalized if ss.get("size"))
+        product.stock_quantity = sum(int(ss.get("qty") or 0) for ss in normalized)
+    return normalized
+
+
+def _size_context_for_product(product, extra: str = "") -> str:
+    return " ".join([
+        product.category or "",
+        product.product_type or "",
+        product.title_raw or "",
+        product.sizes_raw or "",
+        product.description or "",
+        " ".join(product.tags or []),
+        extra or "",
+    ])

@@ -60,6 +60,7 @@ async def sync_shopify_stock_after_change(product_id: str, reason: str) -> None:
                     "variants": result.get("variants"),
                     "inventory": result.get("inventory"),
                     "filters": result.get("filters"),
+                    "googleShopping": result.get("googleShopping"),
                 },
             )
             db.commit()
@@ -105,7 +106,11 @@ async def sync_shopify_metadata_after_change(product_id: str, reason: str) -> No
                 "shopify_metadata_sync",
                 product_id=product.id,
                 product_title=product.title_raw,
-                details={"reason": reason, "filters": result.get("filters")},
+                details={
+                    "reason": reason,
+                    "filters": result.get("filters"),
+                    "googleShopping": result.get("googleShopping"),
+                },
             )
             db.commit()
         except Exception as exc:

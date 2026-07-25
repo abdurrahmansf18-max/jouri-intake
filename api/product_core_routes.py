@@ -308,9 +308,16 @@ def _apply_status_change(p: Product, new_status: str) -> None:
     if new_status == "sold_archive":
         p.stock_quantity = 0
         if p.size_stocks:
-            p.size_stocks = [{"size": ss["size"], "qty": 0} for ss in p.size_stocks]
+            normalized_stocks = normalize_size_stock_list(p.size_stocks, _size_context_for_product(p))
+            p.size_stocks = [{"size": ss["size"], "qty": 0} for ss in normalized_stocks]
+            p.sizes_raw = ", ".join(str(ss.get("size") or "") for ss in p.size_stocks if ss.get("size"))
     else:
-        p.stock_quantity = max(1, p.stock_quantity)
+        if p.size_stocks:
+            p.size_stocks = normalize_size_stock_list(p.size_stocks, _size_context_for_product(p))
+            p.stock_quantity = sum(int(ss.get("qty") or 0) for ss in p.size_stocks)
+            p.sizes_raw = ", ".join(str(ss.get("size") or "") for ss in p.size_stocks if ss.get("size"))
+        else:
+            p.stock_quantity = max(1, p.stock_quantity)
 
 
 def _status_change_requires_unlock(old_status: str, new_status: str) -> bool:
