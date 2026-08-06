@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, ChevronLeft, ChevronRight, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
@@ -598,12 +598,12 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           <div className={cn("flex sm:hidden border-b", s.panelBorder)}>
             <button type="button" onClick={() => setMode("view")}
               className={cn("flex-1 py-2.5 text-xs font-extrabold transition border-b-2",
-                mode === "view" ? "border-violet-400 text-violet-400" : cn("border-transparent", s.muted))}>
+                mode === "view" ? "border-emerald-400 text-emerald-400" : cn("border-transparent", s.muted))}>
               {t.viewDetails}
             </button>
             <button type="button" onClick={() => setMode("edit")}
               className={cn("flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 text-xs font-extrabold transition border-b-2",
-                mode === "edit" ? "border-violet-400 text-violet-400" : cn("border-transparent", s.muted))}>
+                mode === "edit" ? "border-emerald-400 text-emerald-400" : cn("border-transparent", s.muted))}>
               {isPublishedLocked && <Lock className="size-3" />}
               {t.editBtn}
             </button>
@@ -677,7 +677,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     {/* Renk */}
                     {p.colorRaw && <InfoRow label={t.color} s={s}>
                       <span className="inline-flex items-center gap-1">
-                        <Palette className="size-3 text-fuchsia-400" />
+                        <Palette className="size-3 text-amber-300" />
                         <span dir="auto">{p.colorRaw}</span>
                       </span>
                     </InfoRow>}
@@ -756,7 +756,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     {/* Kategori */}
                     {p.categorySuggestion && <InfoRow label={t.category} s={s}>
                       <span className="inline-flex items-center gap-1">
-                        <Tag className="size-3 text-violet-400" />
+                        <Tag className="size-3 text-emerald-400" />
                         {p.categorySuggestion}
                       </span>
                     </InfoRow>}
@@ -828,7 +828,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {allProducts && (record.relatedProducts ?? []).length > 0 && (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
                     <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
-                      <Palette className="size-4 text-fuchsia-400" />
+                      <Palette className="size-4 text-amber-300" />
                       {t.colorVariants}
                     </h3>
                     <div className="flex flex-wrap gap-3">
@@ -843,7 +843,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                             onClick={() => onNavigate?.(rel)}
                             className={cn(
                               "flex flex-col items-center gap-1.5 rounded-xl border p-2 transition",
-                              "hover:border-fuchsia-400/50 hover:bg-fuchsia-400/5 active:scale-95",
+                              "hover:border-amber-300/50 hover:bg-amber-300/10 active:scale-95",
                               s.panelBorder,
                             )}
                           >
@@ -947,7 +947,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {!isArchive ? (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>
                     <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
-                      <ReceiptText className="size-4 text-violet-400" /> {t.saleInfoTitle}
+                      <ReceiptText className="size-4 text-emerald-400" /> {t.saleInfoTitle}
                     </h3>
 
                     <div className="grid gap-3">
@@ -1083,23 +1083,23 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         <div key={`${sale.soldAt}-${i}`} className={cn("rounded-lg border px-3 py-2 text-xs", s.panelBorder)}>
                           <div className={cn("font-extrabold flex flex-wrap items-center gap-1", s.title)}>
                             {new Date(sale.soldAt).toLocaleString(dateLocale)}
-                            <span className="text-violet-400">·</span>
+                            <span className="text-emerald-400">·</span>
                             <span>{sale.quantity} {t.soldQuantity.toLowerCase()}</span>
                             {sale.size && (
                               <>
-                                <span className="text-violet-400">·</span>
+                                <span className="text-emerald-400">·</span>
                                 <span className="inline-flex items-center gap-0.5 text-sky-400">
                                   <Ruler className="size-2.5" />{sale.size}
                                 </span>
                               </>
                             )}
-                            <span className="text-violet-400">·</span>
-                            <span className={cn("rounded-md px-1.5 py-0.5 text-[10px]", sale.source === "shopify" ? "bg-emerald-400/10 text-emerald-400" : "bg-violet-400/10 text-violet-400")}>
+                            <span className="text-emerald-400">·</span>
+                            <span className={cn("rounded-md px-1.5 py-0.5 text-[10px]", sale.source === "shopify" ? "bg-emerald-400/10 text-emerald-400" : "bg-emerald-400/10 text-emerald-400")}>
                               {sale.source === "shopify" ? (t as any).saleSourceShopify : (t as any).saleSourceManual}
                             </span>
                             {sale.orderName && (
                               <>
-                                <span className="text-violet-400">·</span>
+                                <span className="text-emerald-400">·</span>
                                 <span dir="ltr">{sale.orderName}</span>
                               </>
                             )}
@@ -1119,11 +1119,11 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         <div key={entry.processedKey} className={cn("rounded-lg border px-3 py-2 text-xs", s.panelBorder)}>
                           <div className={cn("flex flex-wrap items-center gap-1 font-extrabold", s.title)}>
                             <span dir="ltr">{entry.orderName || entry.orderId}</span>
-                            <span className="text-violet-400">·</span>
+                            <span className="text-emerald-400">·</span>
                             <span>{entry.quantity} {t.soldQuantity.toLowerCase()}</span>
                             {entry.size && (
                               <>
-                                <span className="text-violet-400">·</span>
+                                <span className="text-emerald-400">·</span>
                                 <span className="inline-flex items-center gap-0.5 text-sky-400">
                                   <Ruler className="size-2.5" />{entry.size}
                                 </span>
@@ -1199,7 +1199,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {/* Form */}
                 <section className={cn("rounded-xl border p-4", s.subPanel)}>
                   <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
-                    <Edit3 className="size-4 text-violet-400" /> {t.editProduct}
+                    <Edit3 className="size-4 text-emerald-400" /> {t.editProduct}
                   </h3>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <DetailField label={t.rawTitle}            s={s} value={draft.titleRaw}              onChange={(v) => patch("titleRaw", v)} />
@@ -1304,7 +1304,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <div className="flex items-center justify-between">
                       <span className={cn("text-xs font-black", s.strong)}>{t.description}</span>
                       <button type="button" onClick={handleRewriteDescription} disabled={rewriteBusy}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] font-black text-violet-500 transition hover:bg-violet-500/20 disabled:opacity-50">
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-black text-emerald-500 transition hover:bg-emerald-500/20 disabled:opacity-50">
                         {rewriteBusy ? <Loader2 className="size-3 animate-spin" /> : <Wand2 className="size-3" />}
                         {(t as any).rewriteDescriptionAi || "✨ Açıklamayı Yenile (AI)"}
                       </button>
@@ -1340,7 +1340,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 <section className={cn("rounded-xl border p-4", s.subPanel)}>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h3 className={cn("flex items-center gap-2 text-sm font-extrabold", s.title)}>
-                      <Images className="size-4 text-violet-400" /> {t.images}
+                      <Images className="size-4 text-emerald-400" /> {t.images}
                     </h3>
                     {imageFiles.length > 0 && (
                       <button type="button" onClick={handleUploadImages} disabled={imageBusy}
@@ -1360,7 +1360,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                               className="aspect-square w-full object-cover" loading="lazy" />
                           </button>
                           {img.folder === "enhanced" && (
-                            <span className="absolute start-1 top-1 rounded-md bg-violet-600/90 px-1.5 py-0.5 text-[10px] font-black text-white">
+                            <span className="absolute start-1 top-1 rounded-md bg-emerald-600/90 px-1.5 py-0.5 text-[10px] font-black text-white">
                               AI
                             </span>
                           )}
@@ -1377,7 +1377,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                               {img.folder !== "enhanced" && (
                                 <button type="button"
                                   onClick={() => openAiImagePanel(img)}
-                                  className="absolute bottom-1 start-1 flex size-7 items-center justify-center rounded-full bg-violet-600/90 text-white transition hover:bg-violet-500 active:scale-95"
+                                  className="absolute bottom-1 start-1 flex size-7 items-center justify-center rounded-full bg-emerald-600/90 text-white transition hover:bg-emerald-500 active:scale-95"
                                   title={t.aiImageCreate}>
                                   <Sparkles className="size-3.5" />
                                 </button>
@@ -1403,7 +1403,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h4 className={cn("flex items-center gap-2 text-sm font-extrabold", s.title)}>
-                            <Sparkles className="size-4 text-violet-400" />
+                            <Sparkles className="size-4 text-emerald-400" />
                             {t.aiImageCreate}
                           </h4>
                           <p className={cn("mt-1 text-xs leading-5", s.muted)}>{t.aiImageHelp}</p>
@@ -1564,7 +1564,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
               </button>
             </div>
             <div className="p-4 flex flex-col gap-3">
-              <div className={cn("rounded-lg border px-3 py-2 text-xs font-extrabold", s.panelBorder, shopifySynced ? "text-blue-400" : "text-emerald-400")}>
+              <div className={cn("rounded-lg border px-3 py-2 text-xs font-extrabold", s.panelBorder, shopifySynced ? "text-teal-300" : "text-emerald-400")}>
                 {shopifySynced ? t.shopifyWillUpdate : t.shopifyWillCreate}
               </div>
               <div className="text-sm">

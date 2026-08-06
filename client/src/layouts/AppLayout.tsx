@@ -39,16 +39,17 @@ export default function AppLayout({ children, onLogout }: Props) {
   const { locale, setLocale, theme, setTheme } = useApp();
   const t = COPY[locale];
   const s = theme === "dark" ? DARK : LIGHT;
+  const isDark = theme === "dark";
   const dir = locale === "ar" ? "rtl" : "ltr";
 
   return (
-    <div className={cn("min-h-screen flex flex-col", s.page)} dir={dir}>
+    <div className={cn("relative min-h-screen flex flex-col overflow-hidden antialiased", s.page, isDark && "app-surface-dark")} dir={dir}>
       {/* ── Top Navbar ── */}
       <header className={cn("sticky top-0 z-40 border-b", s.header)}>
         <div className="flex h-14 items-center gap-3 px-3 sm:px-5">
           {/* Logo */}
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className={cn("flex size-8 items-center justify-center rounded-lg", s.logo)}>
+            <div className={cn("flex size-8 items-center justify-center rounded-lg transition-transform duration-300 hover:scale-105", s.logo)}>
               <PackageCheck className="size-4" />
             </div>
             <span className={cn("max-w-[8rem] truncate text-base font-black tracking-tight sm:max-w-none", s.title)}>{t.appTitle}</span>
@@ -112,7 +113,7 @@ export default function AppLayout({ children, onLogout }: Props) {
       </header>
 
       {/* ── Body ── */}
-      <div className="flex flex-1 min-h-0">
+      <div className="relative z-10 flex flex-1 min-h-0">
         {/* Desktop sidebar */}
         <aside className={cn("hidden md:flex flex-col w-52 shrink-0 border-e py-4 gap-1 px-2", s.header, s.panelBorder)}>
           {NAV_ITEMS.map((item) => (
@@ -122,7 +123,7 @@ export default function AppLayout({ children, onLogout }: Props) {
 
         {/* Main content */}
         <main className="flex-1 min-w-0 overflow-y-auto pb-20 md:pb-0">
-          <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
+          <div className="animate-page-in mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6">
             {children}
           </div>
         </main>
@@ -173,7 +174,7 @@ function MobileNavLink({ item, locale }: { item: NavItem; locale: Locale }) {
       to={item.to}
       className={cn(
         "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-extrabold transition",
-        isActive ? (theme === "dark" ? "text-violet-400" : "text-violet-600") : s.muted,
+        isActive ? (theme === "dark" ? "text-emerald-300" : "text-emerald-700") : s.muted,
       )}
     >
       {item.icon}

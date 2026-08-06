@@ -37,27 +37,27 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
       className={cn("relative min-h-screen flex flex-col items-center justify-center px-4 py-10 overflow-hidden", s.page)}
       dir={t.dir}
     >
-      {/* Renkli arka plan parıltıları */}
+      {/* Soft professional background glow */}
       <div className="pointer-events-none absolute inset-0">
         <div className={cn(
           "absolute -top-32 -start-32 h-96 w-96 rounded-full blur-[120px]",
-          isDark ? "bg-violet-600 opacity-40" : "bg-violet-400 opacity-25",
+          isDark ? "bg-emerald-700 opacity-[0.24]" : "bg-emerald-400 opacity-25",
         )} />
         <div className={cn(
           "absolute -bottom-32 -end-32 h-96 w-96 rounded-full blur-[120px]",
-          isDark ? "bg-indigo-600 opacity-40" : "bg-indigo-400 opacity-20",
+          isDark ? "bg-amber-700 opacity-[0.18]" : "bg-amber-400 opacity-20",
         )} />
         <div className={cn(
           "absolute top-1/2 start-1/2 -translate-x-1/2 -translate-y-1/2 h-72 w-72 rounded-full blur-[100px]",
-          isDark ? "bg-purple-700 opacity-30" : "bg-purple-400 opacity-15",
+          isDark ? "bg-stone-600 opacity-[0.18]" : "bg-emerald-300 opacity-15",
         )} />
         <div className={cn(
           "absolute top-10 end-10 h-48 w-48 rounded-full blur-[80px]",
-          isDark ? "bg-blue-600 opacity-25" : "bg-blue-400 opacity-15",
+          isDark ? "bg-lime-700 opacity-[0.12]" : "bg-lime-300 opacity-15",
         )} />
         <div className={cn(
           "absolute bottom-10 start-10 h-48 w-48 rounded-full blur-[80px]",
-          isDark ? "bg-fuchsia-600 opacity-25" : "bg-fuchsia-400 opacity-15",
+          isDark ? "bg-orange-700 opacity-[0.12]" : "bg-orange-300 opacity-15",
         )} />
       </div>
       {/* Controls — top */}
@@ -96,7 +96,7 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
         className={cn(
           "w-full max-w-sm rounded-2xl border p-8",
           "shadow-2xl",
-          isDark ? "shadow-violet-950/40 border-white/10 bg-[#151d34]" : "shadow-slate-200 border-slate-200 bg-white",
+          isDark ? "shadow-black/40 border-white/10 bg-[#1b1c16]" : "shadow-slate-200 border-slate-200 bg-white",
         )}
       >
         {/* Logo */}
@@ -105,8 +105,8 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
             "flex size-16 items-center justify-center rounded-2xl mb-4",
             "shadow-lg",
             isDark
-              ? "bg-violet-500 shadow-violet-950/50"
-              : "bg-violet-600 shadow-violet-200",
+              ? "bg-emerald-500 shadow-emerald-950/50"
+              : "bg-emerald-600 shadow-emerald-200",
           )}>
             <LockKeyhole className="size-8 text-white" />
           </div>
@@ -119,8 +119,8 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
           <span className={cn(
             "mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-extrabold",
             isDark
-              ? "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30"
-              : "bg-violet-50 text-violet-700 ring-1 ring-violet-200",
+              ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30"
+              : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
           )}>
             <ShieldCheck className="size-3.5" />
             {t.loginAdminLabel}
@@ -187,7 +187,7 @@ export default function LoginGate({ locale, setLocale, theme, setTheme, onLogin 
         {locale === "ar" ? " : " : ": "}
         <span className={cn(
           "font-extrabold",
-          isDark ? "text-violet-400" : "text-violet-600",
+          isDark ? "text-emerald-400" : "text-emerald-600",
         )}>
           {t.loginDeveloperName}
         </span>

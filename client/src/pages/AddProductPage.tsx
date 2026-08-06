@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ClipboardList,
@@ -343,7 +343,7 @@ export default function AddProductPage() {
               {t.maxImages}
             </span>
             {files.length > 0 && (
-              <span className={cn("mt-1 text-xs font-black", files.length > 5 ? "text-red-400" : "text-violet-400")}>
+              <span className={cn("mt-1 text-xs font-black", files.length > 5 ? "text-red-400" : "text-emerald-400")}>
                 {t.imageCount(files.length)}
               </span>
             )}
@@ -369,7 +369,7 @@ export default function AddProductPage() {
           {/* Açıklama */}
           <label className="grid gap-2">
             <span className={cn("flex items-center gap-2 text-sm font-bold", s.label)}>
-              <ClipboardList className="size-4 text-violet-400" />
+              <ClipboardList className="size-4 text-emerald-400" />
               {t.description}
             </span>
             <textarea
@@ -385,7 +385,7 @@ export default function AddProductPage() {
           {/* Zorunlu alanlar */}
           <section className={cn("rounded-xl border p-4", s.subPanel)}>
             <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-extrabold", s.title)}>
-              <Edit3 className="size-4 text-violet-400" />
+              <Edit3 className="size-4 text-emerald-400" />
               {t.createDetailsTitle}
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">

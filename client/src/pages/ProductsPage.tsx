@@ -259,7 +259,7 @@ export default function ProductsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-8 animate-spin text-violet-400" />
+        <Loader2 className="size-8 animate-spin text-emerald-400" />
       </div>
     );
   }
@@ -268,11 +268,11 @@ export default function ProductsPage() {
     <div className="grid gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.productsTitle}</h1>
-        <div className="text-sm font-bold text-violet-400">{t.imageCount(records.reduce((n, r) => n + r.images.length, 0))}</div>
+        <div className="text-sm font-bold text-emerald-400">{t.imageCount(records.reduce((n, r) => n + r.images.length, 0))}</div>
       </div>
 
       {/* Filtreler + arama */}
-      <div className={cn("rounded-xl border p-4", s.panel)}>
+      <div className={cn("motion-card rounded-2xl border p-4 shadow-lg shadow-emerald-950/5", s.panel)}>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex flex-wrap gap-1.5">
@@ -297,7 +297,7 @@ export default function ProductsPage() {
               </button>
             </div>
             <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
-              <Search className="size-4 shrink-0 text-violet-400" />
+              <Search className="size-4 shrink-0 text-emerald-400" />
               <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
                 value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder={t.searchPlaceholder} dir="auto" />
@@ -578,7 +578,7 @@ export default function ProductsPage() {
                 {showBulkEditSeason && (
                 <button
                   type="button"
-                  className="min-h-11 min-w-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-black text-white hover:bg-violet-500 sm:col-span-2 lg:col-span-1"
+                  className="min-h-11 min-w-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-500 sm:col-span-2 lg:col-span-1"
                   onClick={async () => {
                     const newSeason = await new Promise<string | null>(resolve => {
                       setPromptConfig({
@@ -610,7 +610,7 @@ export default function ProductsPage() {
                   disabled={statusBulkLoading !== null}
                   className={cn(
                     "min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
-                    statusBulkLoading !== null ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-500"
+                    statusBulkLoading !== null ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500"
                   )}
                   onClick={() => handleBulkStatusChange("ai_enhanced")}
                 >
@@ -648,7 +648,7 @@ export default function ProductsPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {paginated.map((record) => (
               <ProductCard
                 key={record.id}

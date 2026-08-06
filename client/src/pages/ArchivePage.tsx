@@ -65,7 +65,7 @@ export default function ArchivePage() {
   const selected = records.find((r) => r.id === selectedId) ?? null;
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><Loader2 className="size-8 animate-spin text-violet-400" /></div>;
+    return <div className="flex items-center justify-center py-20"><Loader2 className="size-8 animate-spin text-emerald-400" /></div>;
   }
 
   return (
@@ -83,7 +83,7 @@ export default function ArchivePage() {
       </div>
 
       <label className={cn("flex min-h-11 items-center gap-2 rounded-xl border px-3", s.input)}>
-        <Search className="size-4 shrink-0 text-violet-400" />
+        <Search className="size-4 shrink-0 text-emerald-400" />
         <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
           value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder={t.searchPlaceholder} dir="auto" />

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle, CheckCircle2, ClipboardList, Loader2, Package,
@@ -217,7 +217,7 @@ export default function BulkProductForm({ initialCards }: { initialCards?: BulkD
       <div className={cn("flex items-center gap-3 rounded-xl border px-4 py-3", s.subPanel)}>
         {/* Kart sayacı */}
         <div className="flex items-center gap-2">
-          <Package className="size-4 text-violet-400 shrink-0" />
+          <Package className="size-4 text-emerald-400 shrink-0" />
           <span className={cn("text-sm font-extrabold", s.title)}>
             {t.bulkCardCount(cards.length)}
           </span>
@@ -284,7 +284,7 @@ export default function BulkProductForm({ initialCards }: { initialCards?: BulkD
       <div className={cn("sticky bottom-20 md:bottom-4 z-10 rounded-xl border p-3 shadow-xl", s.panel)}>
         {busy ? (
           <div className="flex items-center justify-center gap-3 py-0.5">
-            <Loader2 className="size-5 animate-spin text-violet-400" />
+            <Loader2 className="size-5 animate-spin text-emerald-400" />
             <span className={cn("text-sm font-extrabold", s.title)}>
               {t.bulkProgress(progress.done, progress.total)}
             </span>
@@ -342,7 +342,7 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
       {/* Kart başlığı */}
       <div className={cn("flex items-center justify-between gap-2 border-b px-4 py-3", s.panelBorder)}>
         <div className="flex min-w-0 items-center gap-2">
-          <Package className="size-4 shrink-0 text-violet-400" />
+          <Package className="size-4 shrink-0 text-emerald-400" />
           <span className={cn("shrink-0 text-sm font-extrabold", s.title)}>
             {t.bulkProductNum(index + 1)}
           </span>
@@ -393,12 +393,12 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
                 e.currentTarget.value = "";
               }}
             />
-            <UploadCloud className="size-4 shrink-0 text-violet-400" />
+            <UploadCloud className="size-4 shrink-0 text-emerald-400" />
             <span className={cn("flex-1 text-xs font-semibold", s.muted)}>
               {card.files.length > 0 ? t.imageCount(card.files.length) : t.chooseGallery}
             </span>
             {card.files.length > 0 && (
-              <span className="text-[10px] font-bold text-violet-400">{card.files.length}/5</span>
+              <span className="text-[10px] font-bold text-emerald-400">{card.files.length}/5</span>
             )}
           </label>
 
@@ -478,7 +478,7 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
         {/* Açıklama */}
         <label className="grid gap-1">
           <span className={cn("flex items-center gap-1.5 text-[10px] font-black", s.strong)}>
-            <ClipboardList className="size-3 text-violet-400" />
+            <ClipboardList className="size-3 text-emerald-400" />
             {t.description}
           </span>
           <textarea

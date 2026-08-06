@@ -147,7 +147,7 @@ export default function BackupPage() {
             disabled={running || loading}
             className={cn(
               "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-extrabold transition",
-              "border-violet-400/30 bg-violet-400/10 text-violet-300 hover:bg-violet-400/20 active:scale-95 disabled:opacity-50",
+              "border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20 active:scale-95 disabled:opacity-50",
             )}
           >
             {running ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
@@ -171,7 +171,7 @@ export default function BackupPage() {
       {running ? (
         <section className={cn("rounded-xl border px-4 py-3 sm:px-5", s.subPanel)}>
           <div className="flex flex-wrap items-center gap-3">
-            <Loader2 className="size-4 animate-spin text-violet-300" />
+            <Loader2 className="size-4 animate-spin text-emerald-300" />
             <div className="min-w-0">
               <div className={cn("text-sm font-black", s.title)}>{t.backupLiveStatusTitle}</div>
               <div className={cn("mt-0.5 text-xs font-semibold", s.muted)}>{runningStepText}</div>
@@ -187,7 +187,7 @@ export default function BackupPage() {
             label={t.backupLastRun}
             value={lastRunText}
             detail={running ? runningStepText : t.backupSchedule}
-            accent="text-violet-300"
+            accent="text-emerald-300"
             s={s}
           />
           <MetricBlock
@@ -283,7 +283,7 @@ export default function BackupPage() {
 
       <BackupList
         title={t.backupAvailable}
-        icon={<HardDrive className="size-4 text-violet-400" />}
+        icon={<HardDrive className="size-4 text-emerald-400" />}
         count={backups.length}
         loading={loading}
         emptyText={t.backupEmpty}
@@ -466,7 +466,7 @@ function BackupList({
       </div>
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="size-8 animate-spin text-violet-400" />
+          <Loader2 className="size-8 animate-spin text-emerald-400" />
         </div>
       ) : count === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">

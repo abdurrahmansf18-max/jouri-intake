@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArchiveRestore, ExternalLink, ImageOff, Pencil, Ruler } from "lucide-react";
+import { ArchiveRestore, Box, CalendarDays, ExternalLink, ImageOff, Images, PackageCheck, Palette, Pencil, Ruler, Tag } from "lucide-react";
 import { productImageUrl, restoreProduct } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -44,6 +44,16 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
   }
 
   const p = record.parsed;
+  const category = p.categorySuggestion?.trim();
+  const productType = p.productTypeSuggestion?.trim();
+  const season = p.season?.trim();
+  const color = (p.colorRaw || p.colorGermanSuggestion)?.trim();
+  const stockTotal = record.sizeStocks.length
+    ? record.sizeStocks.reduce((sum, item) => sum + Math.max(0, item.qty), 0)
+    : Math.max(0, record.stockQuantity || 0);
+  const sizeSummary = formatSizeSummary(record.sizeStocks);
+  const hasShopifyLink = Boolean(record.shopify?.productId);
+  const hasCampaign = record.isDiscounted || record.isLimitedTimeDeal || record.isFinalSale;
   const isPartialSoldArchive = Boolean(showSoldSizes && record.status !== "sold_archive" && record.soldSizes.length > 0);
   const statusText = isPartialSoldArchive ? t.partiallySold : statusLabel(record.status, locale);
   const statusClass = isPartialSoldArchive
@@ -53,8 +63,9 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
   return (
     <article
       className={cn(
-        "group cursor-pointer rounded-xl border overflow-hidden",
-        "transition-all duration-200 hover:-translate-y-1 hover:border-violet-400/50 hover:shadow-lg hover:shadow-violet-900/20",
+        "motion-card group cursor-pointer rounded-2xl border overflow-hidden bg-clip-padding",
+        "transition-all duration-300 ease-out hover:-translate-y-1 hover:border-emerald-400/50 hover:shadow-2xl hover:shadow-black/25",
+        "focus-within:border-emerald-400/50",
         "select-none relative",
         s.subPanel,
       )}
@@ -67,34 +78,48 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
             type="checkbox"
             checked={selected}
             onChange={(e) => onToggleSelect?.(record.id, e.target.checked)}
-            className="size-5 rounded border-2 border-white cursor-pointer"
+            className="size-5 cursor-pointer rounded border-2 border-white accent-emerald-500 shadow-sm"
           />
         </div>
       )}
       {record.images.length > 0 ? (
         <div
-          className="flex gap-1.5 overflow-x-auto p-2 relative"
-          style={{ scrollbarWidth: "none", background: "rgba(0,0,0,0.25)" }}
+          className={cn(
+            "flex gap-1.5 overflow-x-auto p-2 relative",
+            theme === "dark" ? "bg-black/[0.24]" : "bg-emerald-950/[0.04]",
+          )}
+          style={{ scrollbarWidth: "none" }}
         >
           {record.images.map((img) => (
             <img
               key={img.fileName}
               src={productImageUrl(record.id, img.fileName)}
               alt={img.originalName}
-              className="h-28 w-28 shrink-0 rounded-lg object-cover ring-1 ring-white/10"
+              className="h-28 w-28 shrink-0 rounded-xl object-cover ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-[1.02]"
               loading="lazy"
               draggable={false}
             />
           ))}
+          <span
+            className={cn(
+              "absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black shadow-sm backdrop-blur-md",
+              theme === "dark"
+                ? "border-emerald-300/20 bg-stone-950/[0.72] text-emerald-100"
+                : "border-emerald-700/10 bg-white/80 text-emerald-800",
+            )}
+          >
+            <Images className="size-3" />
+            {record.images.length}
+          </span>
         </div>
       ) : (
-        <div className="flex h-20 items-center justify-center" style={{ background: "rgba(0,0,0,0.15)" }}>
+        <div className={cn("flex h-20 items-center justify-center", theme === "dark" ? "bg-black/20" : "bg-emerald-950/[0.04]")}>
           <ImageOff className="size-7 opacity-30" />
         </div>
       )}
 
       {/* ── İçerik ── */}
-      <div className="p-3">
+      <div className="p-3.5">
         {/* Başlık — her zaman orijinal ad */}
         {p.titleRaw ? (
           <h3 className={cn("line-clamp-2 text-sm font-extrabold leading-5", s.title)} dir="auto">
@@ -110,13 +135,13 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
               <span
                 key={match.key}
                 className={cn(
-                  "inline-flex max-w-full items-center gap-1 rounded-lg border border-violet-300/20 bg-violet-400/10 px-2 py-0.5 text-[10px] font-extrabold",
-                  theme === "dark" ? "text-violet-100" : "text-violet-800",
+                  "inline-flex max-w-full items-center gap-1 rounded-lg border border-emerald-300/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-extrabold",
+                  theme === "dark" ? "text-emerald-100" : "text-emerald-800",
                 )}
                 title={`${searchMatchLabel(match.key, t)}: ${match.value}`}
                 dir="auto"
               >
-                <span className={cn("shrink-0", theme === "dark" ? "text-violet-300" : "text-violet-700")}>{searchMatchLabel(match.key, t)}:</span>
+                <span className={cn("shrink-0", theme === "dark" ? "text-emerald-300" : "text-emerald-700")}>{searchMatchLabel(match.key, t)}:</span>
                 <span className="min-w-0 truncate">
                   <Highlight text={compactMatchValue(match.value)} query={searchQuery} />
                 </span>
@@ -124,6 +149,37 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
             ))}
           </div>
         )}
+
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
+          {(category || productType) && (
+            <MetaChip theme={theme} icon={<Tag className="size-3" />} title={[category, productType].filter(Boolean).join(" / ")}>
+              {[category, productType].filter(Boolean).join(" / ")}
+            </MetaChip>
+          )}
+          {season && (
+            <MetaChip theme={theme} icon={<CalendarDays className="size-3" />} title={season}>
+              {season}
+            </MetaChip>
+          )}
+          {color && (
+            <MetaChip theme={theme} icon={<Palette className="size-3" />} title={color}>
+              {color}
+            </MetaChip>
+          )}
+          {sizeSummary && (
+            <MetaChip theme={theme} icon={<Ruler className="size-3" />} title={sizeSummary}>
+              {sizeSummary}
+            </MetaChip>
+          )}
+          <MetaChip theme={theme} icon={<Box className="size-3" />} title={`${t.stockQuantity}: ${stockTotal}`}>
+            {t.stockQuantity}: {stockTotal}
+          </MetaChip>
+          {hasShopifyLink && (
+            <MetaChip theme={theme} icon={<PackageCheck className="size-3" />} title="Shopify">
+              Shopify
+            </MetaChip>
+          )}
+        </div>
 
         {/* Satılan bedenler (arşiv görünümünde) */}
         {showSoldSizes && record.soldSizes.length > 0 && (
@@ -141,8 +197,18 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
         {/* Fiyat + Durum */}
         <div className="mt-2 flex items-center justify-between gap-2">
           {p.priceAmount ? (
-            <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-sm font-black text-emerald-300">
-              {formatPrice(p.priceAmount, p.currency)}
+            <span className="inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-sm font-black text-emerald-300">
+              {record.compareAtPriceAmount && (
+                <span className="text-[11px] text-slate-400 line-through">
+                  {formatPrice(record.compareAtPriceAmount, p.currency)}
+                </span>
+              )}
+              <span>{formatPrice(p.priceAmount, p.currency)}</span>
+              {hasCampaign && (
+                <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-400">
+                  {record.isFinalSale ? t.finalSaleShort : t.discountedProduct}
+                </span>
+              )}
             </span>
           ) : <span />}
           <span className={cn("rounded-lg border px-2 py-0.5 text-[10px] font-black", statusClass)}>
@@ -162,8 +228,8 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
         {/* Alt satır: detay göstergesi + düzenle/geri al butonu */}
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className={cn(
-            "inline-flex items-center gap-1 text-[10px] font-bold text-violet-400",
-            "opacity-0 transition-opacity group-hover:opacity-100",
+            "inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400",
+            "opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100",
           )}>
             <ExternalLink className="size-2.5" />
             {t.viewDetails}
@@ -189,7 +255,7 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold",
                 "transition-all active:scale-95",
-                "border-violet-400/30 bg-violet-400/10 text-violet-300 hover:bg-violet-400/20",
+                "border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20",
               )}
             >
               <Pencil className="size-3" />
@@ -200,6 +266,32 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
       </div>
     </article>
   );
+}
+
+function MetaChip({ icon, children, title, theme }: { icon: React.ReactNode; children: React.ReactNode; title?: string; theme: "dark" | "light" }) {
+  return (
+    <span
+      className={cn(
+        "smart-chip inline-flex min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-extrabold",
+        theme === "dark"
+          ? "border-emerald-300/15 bg-emerald-300/10 text-emerald-100"
+          : "border-emerald-700/10 bg-emerald-700/[0.06] text-emerald-900",
+      )}
+      title={title}
+      dir="auto"
+    >
+      <span className={theme === "dark" ? "text-emerald-300" : "text-emerald-700"}>{icon}</span>
+      <span className="min-w-0 truncate">{children}</span>
+    </span>
+  );
+}
+
+function formatSizeSummary(sizeStocks: ProductRecord["sizeStocks"]): string | null {
+  const available = sizeStocks.filter((item) => item.size.trim() && item.qty > 0);
+  if (!available.length) return null;
+  const visible = available.slice(0, 2).map((item) => `${item.size} x${item.qty}`);
+  const hidden = available.length - visible.length;
+  return hidden > 0 ? `${visible.join(" • ")} +${hidden}` : visible.join(" • ");
 }
 
 function Highlight({ text, query }: { text: string; query: string }) {

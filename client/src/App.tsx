@@ -52,7 +52,7 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
     document.documentElement.lang = locale;
-    document.body.style.background = theme === "dark" ? "#0e1324" : "#f6f7fb";
+    document.body.style.background = theme === "dark" ? "#11130f" : "#f6f7fb";
   }, [locale, theme]);
 
   // Check auth on mount
@@ -85,8 +85,8 @@ export default function App() {
 
   if (checking) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${theme === "dark" ? "bg-[#0e1324]" : "bg-[#f6f7fb]"}`}>
-        <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      <div className={`min-h-screen flex items-center justify-center ${theme === "dark" ? "bg-[#11130f]" : "bg-[#f6f7fb]"}`}>
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }

@@ -215,7 +215,7 @@ export default function DashboardPage() {
   const activeTotal = counts.pending + counts.ai_enhanced + counts.published;
   const workflowSteps = [
     { label: t.dashPending,    count: counts.pending,     color: "bg-amber-400",   border: "border-amber-400/40",  text: "text-amber-400" },
-    { label: t.dashAiEnhanced, count: counts.ai_enhanced, color: "bg-blue-400",    border: "border-blue-400/40",   text: "text-blue-400" },
+    { label: t.dashAiEnhanced, count: counts.ai_enhanced, color: "bg-teal-400",    border: "border-teal-400/40",   text: "text-teal-300" },
     { label: t.dashPublished,  count: counts.published,   color: "bg-emerald-400", border: "border-emerald-400/40",text: "text-emerald-400" },
   ];
 
@@ -281,15 +281,15 @@ export default function DashboardPage() {
   function actionIcon(action: string) {
     const cls = "size-4"; // İkon boyutu
     switch (action) {
-      case "login":        return <LogIn        className={cn(cls, "text-violet-400")} />;
+      case "login":        return <LogIn        className={cn(cls, "text-emerald-400")} />;
       case "create":       return <PackageCheck className={cn(cls, "text-emerald-400")} />;
-      case "update":       return <Activity     className={cn(cls, "text-blue-400")} />;
+      case "update":       return <Activity     className={cn(cls, "text-teal-300")} />;
       case "delete":       return <Trash2       className={cn(cls, "text-red-400")} />;
       case "sell":         return <ShoppingBag  className={cn(cls, "text-amber-400")} />;
-      case "restore":      return <ArchiveIcon  className={cn(cls, "text-violet-400")} />;
-      case "status_change":return <CheckCircle2 className={cn(cls, "text-indigo-400")} />;
+      case "restore":      return <ArchiveIcon  className={cn(cls, "text-emerald-400")} />;
+      case "status_change":return <CheckCircle2 className={cn(cls, "text-lime-300")} />;
       case "add_images":   return <Images       className={cn(cls, "text-sky-400")} />;
-      case "ai_generate_images": return <Sparkles className={cn(cls, "text-violet-400")} />;
+      case "ai_generate_images": return <Sparkles className={cn(cls, "text-emerald-400")} />;
       case "shopify_push": return <ShoppingBag  className={cn(cls, "text-emerald-400")} />;
       case "reset_sales":  return <PackageX     className={cn(cls, "text-slate-400")} />;
       default:             return <Activity     className={cn(cls, s.muted)} />;
@@ -300,7 +300,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-8 animate-spin text-violet-400" />
+        <Loader2 className="size-8 animate-spin text-emerald-400" />
       </div>
     );
   }
@@ -361,11 +361,11 @@ export default function DashboardPage() {
           bg="bg-emerald-400/10 border-emerald-400/20"
         />
         <MetricCard
-          icon={<DollarSign className="size-4 text-violet-400" />}
+          icon={<DollarSign className="size-4 text-emerald-400" />}
           label={t.dashStockValue} // Stok Değeri
           value={formatPrice(stockValue.toFixed(0), "EUR")}
-          color="text-violet-400"
-          bg="bg-violet-400/10 border-violet-400/20"
+          color="text-emerald-400"
+          bg="bg-emerald-400/10 border-emerald-400/20"
           small
         />
         <MetricCard
@@ -383,18 +383,18 @@ export default function DashboardPage() {
           bg="bg-amber-400/10 border-amber-400/20"
         />
         <MetricCard
-          icon={<Images className="size-4 text-blue-400" />}
+          icon={<Images className="size-4 text-teal-300" />}
           label={t.dashAiImages} // AI Tarafından İşlenen Görseller
           value={imageStats.ai}
-          color="text-blue-400"
-          bg="bg-blue-400/10 border-blue-400/20"
+          color="text-teal-300"
+          bg="bg-teal-400/10 border-teal-400/20"
         />
         <MetricCard
-          icon={<Activity className="size-4 text-fuchsia-400" />}
+          icon={<Activity className="size-4 text-lime-300" />}
           label={t.dashAvgImages} // Ürün Başına Ortalama Görsel
           value={avgImages}
-          color="text-fuchsia-400"
-          bg="bg-fuchsia-400/10 border-fuchsia-400/20"
+          color="text-lime-300"
+          bg="bg-lime-400/10 border-lime-400/20"
         />
       </div>
 
@@ -405,8 +405,8 @@ export default function DashboardPage() {
           <PanelHeader icon={<Images className="size-5 text-sky-400" />} title={t.dashImageHealth} s={s} />
           <div className="grid gap-4 p-4 sm:grid-cols-3">
             <ImageStat label={t.dashOriginalImages} value={imageStats.original} pct={originalImagePct} color="bg-sky-400" s={s} />
-            <ImageStat label={t.dashAiImages} value={imageStats.ai} pct={aiImagePct} color="bg-blue-400" s={s} />
-            <ImageStat label={t.dashAiCoverage} value={`${smart.aiImageProducts}/${active.length}`} pct={aiProductPct} color="bg-violet-400" s={s} />
+            <ImageStat label={t.dashAiImages} value={imageStats.ai} pct={aiImagePct} color="bg-teal-400" s={s} />
+            <ImageStat label={t.dashAiCoverage} value={`${smart.aiImageProducts}/${active.length}`} pct={aiProductPct} color="bg-emerald-400" s={s} />
           </div>
         </div>
 
@@ -444,9 +444,9 @@ export default function DashboardPage() {
           {/* Her bir hata satırını sadece o hata sayısı 0'dan büyükse ekrana çizer */}
           {attention.noPrice > 0 && <AttentionRow icon={<DollarSign className="size-4 text-amber-400" />} text={t.dashNoPrice(attention.noPrice)} s={s} />}
           {attention.noImages > 0 && <AttentionRow icon={<Images className="size-4 text-red-400" />} text={t.dashNoImages(attention.noImages)} s={s} />}
-          {smart.noCategory > 0 && <AttentionRow icon={<Tag className="size-4 text-violet-400" />} text={t.dashNoCategory(smart.noCategory)} s={s} />}
+          {smart.noCategory > 0 && <AttentionRow icon={<Tag className="size-4 text-emerald-400" />} text={t.dashNoCategory(smart.noCategory)} s={s} />}
           {smart.noProductType > 0 && <AttentionRow icon={<Box className="size-4 text-sky-400" />} text={t.dashNoProductType(smart.noProductType)} s={s} />}
-          {smart.aiReadyPending > 0 && <AttentionRow icon={<PackageCheck className="size-4 text-blue-400" />} text={t.dashAiReadyPendingText(smart.aiReadyPending)} s={s} />}
+          {smart.aiReadyPending > 0 && <AttentionRow icon={<PackageCheck className="size-4 text-teal-300" />} text={t.dashAiReadyPendingText(smart.aiReadyPending)} s={s} />}
           {smart.lowStock > 0 && <AttentionRow icon={<Box className="size-4 text-amber-400" />} text={t.dashLowStockText(smart.lowStock)} s={s} />}
           {smart.outOfStock > 0 && <AttentionRow icon={<PackageX className="size-4 text-red-400" />} text={t.dashOutOfStockText(smart.outOfStock)} s={s} />}
           {smart.publishedUnsynced > 0 && <AttentionRow icon={<ShoppingBag className="size-4 text-amber-400" />} text={t.dashPublishedUnsynced(smart.publishedUnsynced)} s={s} />}
@@ -461,7 +461,7 @@ export default function DashboardPage() {
           title={t.dashTopCategories}
           items={topCategories}
           emptyText={t.dashNoCategoryData}
-          icon={<Tag className="size-5 text-violet-400" />}
+          icon={<Tag className="size-5 text-emerald-400" />}
           s={s}
         />
         <TopListPanel
@@ -478,7 +478,7 @@ export default function DashboardPage() {
       {recentProducts.length > 0 && (
         <div className={cn("rounded-xl border", s.panel)}>
           <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
-            <PackageCheck className="size-5 text-violet-400" />
+            <PackageCheck className="size-5 text-emerald-400" />
             <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashRecentProducts}</h2>
           </div>
           <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
@@ -529,7 +529,7 @@ export default function DashboardPage() {
       {/* Sistemdeki her hareketin (Ekleme, Silme, Güncelleme) listelendiği aktivite günlüğü */}
       <div className={cn("rounded-xl border min-w-0 overflow-hidden", s.panel)}>
         <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
-          <Activity className="size-5 text-violet-400" />
+          <Activity className="size-5 text-emerald-400" />
           <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashRecentActivity}</h2>
         </div>
 
@@ -575,7 +575,7 @@ export default function DashboardPage() {
                         {Object.entries(changed).map(([field, ch]) => (
                           <span
                             key={field}
-                            className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-400/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-300 ring-1 ring-blue-400/20"
+                            className="inline-flex max-w-full items-center gap-1 rounded-md bg-teal-400/10 px-1.5 py-0.5 text-[10px] font-bold text-teal-200 ring-1 ring-teal-400/20"
                           >
                             <span className="shrink-0">{fieldLabel(field)}:</span>
                             {/* Eski Değer (Üstü Çizili) */}
@@ -680,8 +680,8 @@ function ImageStat({ label, value, pct, color, s }: {
 function SmartRow({ label, value, tone, s }: {
   label: string; value: number; tone: "blue" | "amber" | "red"; s: ThemeStyles;
 }) {
-  const color = tone === "blue" ? "text-blue-400" : tone === "amber" ? "text-amber-400" : "text-red-400";
-  const bg = tone === "blue" ? "bg-blue-400/10" : tone === "amber" ? "bg-amber-400/10" : "bg-red-400/10";
+  const color = tone === "blue" ? "text-teal-300" : tone === "amber" ? "text-amber-400" : "text-red-400";
+  const bg = tone === "blue" ? "bg-teal-400/10" : tone === "amber" ? "bg-amber-400/10" : "bg-red-400/10";
   return (
     <div className={cn("flex items-center justify-between gap-3 px-4 sm:px-5 py-3", s.panelBorder)}>
       <span className={cn("min-w-0 text-sm font-semibold", s.muted)}>{label}</span>
@@ -714,7 +714,7 @@ function TopListPanel({ title, items, emptyText, icon, s }: {
                   <span className={cn("shrink-0 text-xs font-black", s.muted)}>{item.count}</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-black/10">
-                  <div className="h-full rounded-full bg-violet-400/80" style={{ width: `${pct}%` }} />
+                  <div className="h-full rounded-full bg-emerald-400/80" style={{ width: `${pct}%` }} />
                 </div>
               </div>
             );

@@ -35,7 +35,7 @@ export function PromptModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-[#2a2a2a] p-6 shadow-xl border border-white/10" dir="auto">
+      <div className="w-full max-w-sm rounded-2xl bg-[#1b1c16] p-6 shadow-2xl shadow-black/35 border border-emerald-300/15" dir="auto">
         <h3 className="mb-2 text-lg font-bold text-white">{title}</h3>
         {description && <p className="mb-4 text-sm text-gray-400">{description}</p>}
         <input
@@ -43,7 +43,7 @@ export function PromptModal({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
-          className="mb-6 w-full rounded-lg bg-black/40 border border-white/10 px-4 py-3 text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+          className="mb-6 w-full rounded-lg bg-black/35 border border-white/10 px-4 py-3 text-white placeholder-gray-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all"
           autoFocus
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -60,7 +60,7 @@ export function PromptModal({
           </button>
           <button
             onClick={() => onConfirm(value)}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/20"
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-500/20"
           >
             {confirmText}
           </button>

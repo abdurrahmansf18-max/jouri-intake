@@ -74,7 +74,7 @@ export default function VariantSelector({
   return (
     <div className="grid gap-1.5">
       <span className={cn("flex items-center gap-2 text-xs font-black", s.strong)}>
-        <Palette className="size-3.5 text-fuchsia-400" />
+        <Palette className="size-3.5 text-amber-300" />
         {label}
       </span>
 
@@ -115,7 +115,7 @@ export default function VariantSelector({
 
       <div ref={containerRef} className="relative">
         <div className={cn("flex items-center gap-2 rounded-xl border px-3", s.input)}>
-          <Search className="size-4 shrink-0 text-fuchsia-400" />
+          <Search className="size-4 shrink-0 text-emerald-300" />
           <input
             className="min-h-10 min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
             value={query}
@@ -180,7 +180,7 @@ export default function VariantSelector({
                       </div>
                       {p.parsed.colorRaw && (
                         <div className={cn("flex items-center gap-1 text-xs", s.muted)} dir="auto">
-                          <Palette className="size-3 text-fuchsia-400 shrink-0" />
+                          <Palette className="size-3 text-amber-300 shrink-0" />
                           {p.parsed.colorRaw}
                         </div>
                       )}
