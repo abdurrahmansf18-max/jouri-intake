@@ -2,5 +2,5 @@ syncra.website {
     reverse_proxy /api/* api:8000
     reverse_proxy /ws api:8000
     reverse_proxy /ws/* api:8000
-    reverse_proxy /* client:5173
+    reverse_proxy /* client:80
 }
