@@ -2,13 +2,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: jouri
-      POSTGRES_PASSWORD: jouri_password
-      POSTGRES_DB: jouri
+      POSTGRES_USER: ${POSTGRES_USER:-jouri}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jouri_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jouri}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jouri -d jouri"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jouri} -d ${POSTGRES_DB:-jouri}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,8 +29,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://jouri:jouri_password@db:5432/jouri
-      - JWT_SECRET=jouri_super_secret_key
+      - DATABASE_URL=${DATABASE_URL:-postgresql://jouri:jouri_password@db:5432/jouri}
+      - JWT_SECRET=${JWT_SECRET:-jouri_super_secret_key}
       - OLLAMA_URL=http://ollama:11434/v1
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
