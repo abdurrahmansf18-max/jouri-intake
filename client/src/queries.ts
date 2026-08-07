@@ -35,7 +35,7 @@ export type BackupOverview = {
 };
 
 export function useProductsQuery() {
-  return useQuery({
+  return useQuery<ProductRecord[]>({
     queryKey: queryKeys.products,
     queryFn: fetchProducts,
   });
@@ -60,10 +60,10 @@ export function useProductCacheActions() {
   const client = useQueryClient();
   return {
     upsertProduct(product: ProductRecord) {
-      client.setQueryData<ProductRecord[]>(queryKeys.products, (current = []) => mergeProductIntoList(current, product));
+      client.setQueryData<ProductRecord[]>(queryKeys.products, (current: ProductRecord[] | undefined) => mergeProductIntoList(current ?? [], product));
     },
     removeProduct(id: string) {
-      client.setQueryData<ProductRecord[]>(queryKeys.products, (current = []) => current.filter((p) => p.id !== id));
+      client.setQueryData<ProductRecord[]>(queryKeys.products, (current: ProductRecord[] | undefined) => (current ?? []).filter((p: ProductRecord) => p.id !== id));
     },
     invalidateProducts() {
       client.invalidateQueries({ queryKey: queryKeys.products });

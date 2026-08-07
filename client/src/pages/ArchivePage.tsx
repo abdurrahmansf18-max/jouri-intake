@@ -28,9 +28,9 @@ export default function ArchivePage() {
   const productsQuery = useProductsQuery();
   const cacheActions = useProductCacheActions();
 
-  const allProducts = productsQuery.data ?? [];
-  const records = useMemo(() => allProducts.filter(isArchived), [allProducts]);
-  const fullSoldCount = useMemo(() => records.filter((record) => record.status === "sold_archive").length, [records]);
+  const allProducts: ProductRecord[] = productsQuery.data ?? [];
+  const records = useMemo<ProductRecord[]>(() => allProducts.filter(isArchived), [allProducts]);
+  const fullSoldCount = useMemo(() => records.filter((record: ProductRecord) => record.status === "sold_archive").length, [records]);
   const partialSoldCount = records.length - fullSoldCount;
   const loading = productsQuery.isLoading;
 
@@ -62,7 +62,7 @@ export default function ArchivePage() {
     if (selectedId === id) setSelectedId(null);
   }
 
-  const selected = records.find((r) => r.id === selectedId) ?? null;
+  const selected = records.find((r: ProductRecord) => r.id === selectedId) ?? null;
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="size-8 animate-spin text-emerald-400" /></div>;

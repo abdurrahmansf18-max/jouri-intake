@@ -20,6 +20,7 @@ import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEdito
 import BulkProductForm from "../components/BulkProductForm";
 import VariantSelector from "../components/VariantSelector";
 import { useProductCacheActions, useProductsQuery } from "../queries";
+import type { ProductRecord } from "../types";
 
 type Draft = {
   titleRaw: string;
@@ -72,18 +73,18 @@ export default function AddProductPage() {
   const [aiImage, setAiImage] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
 
-  const allProducts = productsQuery.data ?? [];
+  const allProducts: ProductRecord[] = productsQuery.data ?? [];
 
-  const existingCategories = Array.from(new Set(
+  const existingCategories = Array.from(new Set<string>(
     allProducts
-      .map((p) => normalizeCategory(p.parsed.categorySuggestion || ""))
-      .filter(Boolean),
-  )).sort((a, b) => a.localeCompare(b));
-  const existingProductTypes = Array.from(new Set(
+      .map((p: ProductRecord) => normalizeCategory(p.parsed.categorySuggestion || ""))
+      .filter((category): category is string => Boolean(category)),
+  )).sort((a: string, b: string) => a.localeCompare(b));
+  const existingProductTypes = Array.from(new Set<string>(
     allProducts
-      .map((p) => normalizeProductType(p.parsed.productTypeSuggestion || ""))
-      .filter(Boolean),
-  )).sort((a, b) => a.localeCompare(b));
+      .map((p: ProductRecord) => normalizeProductType(p.parsed.productTypeSuggestion || ""))
+      .filter((productType): productType is string => Boolean(productType)),
+  )).sort((a: string, b: string) => a.localeCompare(b));
 
   function patch(key: keyof Draft, value: string) {
     setDraft((d) => ({ ...d, [key]: value }));

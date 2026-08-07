@@ -51,18 +51,18 @@ export default function ProductsPage() {
   const productsQuery = useProductsQuery();
   const cacheActions = useProductCacheActions();
 
-  const allProducts = productsQuery.data ?? [];
-  const records = useMemo(() => allProducts.filter((p) => p.status !== "sold_archive"), [allProducts]);
+  const allProducts: ProductRecord[] = productsQuery.data ?? [];
+  const records = useMemo<ProductRecord[]>(() => allProducts.filter((p: ProductRecord) => p.status !== "sold_archive"), [allProducts]);
   const loading = productsQuery.isLoading;
 
   const counts: Record<StatusFilter, number> = {
     all: records.length,
-    pending: records.filter((r) => r.status === "pending").length,
-    ai_enhanced: records.filter((r) => r.status === "ai_enhanced").length,
-    published: records.filter((r) => r.status === "published").length,
+    pending: records.filter((r: ProductRecord) => r.status === "pending").length,
+    ai_enhanced: records.filter((r: ProductRecord) => r.status === "ai_enhanced").length,
+    published: records.filter((r: ProductRecord) => r.status === "published").length,
     sold_archive: 0,
   };
-  const unsyncedPublishedCount = records.filter((r) => r.status === "published" && !r.shopify?.productId).length;
+  const unsyncedPublishedCount = records.filter((r: ProductRecord) => r.status === "published" && !r.shopify?.productId).length;
 
   // Toplu işlem butonları sadece seçili filtrede anlamlı olan durumlarda görünsün.
   // "Şopify'e Gönderilmedi" açıkken görünür kayıtlar zaten hep published'tır.
@@ -72,16 +72,16 @@ export default function ProductsPage() {
   const showBulkMarkAiEnhanced = effectiveBulkStatus === "pending";
   const showBulkMarkPublished = effectiveBulkStatus === "ai_enhanced";
   const selectedAlreadySynced = selectedIds.length > 0 && selectedIds.every(
-    (id) => Boolean(records.find((r) => r.id === id)?.shopify?.productId)
+    (id) => Boolean(records.find((r: ProductRecord) => r.id === id)?.shopify?.productId)
   );
 
-  const statusRecords = useMemo(
-    () => records.filter((r) => filter === "all" || r.status === filter),
+  const statusRecords = useMemo<ProductRecord[]>(
+    () => records.filter((r: ProductRecord) => filter === "all" || r.status === filter),
     [records, filter],
   );
 
   const recordsForCategoryCounts = useMemo(
-    () => statusRecords.filter((r) => {
+    () => statusRecords.filter((r: ProductRecord) => {
       const productType = normalizeProductType(r.parsed?.productTypeSuggestion ?? "");
       if (typeFilter === "untyped") return !productType;
       if (typeFilter !== "all") return productType === typeFilter;
@@ -94,7 +94,7 @@ export default function ProductsPage() {
   );
 
   const recordsForTypeCounts = useMemo(
-    () => statusRecords.filter((r) => {
+    () => statusRecords.filter((r: ProductRecord) => {
       const category = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (categoryFilter === "uncategorized") return !category;
       if (categoryFilter !== "all") return category === categoryFilter;
@@ -109,7 +109,7 @@ export default function ProductsPage() {
   const categoryCounts = useMemo(() => {
     const countsByCategory = new Map<string, number>();
     let uncategorized = 0;
-    recordsForCategoryCounts.forEach((r) => {
+    recordsForCategoryCounts.forEach((r: ProductRecord) => {
       const category = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (!category) {
         uncategorized += 1;
@@ -126,7 +126,7 @@ export default function ProductsPage() {
   const typeCounts = useMemo(() => {
     const countsByType = new Map<string, number>();
     let untyped = 0;
-    recordsForTypeCounts.forEach((r) => {
+    recordsForTypeCounts.forEach((r: ProductRecord) => {
       const productType = normalizeProductType(r.parsed?.productTypeSuggestion ?? "");
       if (!productType) {
         untyped += 1;
@@ -141,7 +141,7 @@ export default function ProductsPage() {
   }, [recordsForTypeCounts]);
 
   const recordsForSeasonCounts = useMemo(
-    () => statusRecords.filter((r) => {
+    () => statusRecords.filter((r: ProductRecord) => {
       const category = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (categoryFilter === "uncategorized" && category) return false;
       if (categoryFilter !== "all" && categoryFilter !== "uncategorized" && category !== categoryFilter) return false;
@@ -157,7 +157,7 @@ export default function ProductsPage() {
   const seasonCounts = useMemo(() => {
     const countsBySeason = new Map<string, number>();
     let unspecified = 0;
-    recordsForSeasonCounts.forEach((r) => {
+    recordsForSeasonCounts.forEach((r: ProductRecord) => {
       const season = r.parsed?.season ?? "";
       if (!season) {
         unspecified += 1;
@@ -175,7 +175,7 @@ export default function ProductsPage() {
   useEffect(() => { setPage(1); }, [filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter]);
 
   const searchResults = useMemo(() => {
-    const filterScoped = records.filter((r) => {
+    const filterScoped = records.filter((r: ProductRecord) => {
       if (filter !== "all" && r.status !== filter) return false;
       if (onlyUnsynced && (r.status !== "published" || r.shopify?.productId)) return false;
 
@@ -242,7 +242,7 @@ export default function ProductsPage() {
   function openView(id: string) { setSelectedId(id); setDetailMode("view"); }
   function openEdit(id: string) { setSelectedId(id); setDetailMode("edit"); }
 
-  const selected = records.find((r) => r.id === selectedId) ?? null;
+  const selected = records.find((r: ProductRecord) => r.id === selectedId) ?? null;
   const selectedCategoryLabel =
     categoryFilter === "all" ? t.allCategories :
     categoryFilter === "uncategorized" ? t.uncategorized :
@@ -268,7 +268,7 @@ export default function ProductsPage() {
     <div className="grid gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className={cn("text-2xl font-black tracking-tight", s.title)}>{t.productsTitle}</h1>
-        <div className="text-sm font-bold text-emerald-400">{t.imageCount(records.reduce((n, r) => n + r.images.length, 0))}</div>
+        <div className="text-sm font-bold text-emerald-400">{t.imageCount(records.reduce((n: number, r: ProductRecord) => n + r.images.length, 0))}</div>
       </div>
 
       {/* Filtreler + arama */}
@@ -514,7 +514,7 @@ export default function ProductsPage() {
                     checked={selectedIds.length > 0 && selectedIds.length === paginated.length} 
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds(paginated.map(r => r.id));
+                        setSelectedIds(paginated.map((r: ProductRecord) => r.id));
                       } else {
                         setSelectedIds([]);
                       }
@@ -540,7 +540,7 @@ export default function ProductsPage() {
                     let successCount = 0;
                     for (let i = 0; i < selectedIds.length; i++) {
                       const id = selectedIds[i];
-                      const r = records.find(x => x.id === id);
+                      const r = records.find((x: ProductRecord) => x.id === id);
                       const productName = r?.parsed?.titleRaw || t.selectedProductFallback;
                       const progressMsg = t.processingAi(i + 1, selectedIds.length, productName);
                       

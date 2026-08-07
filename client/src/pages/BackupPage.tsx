@@ -39,8 +39,8 @@ export default function BackupPage() {
   const status = backupsQuery.data?.status ?? {};
   const dbStatus = status.database ?? {};
   const storage = status.storage ?? {};
-  const backups = backupsQuery.data?.backups ?? [];
-  const driveBackups = backupsQuery.data?.drive_backups ?? [];
+  const backups: BackupOverview["backups"] = backupsQuery.data?.backups ?? [];
+  const driveBackups: BackupOverview["drive_backups"] = backupsQuery.data?.drive_backups ?? [];
   const loading = backupsQuery.isLoading;
   const running = starting || !!status.running;
   const refetchBackups = backupsQuery.refetch;
@@ -79,7 +79,7 @@ export default function BackupPage() {
     setDeleting(date);
     try {
       await deleteBackup(date);
-      queryClient.setQueryData<BackupOverview>(queryKeys.backups, (current) => current
+      queryClient.setQueryData<BackupOverview>(queryKeys.backups, (current: BackupOverview | undefined) => current
         ? { ...current, backups: current.backups.filter((b) => b.date !== date) }
         : current);
       showToast(t.backupDeleted, "success");
@@ -95,8 +95,8 @@ export default function BackupPage() {
     setDeletingDrive(date);
     try {
       await deleteDriveBackup(date);
-      queryClient.setQueryData<BackupOverview>(queryKeys.backups, (current) => current
-        ? { ...current, drive_backups: current.drive_backups.filter((d) => d !== date) }
+      queryClient.setQueryData<BackupOverview>(queryKeys.backups, (current: BackupOverview | undefined) => current
+        ? { ...current, drive_backups: current.drive_backups.filter((d: string) => d !== date) }
         : current);
       showToast(t.backupDriveDeleted, "success");
     } catch {
@@ -132,6 +132,7 @@ export default function BackupPage() {
   const runningStepText = stepLabel(status.running_step, t);
   const statusOrder = ["pending", "ai_enhanced", "published", "sold_archive"];
   const productsByStatus = dbStatus.products_by_status ?? {};
+  const workflowSteps = (storage.workflow ?? ["database_dump", "local_snapshot", "photo_manifest", "drive_sync"]) as string[];
 
   return (
     <div className="grid gap-5">
@@ -272,7 +273,7 @@ export default function BackupPage() {
 
         <div className={cn("border-t px-4 py-4 sm:px-5", s.panelBorder)}>
           <div className="grid gap-2 md:grid-cols-4">
-            {(storage.workflow ?? ["database_dump", "local_snapshot", "photo_manifest", "drive_sync"]).map((step) => (
+            {workflowSteps.map((step: string) => (
               <div key={step} className={cn("rounded-lg px-3 py-2 text-xs font-bold leading-5 ring-1", s.pill)}>
                 {workflowLabel(step, t)}
               </div>
@@ -290,7 +291,7 @@ export default function BackupPage() {
         emptyIcon={<HardDrive className={cn("size-10", s.emptyIcon)} />}
         s={s}
       >
-        {backups.map((b) => (
+        {backups.map((b: BackupOverview["backups"][number]) => (
           <div
             key={b.date}
             className={cn(
@@ -329,7 +330,7 @@ export default function BackupPage() {
         emptyIcon={<CloudUpload className={cn("size-10", s.emptyIcon)} />}
         s={s}
       >
-        {driveBackups.map((date) => (
+        {driveBackups.map((date: string) => (
           <div
             key={date}
             className={cn(

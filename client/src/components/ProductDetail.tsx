@@ -200,7 +200,20 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0, behavior: "instant" });
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overscrollBehavior = "none";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
     setDraft(recordToDraft(record));
     setSizeRows(sizeStocksToRows(record.sizeStocks));
     setSelectedVariantIds(record.relatedProducts ?? []);
@@ -535,9 +548,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/60 p-0 sm:p-4" role="dialog" aria-modal="true">
+      <div className="product-detail-overlay fixed inset-0 z-50 overflow-hidden bg-black/60 p-0 sm:p-4" role="dialog" aria-modal="true">
         <div
-          className={cn("ms-auto flex h-full w-full max-w-3xl flex-col overflow-hidden border shadow-2xl sm:rounded-2xl", s.panel)}
+          className={cn("product-detail-shell ms-auto flex w-full max-w-3xl flex-col overflow-hidden border shadow-2xl sm:rounded-2xl", s.panel)}
           dir={locale === "ar" ? "rtl" : "ltr"}
         >
           {/* ── Başlık ── */}
@@ -610,7 +623,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           </div>
 
           {/* ── İçerik ── */}
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <div ref={scrollRef} className="product-detail-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
             {mode === "view" ? (
               /* ────────────────── GÖRÜNTÜLEME MODU ────────────────── */
               <div className="grid gap-4">

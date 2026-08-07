@@ -116,8 +116,8 @@ export default function DashboardPage() {
   const logsQuery = useLogsQuery(50);
 
   // Çekilen verileri değişkene atıyoruz (Eğer henüz yükleniyorsa boş dizi [] atıyoruz)
-  const products = productsQuery.data ?? [];
-  const logs = logsQuery.data ?? [];
+  const products: ProductRecord[] = productsQuery.data ?? [];
+  const logs: ActivityLog[] = logsQuery.data ?? [];
   // Hem ürünler hem de loglar yükleniyor mu diye kontrol ediyoruz
   const loading = productsQuery.isLoading || logsQuery.isLoading;
 
@@ -125,27 +125,27 @@ export default function DashboardPage() {
 
   // Satılıp arşive gitmemiş olan tüm "aktif" ürünleri filtreliyoruz.
   // useMemo sayesinde sadece "products" değiştiğinde bu işlem tekrar yapılır, performansı artırır.
-  const active = useMemo(() => products.filter((p) => p.status !== "sold_archive"), [products]);
+  const active = useMemo<ProductRecord[]>(() => products.filter((p: ProductRecord) => p.status !== "sold_archive"), [products]);
 
   // Ürünlerin durumlarına göre toplam sayılarını hesaplıyoruz
   const counts = {
-    pending:      products.filter((p) => p.status === "pending").length, // Beklemede olanlar
-    ai_enhanced:  products.filter((p) => p.status === "ai_enhanced").length, // Yapay Zeka işlemi bitenler
-    published:    products.filter((p) => p.status === "published").length, // Yayınlananlar
-    sold_archive: products.filter((p) => p.status === "sold_archive").length, // Satılıp arşivlenenler
+    pending:      products.filter((p: ProductRecord) => p.status === "pending").length, // Beklemede olanlar
+    ai_enhanced:  products.filter((p: ProductRecord) => p.status === "ai_enhanced").length, // Yapay Zeka işlemi bitenler
+    published:    products.filter((p: ProductRecord) => p.status === "published").length, // Yayınlananlar
+    sold_archive: products.filter((p: ProductRecord) => p.status === "sold_archive").length, // Satılıp arşivlenenler
     // Sadece aktif ürünlerin stok miktarlarını topluyoruz (stok sıfırın altındaysa 0 kabul edilir)
-    activeStock: active.reduce((n, p) => n + Math.max(0, p.stockQuantity), 0),
+    activeStock: active.reduce((n: number, p: ProductRecord) => n + Math.max(0, p.stockQuantity), 0),
     // Aktif ürünlerin toplam fotoğraf sayısı
-    totalImages: active.reduce((n, p) => n + p.images.length, 0),
+    totalImages: active.reduce((n: number, p: ProductRecord) => n + p.images.length, 0),
     // Bugüne kadar satılmış olan toplam ürün adedi (Tüm ürünlerdeki "soldQuantity" toplamı)
-    totalSold: products.reduce((n, p) => n + Math.max(0, p.soldQuantity), 0),
+    totalSold: products.reduce((n: number, p: ProductRecord) => n + Math.max(0, p.soldQuantity), 0),
   };
-  const partialSoldCount = products.filter((p) => p.status !== "sold_archive" && p.soldSizes.length > 0).length;
+  const partialSoldCount = products.filter((p: ProductRecord) => p.status !== "sold_archive" && p.soldSizes.length > 0).length;
   const salesArchiveCount = counts.sold_archive + partialSoldCount;
 
   // Aktif ürünlerin fotoğraflarının kaç tanesi orijinal, kaç tanesi Yapay Zeka tarafından işlenmiş sayıyoruz
   const imageStats = active.reduce(
-    (stats, product) => {
+    (stats: { original: number; ai: number }, product: ProductRecord) => {
       for (const image of product.images) {
         if (isEnhancedImage(image)) stats.ai += 1;
         else stats.original += 1;
@@ -158,19 +158,19 @@ export default function DashboardPage() {
   // Panelin uyarı/tavsiye bölümünde gösterilecek "Akıllı Metrikler" (Eksikler, azalan stoklar vb.)
   const smart = {
     // Fotoğrafları yapay zekadan çıkmış ama kendisi hala "Bekliyor (Pending)" statüsünde kalan ürünler (Yani yayımlanmaya hazır)
-    aiReadyPending: active.filter((p) => p.status === "pending" && hasEnhancedImage(p)).length,
+    aiReadyPending: active.filter((p: ProductRecord) => p.status === "pending" && hasEnhancedImage(p)).length,
     // İçinde yapay zeka fotoğrafı bulunan toplam ürün sayısı
     aiImageProducts: active.filter(hasEnhancedImage).length,
     // Kategorisi girilmemiş ürünler
-    noCategory: active.filter((p) => isMissingValue(p.parsed.categorySuggestion)).length,
+    noCategory: active.filter((p: ProductRecord) => isMissingValue(p.parsed.categorySuggestion)).length,
     // Ürün türü girilmemiş ürünler
-    noProductType: active.filter((p) => isMissingValue(p.parsed.productTypeSuggestion)).length,
+    noProductType: active.filter((p: ProductRecord) => isMissingValue(p.parsed.productTypeSuggestion)).length,
     // Stok miktarı 1 veya 2 kalmış ürünler
-    lowStock: active.filter((p) => p.stockQuantity > 0 && p.stockQuantity <= 2).length,
+    lowStock: active.filter((p: ProductRecord) => p.stockQuantity > 0 && p.stockQuantity <= 2).length,
     // Stoku tamamen tükenmiş olan aktif ürünler
-    outOfStock: active.filter((p) => p.stockQuantity === 0).length,
+    outOfStock: active.filter((p: ProductRecord) => p.stockQuantity === 0).length,
     // Yayında olup henüz Shopify'e gönderilmemiş ürünler
-    publishedUnsynced: active.filter((p) => p.status === "published" && !p.shopify?.productId).length,
+    publishedUnsynced: active.filter((p: ProductRecord) => p.status === "published" && !p.shopify?.productId).length,
   };
 
   // Ürün başına ortalama düşen fotoğraf sayısı (1 ondalık haneye kadar, Örn: 3.2)
@@ -182,12 +182,12 @@ export default function DashboardPage() {
   // Ürünlerin yüzde kaçı yapay zekaya girmiş?
   const aiProductPct = percent(smart.aiImageProducts, active.length);
   // Sistemdeki en popüler ilk 5 kategori
-  const topCategories = topCounts(active, (p) => normalizeCategory(p.parsed.categorySuggestion));
+  const topCategories = topCounts(active, (p: ProductRecord) => normalizeCategory(p.parsed.categorySuggestion));
   // Sistemdeki en popüler ilk 5 ürün türü
-  const topProductTypes = topCounts(active, (p) => normalizeProductType(p.parsed.productTypeSuggestion));
+  const topProductTypes = topCounts(active, (p: ProductRecord) => normalizeProductType(p.parsed.productTypeSuggestion));
 
   // Toplam Stok Değeri Hesaplaması: Sadece fiyatı girilmiş ve stoku olan aktif ürünlerin (Fiyat x Stok) toplamı
-  const stockValue = active.reduce((sum, p) => {
+  const stockValue = active.reduce((sum: number, p: ProductRecord) => {
     const price = parsePriceAmount(p.parsed.priceAmount);
     if (price !== null && p.stockQuantity > 0) return sum + price * p.stockQuantity;
     return sum;
@@ -196,9 +196,9 @@ export default function DashboardPage() {
   // "İnceleme Gerektirenler" metrikleri
   const attention = {
     // Fiyatı girilmemiş ürünler
-    noPrice:  active.filter((p) => isMissingValue(p.parsed.priceAmount)).length,
+    noPrice:  active.filter((p: ProductRecord) => isMissingValue(p.parsed.priceAmount)).length,
     // Hiç fotoğrafı olmayan ürünler
-    noImages: active.filter((p) => p.images.length === 0).length,
+    noImages: active.filter((p: ProductRecord) => p.images.length === 0).length,
   };
   // Eğer yukarıdaki eksiklerden herhangi biri 0'dan büyükse, uyarı panelini ekranda göstermek için bir değişken oluşturuyoruz
   const hasAttention = attention.noPrice > 0 || attention.noImages > 0
@@ -247,7 +247,7 @@ export default function DashboardPage() {
       // React Query önbelleğini güncelle: Silinen ID'yi listeden çıkart
       queryClient.setQueriesData<ActivityLog[]>(
         { queryKey: queryKeys.logsRoot },
-        (current = []) => current.filter((l) => l.id !== id),
+        (current: ActivityLog[] | undefined) => (current ?? []).filter((l: ActivityLog) => l.id !== id),
       );
       // Diğer sayfaların da bu durumdan haberdar olması için tüm log sorgularını iptal edip yeniden çekilmelerini işaretle
       await queryClient.invalidateQueries({ queryKey: queryKeys.logsRoot });
@@ -541,7 +541,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="max-h-[28rem] overflow-y-auto">
-            {logs.map((log) => {
+            {logs.map((log: ActivityLog) => {
               // Log içinde "değişen şeyler" (Örn: fiyattı 100'dü, 200 oldu) verisini çözümle
               const changed = log.action === "update" && log.details?.changed
                 ? log.details.changed as Record<string, { from: string; to: string }>

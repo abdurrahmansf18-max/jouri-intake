@@ -209,6 +209,35 @@
     }
   }
 
+  .product-detail-overlay {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
+  .product-detail-shell {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .product-detail-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 640px) {
+    .product-detail-shell {
+      height: calc(100vh - 2rem);
+      height: calc(100dvh - 2rem);
+      max-height: calc(100dvh - 2rem);
+    }
+  }
+
   @keyframes page-in {
     from {
       opacity: 0;
