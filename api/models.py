@@ -194,6 +194,7 @@ class BulkStatusRequest(BaseModel):
 class SellProductRequest(BaseModel):
     quantity: int = 1
     size: Optional[str] = None
+    sizes: Optional[list[str]] = None
     note: Optional[str] = None
 
 

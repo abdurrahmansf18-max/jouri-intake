@@ -35,42 +35,68 @@ def sell_product(
     p = product_service.get_or_404(db, product_id)
     quantity = max(1, int(body.quantity))
     size_stocks = _normalize_product_size_state(p)
+    requested_sizes = [str(size).strip() for size in (body.sizes or []) if str(size).strip()]
+    if not requested_sizes and body.size:
+        requested_sizes = [body.size.strip()]
     selected_size = ""
+    sold_details: list[dict] = []
     now = datetime.now(timezone.utc)
 
     if size_stocks:
         # Beden bazlı stok takibi
-        if not body.size:
+        if not requested_sizes:
             raise HTTPException(status_code=400, detail={"code": "ERR_SIZE_REQUIRED"})
-        requested_key = size_key(body.size)
-        size_entry = next((ss for ss in size_stocks if size_key(str(ss.get("size") or "")) == requested_key), None)
-        if not size_entry:
-            raise HTTPException(status_code=400, detail={"code": "ERR_SIZE_NOT_FOUND"})
-        if size_entry["qty"] <= 0:
-            raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
-        selected_size = str(size_entry.get("size") or body.size).strip()
-        sold_amount = min(quantity, size_entry["qty"])
-        new_size_stocks = [
-            {
+        requested_keys = []
+        for size in requested_sizes:
+            key = size_key(size)
+            if key and key not in requested_keys:
+                requested_keys.append(key)
+
+        stock_by_key = {size_key(str(ss.get("size") or "")): ss for ss in size_stocks}
+        for requested_key in requested_keys:
+            size_entry = stock_by_key.get(requested_key)
+            if not size_entry:
+                raise HTTPException(status_code=400, detail={"code": "ERR_SIZE_NOT_FOUND"})
+            if int(size_entry["qty"]) <= 0:
+                raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
+
+        sold_by_key: dict[str, int] = {}
+        selected_sizes: list[str] = []
+        for requested_key in requested_keys:
+            size_entry = stock_by_key[requested_key]
+            size_name = str(size_entry.get("size") or "").strip()
+            amount = min(quantity, int(size_entry["qty"]))
+            sold_by_key[requested_key] = amount
+            selected_sizes.append(size_name)
+            sold_details.append({"size": size_name, "quantity": amount})
+
+        selected_size = ", ".join(selected_sizes)
+        sold_amount = sum(sold_by_key.values())
+        new_size_stocks = []
+        for ss in size_stocks:
+            key = size_key(str(ss.get("size") or ""))
+            new_size_stocks.append({
                 "size": ss["size"],
-                "qty": ss["qty"] - sold_amount if size_key(str(ss.get("size") or "")) == requested_key else ss["qty"],
-            }
-            for ss in size_stocks
-        ]
+                "qty": ss["qty"] - sold_by_key.get(key, 0),
+            })
         p.size_stocks = new_size_stocks
         next_stock = sum(ss["qty"] for ss in new_size_stocks)
 
         # Beden tamamen bitti → sold_sizes'a ekle / güncelle
-        sold_qty_after = next((ss["qty"] for ss in new_size_stocks if size_key(str(ss.get("size") or "")) == requested_key), 0)
-        if sold_qty_after == 0:
-            sold_sizes_list = [s for s in (p.sold_sizes or []) if size_key(str(s.get("size") or "")) != requested_key]
+        sold_sizes_list = list(p.sold_sizes or [])
+        for detail in sold_details:
+            requested_key = size_key(str(detail.get("size") or ""))
+            sold_qty_after = next((ss["qty"] for ss in new_size_stocks if size_key(str(ss.get("size") or "")) == requested_key), 0)
+            if sold_qty_after != 0:
+                continue
+            sold_sizes_list = [s for s in sold_sizes_list if size_key(str(s.get("size") or "")) != requested_key]
             sold_sizes_list.append({
-                "size": selected_size,
+                "size": detail["size"],
                 "soldAt": now.isoformat(),
                 "note": (body.note or "").strip(),
                 "source": "manual",
             })
-            p.sold_sizes = sold_sizes_list
+        p.sold_sizes = sold_sizes_list
     else:
         # Eski sistem (beden yoksa toplam stok)
         current_stock = max(0, p.stock_quantity)
@@ -78,15 +104,17 @@ def sell_product(
             raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
         sold_amount = min(quantity, current_stock)
         next_stock = current_stock - sold_amount
+        sold_details.append({"size": body.size or "", "quantity": sold_amount})
 
     new_history = list(p.sale_history or []) + [
         {
             "soldAt": now.isoformat(),
-            "quantity": sold_amount,
-            "size": selected_size if size_stocks else (body.size or ""),
+            "quantity": int(detail["quantity"]),
+            "size": detail["size"],
             "note": (body.note or "").strip(),
             "source": "manual",
         }
+        for detail in sold_details
     ]
     p.sale_history = new_history[-200:]  # son 200 satış kaydını tut
     p.sold_quantity = (p.sold_quantity or 0) + sold_amount

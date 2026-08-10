@@ -37,6 +37,7 @@ type Draft = {
   restoreStock: string;
   saleQuantity: string; saleNote: string;
   saleSize: string;
+  saleSizes: string[];
   isDiscounted: boolean;
   isFinalSale: boolean;
   isLimitedTimeDeal: boolean;
@@ -59,6 +60,7 @@ function recordToDraft(r: ProductRecord): Draft {
     saleQuantity: "1",
     saleNote: "",
     saleSize: "",
+    saleSizes: [],
     isDiscounted: Boolean(r.isDiscounted),
     isFinalSale: Boolean(r.isFinalSale),
     isLimitedTimeDeal: Boolean(r.isLimitedTimeDeal),
@@ -238,6 +240,14 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
   function patch(key: keyof Draft, val: string) { setDraft((d) => ({ ...d, [key]: val })); }
   function patchBool(key: keyof Draft, val: boolean) { setDraft((d) => ({ ...d, [key]: val })); }
+  function toggleSaleSize(size: string) {
+    setDraft((d) => {
+      const exists = d.saleSizes.includes(size);
+      const saleSizes = exists ? d.saleSizes.filter((item) => item !== size) : [...d.saleSizes, size];
+      return { ...d, saleSizes, saleSize: saleSizes[0] ?? "" };
+    });
+    setSellError("");
+  }
   function num(val: string, fb: number) { const n = parseInt(val, 10); return Number.isFinite(n) ? n : fb; }
   function statusCanMoveWithoutUnlock(from: ProductStatus, to: ProductStatus) {
     const fromRank = ACTIVE_STATUSES.indexOf(from);
@@ -315,19 +325,19 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
   async function handleSell() {
     const hasSizeStocks = record.sizeStocks.length > 0;
-    if (hasSizeStocks && !draft.saleSize) {
+    if (hasSizeStocks && draft.saleSizes.length === 0) {
       setSellError(t.errSizeSelectRequired);
       return;
     }
     setSellError("");
     setBusy(true);
     try {
-      const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), draft.saleSize, draft.saleNote);
+      const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), draft.saleSizes, draft.saleNote);
       onReplace(updated);
       showToast(t.toastSold, "success");
       patch("saleQuantity", "1");
       patch("saleNote", "");
-      patch("saleSize", "");
+      setDraft((d) => ({ ...d, saleSize: "", saleSizes: [] }));
     } catch (err) {
       const code = err instanceof Error ? err.message : "ERR_GENERAL";
       showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
@@ -1006,24 +1016,44 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                             {t.allSizesOutOfStock}
                           </div>
                         ) : (
-                          <label className="grid gap-1.5">
+                          <label className="grid gap-2">
                             <span className={cn("text-xs font-black", s.strong)}>{t.selectSizeForSale} *</span>
-                            <select
-                              value={draft.saleSize}
-                              onChange={(e) => { patch("saleSize", e.target.value); setSellError(""); }}
-                              className={cn(
-                                "min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4",
-                                s.input,
-                                sellError ? "border-red-400 focus:ring-red-500/15" : "",
-                              )}
-                            >
-                              <option value="">— {t.selectSizeForSale} —</option>
-                              {availableSizes.map((ss) => (
-                                <option key={ss.size} value={ss.size}>
-                                  {t.sizeStockDisplay(ss.size, ss.qty)}{ss.code ? ` · ${ss.code}` : ""}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              {availableSizes.map((ss) => {
+                                const selected = draft.saleSizes.includes(ss.size);
+                                return (
+                                  <button
+                                    key={ss.size}
+                                    type="button"
+                                    onClick={() => toggleSaleSize(ss.size)}
+                                    className={cn(
+                                      "group flex min-h-16 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-start transition active:scale-[0.99]",
+                                      selected
+                                        ? "border-emerald-400 bg-emerald-400/15 text-emerald-100 shadow-lg shadow-emerald-950/20"
+                                        : cn(s.controlGroup, s.controlIdle),
+                                      sellError && "border-red-400",
+                                    )}
+                                  >
+                                    <span className="grid min-w-0 gap-1">
+                                      <span className={cn("text-sm font-black", selected ? "text-emerald-200" : s.title)} dir="auto">
+                                        {t.sizeStockDisplay(ss.size, ss.qty)}
+                                      </span>
+                                      {ss.code && (
+                                        <span className={cn("truncate font-mono text-[11px] font-black", selected ? "text-emerald-300" : s.muted)} dir="ltr">
+                                          {ss.code}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className={cn(
+                                      "grid size-6 shrink-0 place-items-center rounded-full border-2",
+                                      selected ? "border-emerald-300 bg-emerald-400 text-stone-950" : "border-slate-400/50",
+                                    )}>
+                                      {selected ? <Check className="size-4" /> : null}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                             {sellError && (
                               <p className={cn("text-xs font-semibold text-red-400")}>{sellError}</p>
                             )}
@@ -1035,8 +1065,8 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         <label className="grid gap-1.5">
                           <span className={cn("text-xs font-black", s.strong)}>{t.saleQuantity}</span>
                           <input type="number" min={1}
-                            max={draft.saleSize
-                              ? record.sizeStocks.find((ss) => ss.size === draft.saleSize)?.qty ?? undefined
+                            max={draft.saleSizes.length
+                              ? Math.min(...draft.saleSizes.map((size) => record.sizeStocks.find((ss) => ss.size === size)?.qty ?? 1))
                               : undefined}
                             value={draft.saleQuantity}
                             onChange={(e) => patch("saleQuantity", e.target.value)}
