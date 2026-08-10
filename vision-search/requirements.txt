@@ -6,3 +6,5 @@ torch
 transformers
 safetensors
 accelerate
+ftfy
+open_clip_torch
