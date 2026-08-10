@@ -9,10 +9,12 @@ from sqlalchemy.orm import Session
 
 import activity_logger
 import auth_service
+import barcode_service
 import file_manager
 import product_service
 import search_service
 import shopify
+import visual_search_service
 from database import get_db
 from db_models import Product
 from dependencies import verify_access
@@ -106,6 +108,35 @@ def search_products_endpoint(
     return search_service.search_products(filtered, q, include_archive_fields=include_archive)
 
 
+@router.post("/api/products/visual-search", response_model=list[ProductSearchResult])
+async def visual_search_products_endpoint(
+    _: Annotated[None, Depends(verify_access)],
+    image: Annotated[UploadFile, File()],
+    include_archive: Annotated[bool, Query(alias="includeArchive")] = False,
+    limit: Annotated[int, Query(ge=1, le=20)] = 8,
+    db: Session = Depends(get_db),
+):
+    query_signature = visual_search_service.image_signature(await image.read())
+    results: list[ProductSearchResult] = []
+    products = db.query(Product).order_by(Product.created_at.desc()).all()
+    for product in products:
+        if not include_archive and product.status == "sold_archive":
+            continue
+        signature = visual_search_service.product_signature(product)
+        if not signature:
+            continue
+        score = int(round(visual_search_service.similarity(query_signature, signature) * 100))
+        if score <= 0:
+            continue
+        record = product_service.to_record(product)
+        results.append(ProductSearchResult(
+            record=record,
+            score=score,
+            matches=[{"key": "visual", "label": "Visual match", "value": f"{score}%", "score": score}],
+        ))
+    return sorted(results, key=lambda result: result.score, reverse=True)[:limit]
+
+
 @router.post("/api/products", response_model=ProductRecord)
 async def create_product(
     _: Annotated[None, Depends(verify_access)],
@@ -121,6 +152,7 @@ async def create_product(
     colorGermanSuggestion: Annotated[str | None, Form()] = None,
     season: Annotated[str | None, Form()] = None,
     sizeStocksJson: Annotated[str | None, Form()] = None,
+    barcodesJson: Annotated[str | None, Form()] = None,
     notes: Annotated[str | None, Form()] = None,
     source: Annotated[str | None, Form()] = None,
 ):
@@ -152,6 +184,17 @@ async def create_product(
     )
     if not size_stocks_data or not any(int(ss.get("qty", 0)) >= 1 for ss in size_stocks_data):
         raise HTTPException(status_code=422, detail={"code": "ERR_SIZE_REQUIRED"})
+    product_barcodes: list[str] = []
+    if barcodesJson:
+        try:
+            product_barcodes = barcode_service.clean_barcodes(json.loads(barcodesJson))
+        except Exception:
+            raise HTTPException(status_code=422, detail={"code": "ERR_BARCODE_INVALID"})
+    size_stocks_data = [
+        {**ss, "barcode": barcode_service.clean_barcode(str(ss.get("barcode") or ""))}
+        for ss in size_stocks_data
+    ]
+    barcode_service.ensure_unique_barcodes(db, "", product_barcodes, size_stocks_data)
 
     if not images:
         raise HTTPException(status_code=422, detail={"code": "ERR_IMAGE_REQUIRED"})
@@ -210,6 +253,7 @@ async def create_product(
         is_limited_time_deal=False,
         images=[img.model_dump() for img in saved_images],
         sale_history=[],
+        barcodes=product_barcodes,
         size_stocks=size_stocks_data,
     )
     db.add(product)
@@ -355,6 +399,11 @@ def update_product(
         track("description", p.description, body.description)
         p.description = body.description
         shopify_catalog_changed = True
+    if body.barcodes is not None:
+        product_barcodes = barcode_service.clean_barcodes(body.barcodes)
+        barcode_service.ensure_unique_barcodes(db, p.id, product_barcodes, p.size_stocks or [])
+        track("barcodes", ",".join(p.barcodes or []), ",".join(product_barcodes))
+        p.barcodes = product_barcodes
     if body.notes is not None:
         track("notes", p.notes, body.notes)
         p.notes = body.notes
@@ -385,6 +434,11 @@ def update_product(
             [ss.model_dump() for ss in body.sizeStocks],
             _size_context_for_product(p),
         )
+        new_ss = [
+            {**ss, "barcode": barcode_service.clean_barcode(str(ss.get("barcode") or ""))}
+            for ss in new_ss
+        ]
+        barcode_service.ensure_unique_barcodes(db, p.id, p.barcodes or [], new_ss)
         stock_changed = True
         p.size_stocks = new_ss
         new_total = sum(int(ss.get("qty") or 0) for ss in new_ss)

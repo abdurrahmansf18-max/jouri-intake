@@ -82,6 +82,18 @@ export async function searchProductsApi(params: {
   return handleResponse<ProductSearchResult[]>(res);
 }
 
+export async function visualSearchProducts(image: File, includeArchive = false): Promise<ProductSearchResult[]> {
+  const form = new FormData();
+  form.append("image", image);
+  const search = new URLSearchParams({ includeArchive: String(includeArchive) });
+  const res = await fetch(`/api/products/visual-search?${search.toString()}`, {
+    method: "POST",
+    headers: headers(),
+    body: form,
+  });
+  return handleResponse<ProductSearchResult[]>(res);
+}
+
 export type AiParseProvider = "gemini" | "gemma" | "parser";
 
 export async function parseProductText(text: string, imageFile?: File): Promise<{ parsed: ParsedProduct, description: string, variants?: any[], provider?: AiParseProvider }> {
@@ -117,6 +129,7 @@ export interface ProductUpdate {
   isLimitedTimeDeal?: boolean;
   stockQuantity?: number;
   description?: string;
+  barcodes?: string[];
   sizeStocks?: SizeStock[];
   parsed?: Partial<ParsedProduct>;
 }
@@ -126,6 +139,7 @@ export async function createProduct(
   images: File[],
   details?: {
     notes?: string;
+    barcodes?: string[];
     sizeStocks?: SizeStock[];
     parsed?: Partial<ParsedProduct>;
   },
@@ -137,6 +151,7 @@ export async function createProduct(
   if (source) form.append("source", source);
   if (details) {
     if (details.notes !== undefined) form.append("notes", details.notes);
+    if (details.barcodes !== undefined) form.append("barcodesJson", JSON.stringify(details.barcodes));
     if (details.sizeStocks !== undefined) {
       form.append("sizeStocksJson", JSON.stringify(details.sizeStocks));
     }

@@ -14,6 +14,7 @@ class SizeStock(BaseModel):
     size: str
     qty: int
     code: str = ""
+    barcode: str = ""
 
 
 class SoldSizeEntry(BaseModel):
@@ -101,6 +102,7 @@ class ShopifySyncInfo(BaseModel):
 class ProductRecord(BaseModel):
     id: str
     productCode: str
+    barcodes: list[str] = Field(default_factory=list)
     createdAt: str
     folderName: str
     folderPath: str
@@ -173,6 +175,7 @@ class ProductUpdateRequest(BaseModel):
     isLimitedTimeDeal: Optional[bool] = None
     stockQuantity: Optional[int] = None
     description: Optional[str] = None
+    barcodes: Optional[list[str]] = None
     sizeStocks: Optional[list[SizeStock]] = None
     parsed: Optional[ParsedProductUpdate] = None
 

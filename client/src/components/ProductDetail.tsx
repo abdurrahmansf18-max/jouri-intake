@@ -34,6 +34,7 @@ type Draft = {
   colorRaw: string; colorGermanSuggestion: string;
   season: string;
   notes: string; description: string;
+  barcode: string;
   restoreStock: string;
   saleQuantity: string; saleNote: string;
   saleSize: string;
@@ -57,6 +58,7 @@ function recordToDraft(r: ProductRecord): Draft {
     season: r.parsed.season || "",
     notes: r.notes || "",
     description: r.description || "",
+    barcode: (r.barcodes || [])[0] || "",
     restoreStock: String(Math.max(1, r.stockQuantity || 1)),
     saleQuantity: "1",
     saleNote: "",
@@ -70,7 +72,7 @@ function recordToDraft(r: ProductRecord): Draft {
 }
 
 function sizeStocksToRows(ss: SizeStock[]): SizeStockRow[] {
-  return ss.map((s) => ({ size: s.size, qty: String(s.qty) }));
+  return ss.map((s) => ({ size: s.size, qty: String(s.qty), barcode: s.barcode || "" }));
 }
 
 function aiImageSizeText(record: ProductRecord): string {
@@ -273,7 +275,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   async function handleSave() {
     const validSizes = sizeRows
       .filter((r) => r.size.trim())
-      .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
+      .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0), barcode: r.barcode?.trim() || "" }));
 
     if (validSizes.length === 0) {
       showToast(t.errSaveNeedSize, "error");
@@ -284,6 +286,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     try {
       let updated = await updateProduct(record.id, {
         notes: draft.notes,
+        barcodes: draft.barcode.trim() ? [draft.barcode.trim()] : [],
         isDiscounted: draft.isDiscounted,
         compareAtPriceAmount: draft.compareAtPriceAmount,
         discountNote: draft.discountNote,
@@ -1347,6 +1350,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     </label>
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />
                     <DetailField label={t.productType}         s={s} value={draft.productTypeSuggestion}  onChange={(v) => patch("productTypeSuggestion", v)} />
+                    <DetailField label={(t as any).barcode || "Barkod"} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" />
                   </div>
 
                   <div className={cn("mt-4 rounded-xl border p-3", s.panelBorder)}>
@@ -1427,6 +1431,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       sizeNamePlaceholder={t.sizeNamePlaceholder}
                       sizeQtyPlaceholder={t.sizeQtyPlaceholder}
                       addRowLabel={t.addSizeRow}
+                      barcodePlaceholder={(t as any).sizeBarcodePlaceholder || "Beden barkodu (opsiyonel)"}
                     />
                   </div>
 

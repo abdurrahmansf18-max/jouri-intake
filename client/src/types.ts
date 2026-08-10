@@ -38,6 +38,7 @@ export interface SizeStock {
   size: string;
   qty: number;
   code?: string;
+  barcode?: string;
 }
 
 export interface SoldSizeEntry {
@@ -93,6 +94,7 @@ export interface ShopifySyncInfo {
 export interface ProductRecord {
   id: string;
   productCode: string;
+  barcodes: string[];
   createdAt: string;
   folderName: string;
   folderPath: string;

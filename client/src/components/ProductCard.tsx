@@ -358,6 +358,8 @@ function compactMatchValue(value: string): string {
 }
 
 function searchMatchLabel(key: string, t: Record<string, any>): string {
+  if (key === "barcode") return t.barcode || "Barkod";
+  if (key === "visual") return t.visualMatch || "Görsel";
   if (key === "product_code") return t.productCode || "Ürün kodu";
   if (key === "title") return t.logFieldTitle;
   if (key === "season") return (t as any).season || "Mevsim";

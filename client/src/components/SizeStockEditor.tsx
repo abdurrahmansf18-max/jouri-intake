@@ -2,7 +2,7 @@ import { Plus, X } from "lucide-react";
 import { cn } from "../i18n";
 import type { ThemeStyles } from "../theme";
 
-export type SizeStockRow = { size: string; qty: string };
+export type SizeStockRow = { size: string; qty: string; barcode?: string };
 
 interface Props {
   value: SizeStockRow[];
@@ -11,10 +11,11 @@ interface Props {
   sizeNamePlaceholder: string;
   sizeQtyPlaceholder: string;
   addRowLabel: string;
+  barcodePlaceholder?: string;
 }
 
 export default function SizeStockEditor({
-  value, onChange, s, sizeNamePlaceholder, sizeQtyPlaceholder, addRowLabel,
+  value, onChange, s, sizeNamePlaceholder, sizeQtyPlaceholder, addRowLabel, barcodePlaceholder,
 }: Props) {
   function updateRow(i: number, key: keyof SizeStockRow, val: string) {
     onChange(value.map((r, j) => j === i ? { ...r, [key]: val } : r));
@@ -25,7 +26,7 @@ export default function SizeStockEditor({
   }
 
   function addRow() {
-    onChange([...value, { size: "", qty: "1" }]);
+    onChange([...value, { size: "", qty: "1", barcode: "" }]);
   }
 
   return (
@@ -66,6 +67,20 @@ export default function SizeStockEditor({
               <X className="size-4" />
             </button>
           </div>
+          {barcodePlaceholder && (
+            <input
+              type="text"
+              inputMode="numeric"
+              value={row.barcode || ""}
+              onChange={(e) => updateRow(i, "barcode", e.target.value)}
+              placeholder={barcodePlaceholder}
+              className={cn(
+                "min-h-10 w-full rounded-xl border px-3 font-mono text-xs font-semibold outline-none focus:ring-4",
+                s.input,
+              )}
+              dir="ltr"
+            />
+          )}
         </div>
       ))}
 

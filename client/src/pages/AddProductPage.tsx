@@ -30,6 +30,7 @@ type Draft = {
   colorRaw: string;
   season: string;
   notes: string;
+  barcode: string;
 };
 
 type AiVariant = {
@@ -46,6 +47,7 @@ function emptyDraft(): Draft {
     colorRaw: "",
     season: "",
     notes: "",
+    barcode: "",
   };
 }
 
@@ -114,7 +116,8 @@ export default function AddProductPage() {
     try {
       await createProduct(description, files, {
         notes: draft.notes,
-        sizeStocks: sizeRows.filter((r) => r.size.trim() && parseInt(r.qty, 10) >= 1).map((r) => ({ size: r.size.trim(), qty: parseInt(r.qty, 10) })),
+        barcodes: draft.barcode.trim() ? [draft.barcode.trim()] : [],
+        sizeStocks: sizeRows.filter((r) => r.size.trim() && parseInt(r.qty, 10) >= 1).map((r) => ({ size: r.size.trim(), qty: parseInt(r.qty, 10), barcode: r.barcode?.trim() || "" })),
         parsed: {
           titleRaw: draft.titleRaw,
           categorySuggestion: draft.categorySuggestion,
@@ -396,6 +399,7 @@ export default function AddProductPage() {
               <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} listId="category-options" />
               <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} listId="product-type-options" />
               <SeasonField label={t.season} s={s} value={draft.season} onChange={(v) => patch("season", v)} />
+              <Field label={(t as any).barcode || "Barkod"} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" />
             </div>
             {existingCategories.length > 0 && (
               <datalist id="category-options">
@@ -425,6 +429,7 @@ export default function AddProductPage() {
                 sizeNamePlaceholder={t.sizeNamePlaceholder}
                 sizeQtyPlaceholder={t.sizeQtyPlaceholder}
                 addRowLabel={t.addSizeRow}
+                barcodePlaceholder={(t as any).sizeBarcodePlaceholder || "Beden barkodu (opsiyonel)"}
               />
             </div>
 

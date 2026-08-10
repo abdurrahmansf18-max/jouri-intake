@@ -139,7 +139,10 @@ export const COPY = {
     statusPublished: "Yayınlandı",
     statusSoldArchive: "Satıldı",
     cardNotOnShopify: "Shopify'de yok",
-    searchPlaceholder: "İsim, mevsim, kategori, tip, renk, beden veya açıklama ara...",
+    searchPlaceholder: "İsim, kod, barkod, beden, kategori, tip, renk veya açıklama ara...",
+    barcode: "Barkod",
+    sizeBarcodePlaceholder: "Beden barkodu (opsiyonel)",
+    visualMatch: "Görsel eşleşme",
     openDetail: "Detay",
     // Product detail
     productDetail: "Ürün Detayı",
@@ -646,7 +649,10 @@ export const COPY = {
     statusPublished: "منشور",
     statusSoldArchive: "مباع",
     cardNotOnShopify: "غير موجود في Shopify",
-    searchPlaceholder: "ابحثي بالاسم أو الموسم أو الفئة أو النوع أو اللون أو المقاس أو الوصف...",
+    searchPlaceholder: "ابحثي بالاسم أو الرمز أو الباركود أو المقاس أو الفئة أو النوع أو اللون...",
+    barcode: "الباركود",
+    sizeBarcodePlaceholder: "باركود المقاس (اختياري)",
+    visualMatch: "تطابق بالصورة",
     openDetail: "التفاصيل",
     // Product detail
     productDetail: "تفاصيل المنتج",

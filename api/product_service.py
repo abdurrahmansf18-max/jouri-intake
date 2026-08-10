@@ -30,6 +30,7 @@ def to_record(p: Product) -> ProductRecord:
     return ProductRecord(
         id=p.id,
         productCode=product_code(p.id),
+        barcodes=list(p.barcodes or []),
         createdAt=p.created_at.isoformat(),
         folderName=p.folder_name,
         folderPath=p.folder_path,

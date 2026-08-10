@@ -9,6 +9,7 @@ import ProductCard from "../components/ProductCard";
 import ProductDetail from "../components/ProductDetail";
 import Pagination from "../components/Pagination";
 import { PromptModal } from "../components/PromptModal";
+import SmartSearchPanel from "../components/SmartSearchPanel";
 import { useProductCacheActions, useProductsQuery } from "../queries";
 import { bulkUpdateProducts, bulkUpdateStatus, bulkPushToShopify } from "../api";
 
@@ -302,6 +303,13 @@ export default function ProductsPage() {
                 value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder={t.searchPlaceholder} dir="auto" />
             </label>
+            <div className="flex gap-2">
+              <SmartSearchPanel
+                s={s}
+                onBarcode={(code) => setSearch(code)}
+                onOpenProduct={(product) => openView(product.id)}
+              />
+            </div>
           </div>
 
           {/* Categories */}

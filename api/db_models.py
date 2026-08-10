@@ -36,6 +36,7 @@ class Product(Base):
     size_stocks = Column(JSON, nullable=True, default=None)
     sold_sizes = Column(JSON, nullable=True, default=None)
     related_products = Column(JSON, nullable=True, default=None)
+    barcodes = Column(JSON, nullable=True, default=None)
     shopify_product_id = Column(String, nullable=True)
     shopify_product_handle = Column(String, nullable=True)
     shopify_synced_at = Column(DateTime(timezone=True), nullable=True)
