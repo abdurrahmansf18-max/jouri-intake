@@ -93,7 +93,7 @@
   }
 
   .animate-page-in {
-    animation: page-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: page-in 360ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .animate-soft-rise {
@@ -215,6 +215,18 @@
     max-height: 100dvh;
     overscroll-behavior: none;
     touch-action: none;
+  }
+
+  .app-shell {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .mobile-bottom-nav {
+    min-height: calc(3.75rem + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .product-detail-shell {

@@ -120,6 +120,16 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
 
       {/* ── İçerik ── */}
       <div className="p-3.5">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className={cn(
+            "inline-flex rounded-md border px-2 py-1 font-mono text-xs font-black tracking-wide",
+            theme === "dark"
+              ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
+              : "border-emerald-700/15 bg-emerald-700/10 text-emerald-800",
+          )}>
+            {record.productCode}
+          </span>
+        </div>
         {/* Başlık — her zaman orijinal ad */}
         {p.titleRaw ? (
           <h3 className={cn("line-clamp-2 text-sm font-extrabold leading-5", s.title)} dir="auto">
@@ -323,6 +333,7 @@ function compactMatchValue(value: string): string {
 }
 
 function searchMatchLabel(key: string, t: Record<string, any>): string {
+  if (key === "product_code") return t.productCode || "Ürün kodu";
   if (key === "title") return t.logFieldTitle;
   if (key === "season") return (t as any).season || "Mevsim";
   if (key === "category") return t.logFieldCategory;

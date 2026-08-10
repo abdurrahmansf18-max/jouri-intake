@@ -16,6 +16,7 @@ from models import (
     ShopifySyncInfo,
 )
 from parser import normalize_category, normalize_product_type
+from product_code import product_code
 
 
 def to_record(p: Product) -> ProductRecord:
@@ -24,6 +25,7 @@ def to_record(p: Product) -> ProductRecord:
     images = _existing_images(p)
     return ProductRecord(
         id=p.id,
+        productCode=product_code(p.id),
         createdAt=p.created_at.isoformat(),
         folderName=p.folder_name,
         folderPath=p.folder_path,

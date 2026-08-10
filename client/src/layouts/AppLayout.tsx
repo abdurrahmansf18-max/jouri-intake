@@ -43,7 +43,7 @@ export default function AppLayout({ children, onLogout }: Props) {
   const dir = locale === "ar" ? "rtl" : "ltr";
 
   return (
-    <div className={cn("relative min-h-screen flex flex-col overflow-hidden antialiased", s.page, isDark && "app-surface-dark")} dir={dir}>
+    <div className={cn("app-shell relative flex flex-col overflow-hidden antialiased", s.page, isDark && "app-surface-dark")} dir={dir}>
       {/* ── Top Navbar ── */}
       <header className={cn("sticky top-0 z-40 border-b", s.header)}>
         <div className="flex h-14 items-center gap-3 px-3 sm:px-5">
@@ -130,7 +130,7 @@ export default function AppLayout({ children, onLogout }: Props) {
       </div>
 
       {/* ── Mobile bottom nav ── */}
-      <nav className={cn("md:hidden fixed bottom-0 inset-x-0 z-40 flex border-t", s.header)}>
+      <nav className={cn("mobile-bottom-nav md:hidden absolute bottom-0 inset-x-0 z-40 flex border-t", s.header)}>
         {NAV_ITEMS.map((item) => (
           <MobileNavLink key={item.to} item={item} locale={locale} />
         ))}
@@ -173,7 +173,7 @@ function MobileNavLink({ item, locale }: { item: NavItem; locale: Locale }) {
     <NavLink
       to={item.to}
       className={cn(
-        "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-extrabold transition",
+        "flex flex-1 flex-col items-center justify-center gap-1 pt-2 text-[10px] font-extrabold transition",
         isActive ? (theme === "dark" ? "text-emerald-300" : "text-emerald-700") : s.muted,
       )}
     >

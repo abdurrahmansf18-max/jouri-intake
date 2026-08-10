@@ -91,6 +91,7 @@ export interface ShopifySyncInfo {
 
 export interface ProductRecord {
   id: string;
+  productCode: string;
   createdAt: string;
   folderName: string;
   folderPath: string;

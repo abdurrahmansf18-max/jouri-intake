@@ -99,6 +99,7 @@ class ShopifySyncInfo(BaseModel):
 
 class ProductRecord(BaseModel):
     id: str
+    productCode: str
     createdAt: str
     folderName: str
     folderPath: str

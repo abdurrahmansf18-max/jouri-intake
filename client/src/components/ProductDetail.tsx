@@ -561,10 +561,13 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
               </h2>
               {navIndex >= 0 && navList.length > 1 ? (
                 <div className={cn("mt-0.5 text-[11px] font-bold", s.muted)}>
-                  {t.productNavPosition(navIndex + 1, navList.length)}
+                  {record.productCode} · {t.productNavPosition(navIndex + 1, navList.length)}
                 </div>
               ) : null}
             </div>
+            {navIndex < 0 || navList.length <= 1 ? (
+              <span className="font-mono text-xs font-black tracking-wide text-emerald-400">{record.productCode}</span>
+            ) : null}
             {onNavigate && navList.length > 1 ? (
               <div className={cn("inline-flex shrink-0 items-center gap-1 rounded-lg border p-0.5", s.controlGroup)}>
                 <button
