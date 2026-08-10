@@ -20,6 +20,18 @@ services:
     ports:
       - "11434:11434"
 
+  vision-search:
+    build:
+      context: ./vision-search
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - VISION_MODEL=${VISION_MODEL:-Marqo/marqo-fashionSigLIP}
+      - MAX_IMAGES_PER_PRODUCT=${MAX_IMAGES_PER_PRODUCT:-3}
+    volumes:
+      - /home/ubuntu/jouri/products_photo:/products_photo:ro
+      - vision_model_cache:/models
+
   api:
     build:
       context: ./api
@@ -27,11 +39,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      vision-search:
+        condition: service_started
     restart: unless-stopped
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://jouri:jouri_password@db:5432/jouri}
       - JWT_SECRET=${JWT_SECRET:-jouri_super_secret_key}
       - OLLAMA_URL=http://ollama:11434/v1
+      - VISION_SEARCH_URL=http://vision-search:8090
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -83,3 +98,4 @@ volumes:
   caddy_data:
   caddy_config:
   ollama_data:
+  vision_model_cache:

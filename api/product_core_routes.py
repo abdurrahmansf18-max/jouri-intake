@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from datetime import datetime, timezone
 from typing import Annotated
@@ -8,13 +9,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 import activity_logger
+import aiohttp
 import auth_service
 import barcode_service
 import file_manager
 import product_service
 import search_service
 import shopify
-import visual_search_service
 from database import get_db
 from db_models import Product
 from dependencies import verify_access
@@ -35,6 +36,7 @@ from shopify_stock_sync import queue_shopify_metadata_sync, queue_shopify_stock_
 
 
 router = APIRouter()
+VISION_SEARCH_URL = os.getenv("VISION_SEARCH_URL", "http://vision-search:8090").rstrip("/")
 
 _ACTIVE_STATUS_RANK = {
     "pending": 0,
@@ -116,25 +118,55 @@ async def visual_search_products_endpoint(
     limit: Annotated[int, Query(ge=1, le=20)] = 8,
     db: Session = Depends(get_db),
 ):
-    query_signature = visual_search_service.image_signature(await image.read())
-    results: list[ProductSearchResult] = []
     products = db.query(Product).order_by(Product.created_at.desc()).all()
+    product_by_id = {product.id: product for product in products}
+    catalog = []
     for product in products:
         if not include_archive and product.status == "sold_archive":
             continue
-        signature = visual_search_service.product_signature(product)
-        if not signature:
+        paths = []
+        for img in product.images or []:
+            try:
+                paths.append(str(file_manager.resolve_image_path(
+                    product.folder_path,
+                    str(img.get("folder") or "originals"),
+                    str(img.get("fileName") or ""),
+                )))
+            except Exception:
+                continue
+        if paths:
+            catalog.append({"id": product.id, "imagePaths": paths})
+
+    form = aiohttp.FormData()
+    form.add_field("image", await image.read(), filename=image.filename or "query.jpg", content_type=image.content_type or "image/jpeg")
+    form.add_field("catalogJson", json.dumps(catalog))
+    form.add_field("limit", str(limit))
+
+    timeout = aiohttp.ClientTimeout(total=180)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        try:
+            async with session.post(f"{VISION_SEARCH_URL}/search", data=form) as response:
+                if response.status >= 400:
+                    raise HTTPException(status_code=502, detail={"code": "ERR_VISUAL_SEARCH_FAILED"})
+                payload = await response.json()
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail={"code": "ERR_VISUAL_SEARCH_UNAVAILABLE"}) from exc
+
+    results: list[ProductSearchResult] = []
+    for row in payload.get("results") or []:
+        product = product_by_id.get(str(row.get("id") or ""))
+        if not product:
             continue
-        score = int(round(visual_search_service.similarity(query_signature, signature) * 100))
-        if score <= 0:
-            continue
+        score = int(row.get("score") or 0)
         record = product_service.to_record(product)
         results.append(ProductSearchResult(
             record=record,
             score=score,
             matches=[{"key": "visual", "label": "Visual match", "value": f"{score}%", "score": score}],
         ))
-    return sorted(results, key=lambda result: result.score, reverse=True)[:limit]
+    return results
 
 
 @router.post("/api/products", response_model=ProductRecord)

@@ -27,12 +27,27 @@ services:
     env_file: .env
     environment:
       PRODUCTS_BASE: /products_photo
+      VISION_SEARCH_URL: http://vision-search:8090
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      vision-search:
+        condition: service_started
+
+  vision-search:
+    build:
+      context: ./vision-search
+      dockerfile: Dockerfile
+    volumes:
+      - ../products_photo:/products_photo:ro
+      - vision_model_cache:/models
+    environment:
+      VISION_MODEL: ${VISION_MODEL:-Marqo/marqo-fashionSigLIP}
+      MAX_IMAGES_PER_PRODUCT: ${MAX_IMAGES_PER_PRODUCT:-3}
+    restart: unless-stopped
 
   client:
     build:
@@ -50,3 +65,4 @@ services:
 
 volumes:
   postgres_data:
+  vision_model_cache:
