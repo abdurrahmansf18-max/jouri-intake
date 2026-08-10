@@ -35,22 +35,38 @@ def sell_product(
     p = product_service.get_or_404(db, product_id)
     quantity = max(1, int(body.quantity))
     size_stocks = _normalize_product_size_state(p)
+    requested_quantities: list[dict[str, int | str]] = []
+    for item in body.sizeQuantities or []:
+        size = str(item.get("size") or "").strip()
+        if not size:
+            continue
+        try:
+            item_quantity = max(1, int(item.get("quantity") or 1))
+        except (TypeError, ValueError):
+            item_quantity = 1
+        requested_quantities.append({"size": size, "quantity": item_quantity})
+
     requested_sizes = [str(size).strip() for size in (body.sizes or []) if str(size).strip()]
     if not requested_sizes and body.size:
         requested_sizes = [body.size.strip()]
+    if not requested_quantities:
+        requested_quantities = [{"size": size, "quantity": quantity} for size in requested_sizes]
     selected_size = ""
     sold_details: list[dict] = []
     now = datetime.now(timezone.utc)
 
     if size_stocks:
         # Beden bazlı stok takibi
-        if not requested_sizes:
+        if not requested_quantities:
             raise HTTPException(status_code=400, detail={"code": "ERR_SIZE_REQUIRED"})
         requested_keys = []
-        for size in requested_sizes:
-            key = size_key(size)
+        quantity_by_key: dict[str, int] = {}
+        for item in requested_quantities:
+            key = size_key(str(item["size"]))
             if key and key not in requested_keys:
                 requested_keys.append(key)
+            if key:
+                quantity_by_key[key] = int(item["quantity"])
 
         stock_by_key = {size_key(str(ss.get("size") or "")): ss for ss in size_stocks}
         for requested_key in requested_keys:
@@ -65,7 +81,10 @@ def sell_product(
         for requested_key in requested_keys:
             size_entry = stock_by_key[requested_key]
             size_name = str(size_entry.get("size") or "").strip()
-            amount = min(quantity, int(size_entry["qty"]))
+            requested_amount = quantity_by_key.get(requested_key, quantity)
+            if requested_amount > int(size_entry["qty"]):
+                raise HTTPException(status_code=400, detail={"code": "ERR_OUT_OF_STOCK"})
+            amount = requested_amount
             sold_by_key[requested_key] = amount
             selected_sizes.append(size_name)
             sold_details.append({"size": size_name, "quantity": amount})

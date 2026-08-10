@@ -174,15 +174,24 @@ export async function updateProduct(productId: string, update: ProductUpdate): P
   return handleResponse<ProductRecord>(res);
 }
 
-export async function sellProduct(productId: string, quantity = 1, size: string | string[] = "", note = ""): Promise<ProductRecord> {
+export async function sellProduct(
+  productId: string,
+  quantity = 1,
+  size: string | string[] | { size: string; quantity: number }[] = "",
+  note = "",
+): Promise<ProductRecord> {
   const sizes = Array.isArray(size) ? size.filter(Boolean) : [];
+  const sizeQuantities = Array.isArray(size) && sizes.length > 0 && typeof sizes[0] === "object"
+    ? (sizes as { size: string; quantity: number }[]).filter((item) => item.size)
+    : [];
   const res = await fetch(`${productBase(productId)}/sell`, {
     method: "POST",
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       quantity,
       size: !Array.isArray(size) && size ? size : undefined,
-      sizes: sizes.length ? sizes : undefined,
+      sizes: sizes.length && typeof sizes[0] === "string" ? sizes : undefined,
+      sizeQuantities: sizeQuantities.length ? sizeQuantities : undefined,
       note,
     }),
   });

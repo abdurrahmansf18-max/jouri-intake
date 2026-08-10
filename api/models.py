@@ -195,6 +195,7 @@ class SellProductRequest(BaseModel):
     quantity: int = 1
     size: Optional[str] = None
     sizes: Optional[list[str]] = None
+    sizeQuantities: Optional[list[dict]] = None
     note: Optional[str] = None
 
 

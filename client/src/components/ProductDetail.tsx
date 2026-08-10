@@ -38,6 +38,7 @@ type Draft = {
   saleQuantity: string; saleNote: string;
   saleSize: string;
   saleSizes: string[];
+  saleSizeQuantities: Record<string, string>;
   isDiscounted: boolean;
   isFinalSale: boolean;
   isLimitedTimeDeal: boolean;
@@ -61,6 +62,7 @@ function recordToDraft(r: ProductRecord): Draft {
     saleNote: "",
     saleSize: "",
     saleSizes: [],
+    saleSizeQuantities: {},
     isDiscounted: Boolean(r.isDiscounted),
     isFinalSale: Boolean(r.isFinalSale),
     isLimitedTimeDeal: Boolean(r.isLimitedTimeDeal),
@@ -244,9 +246,21 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setDraft((d) => {
       const exists = d.saleSizes.includes(size);
       const saleSizes = exists ? d.saleSizes.filter((item) => item !== size) : [...d.saleSizes, size];
-      return { ...d, saleSizes, saleSize: saleSizes[0] ?? "" };
+      const saleSizeQuantities = { ...d.saleSizeQuantities };
+      if (exists) delete saleSizeQuantities[size];
+      else saleSizeQuantities[size] = saleSizeQuantities[size] || "1";
+      return { ...d, saleSizes, saleSize: saleSizes[0] ?? "", saleSizeQuantities };
     });
     setSellError("");
+  }
+  function patchSaleSizeQuantity(size: string, val: string) {
+    const stockLimit = record.sizeStocks.find((ss) => ss.size === size)?.qty ?? 1;
+    const raw = parseInt(val, 10);
+    const nextValue = Number.isFinite(raw) ? String(Math.min(stockLimit, Math.max(1, raw))) : "";
+    setDraft((d) => ({
+      ...d,
+      saleSizeQuantities: { ...d.saleSizeQuantities, [size]: nextValue },
+    }));
   }
   function num(val: string, fb: number) { const n = parseInt(val, 10); return Number.isFinite(n) ? n : fb; }
   function statusCanMoveWithoutUnlock(from: ProductStatus, to: ProductStatus) {
@@ -332,12 +346,16 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     setSellError("");
     setBusy(true);
     try {
-      const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), draft.saleSizes, draft.saleNote);
+      const sizeQuantities = draft.saleSizes.map((size) => ({
+        size,
+        quantity: num(draft.saleSizeQuantities[size] || draft.saleQuantity, 1),
+      }));
+      const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), sizeQuantities, draft.saleNote);
       onReplace(updated);
       showToast(t.toastSold, "success");
       patch("saleQuantity", "1");
       patch("saleNote", "");
-      setDraft((d) => ({ ...d, saleSize: "", saleSizes: [] }));
+      setDraft((d) => ({ ...d, saleSize: "", saleSizes: [], saleSizeQuantities: {} }));
     } catch (err) {
       const code = err instanceof Error ? err.message : "ERR_GENERAL";
       showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
@@ -1022,35 +1040,73 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                               {availableSizes.map((ss) => {
                                 const selected = draft.saleSizes.includes(ss.size);
                                 return (
-                                  <button
-                                    key={ss.size}
-                                    type="button"
-                                    onClick={() => toggleSaleSize(ss.size)}
-                                    className={cn(
-                                      "group flex min-h-16 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-start transition active:scale-[0.99]",
-                                      selected
-                                        ? "border-emerald-400 bg-emerald-400/15 text-emerald-100 shadow-lg shadow-emerald-950/20"
-                                        : cn(s.controlGroup, s.controlIdle),
-                                      sellError && "border-red-400",
-                                    )}
-                                  >
-                                    <span className="grid min-w-0 gap-1">
-                                      <span className={cn("text-sm font-black", selected ? "text-emerald-200" : s.title)} dir="auto">
-                                        {t.sizeStockDisplay(ss.size, ss.qty)}
-                                      </span>
-                                      {ss.code && (
-                                        <span className={cn("truncate font-mono text-[11px] font-black", selected ? "text-emerald-300" : s.muted)} dir="ltr">
-                                          {ss.code}
-                                        </span>
+                                  <div key={ss.size} className="grid gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleSaleSize(ss.size)}
+                                      className={cn(
+                                        "group flex min-h-16 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-start transition active:scale-[0.99]",
+                                        selected
+                                          ? "border-emerald-400 bg-emerald-400/15 text-emerald-100 shadow-lg shadow-emerald-950/20"
+                                          : cn(s.controlGroup, s.controlIdle),
+                                        sellError && "border-red-400",
                                       )}
-                                    </span>
-                                    <span className={cn(
-                                      "grid size-6 shrink-0 place-items-center rounded-full border-2",
-                                      selected ? "border-emerald-300 bg-emerald-400 text-stone-950" : "border-slate-400/50",
-                                    )}>
-                                      {selected ? <Check className="size-4" /> : null}
-                                    </span>
-                                  </button>
+                                    >
+                                      <span className="grid min-w-0 gap-1">
+                                        <span className={cn("text-sm font-black", selected ? "text-emerald-200" : s.title)} dir="auto">
+                                          {t.sizeStockDisplay(ss.size, ss.qty)}
+                                        </span>
+                                        {ss.code && (
+                                          <span className={cn("truncate font-mono text-[11px] font-black", selected ? "text-emerald-300" : s.muted)} dir="ltr">
+                                            {ss.code}
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className={cn(
+                                        "grid size-6 shrink-0 place-items-center rounded-full border-2",
+                                        selected ? "border-emerald-300 bg-emerald-400 text-stone-950" : "border-slate-400/50",
+                                      )}>
+                                        {selected ? <Check className="size-4" /> : null}
+                                      </span>
+                                    </button>
+                                    {selected && (
+                                      <div
+                                        className={cn("flex items-center justify-between gap-3 rounded-xl border px-3 py-2", s.controlGroup)}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <span className={cn("text-xs font-black", s.strong)}>{ss.size}</span>
+                                        <div className="flex items-center gap-2" dir="ltr">
+                                          <button
+                                            type="button"
+                                            onClick={() => patchSaleSizeQuantity(ss.size, String(Math.max(1, num(draft.saleSizeQuantities[ss.size] || "1", 1) - 1)))}
+                                            disabled={num(draft.saleSizeQuantities[ss.size] || "1", 1) <= 1}
+                                            className={cn("grid size-8 place-items-center rounded-lg border text-base font-black transition active:scale-95 disabled:opacity-40", s.controlGroup, s.controlIdle)}
+                                          >
+                                            -
+                                          </button>
+                                          <input
+                                            type="number"
+                                            min={1}
+                                            max={ss.qty}
+                                            value={draft.saleSizeQuantities[ss.size] || "1"}
+                                          onChange={(e) => patchSaleSizeQuantity(ss.size, e.target.value)}
+                                          onBlur={() => {
+                                            if (!draft.saleSizeQuantities[ss.size]) patchSaleSizeQuantity(ss.size, "1");
+                                          }}
+                                            className={cn("h-8 w-16 rounded-lg border px-2 text-center text-sm font-black outline-none focus:ring-4", s.input)}
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => patchSaleSizeQuantity(ss.size, String(Math.min(ss.qty, num(draft.saleSizeQuantities[ss.size] || "1", 1) + 1)))}
+                                            disabled={num(draft.saleSizeQuantities[ss.size] || "1", 1) >= ss.qty}
+                                            className={cn("grid size-8 place-items-center rounded-lg border text-base font-black transition active:scale-95 disabled:opacity-40", s.controlGroup, s.controlIdle)}
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 );
                               })}
                             </div>
@@ -1062,16 +1118,15 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       )}
 
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="grid gap-1.5">
-                          <span className={cn("text-xs font-black", s.strong)}>{t.saleQuantity}</span>
-                          <input type="number" min={1}
-                            max={draft.saleSizes.length
-                              ? Math.min(...draft.saleSizes.map((size) => record.sizeStocks.find((ss) => ss.size === size)?.qty ?? 1))
-                              : undefined}
-                            value={draft.saleQuantity}
-                            onChange={(e) => patch("saleQuantity", e.target.value)}
-                            className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
-                        </label>
+                        {record.sizeStocks.length === 0 && (
+                          <label className="grid gap-1.5">
+                            <span className={cn("text-xs font-black", s.strong)}>{t.saleQuantity}</span>
+                            <input type="number" min={1}
+                              value={draft.saleQuantity}
+                              onChange={(e) => patch("saleQuantity", e.target.value)}
+                              className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
+                          </label>
+                        )}
                         <label className="grid gap-1.5">
                           <span className={cn("text-xs font-black", s.strong)}>{t.saleNote}</span>
                           <input value={draft.saleNote} onChange={(e) => patch("saleNote", e.target.value)}
