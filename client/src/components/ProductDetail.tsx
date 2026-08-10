@@ -1024,18 +1024,20 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       </div>
                     </div>
 
-                    <button type="button" onClick={handleSell}
-                      disabled={busy || (record.sizeStocks.length > 0 && availableSizes.length === 0)}
-                      className={cn("mt-3 inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border text-sm font-extrabold transition disabled:opacity-60", s.error)}>
-                      {busy ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
-                      {t.markSold}
-                    </button>
-                    {record.soldQuantity > 0 && (
-                      <button type="button" onClick={handleResetSales} disabled={busy}
-                        className={cn("mt-2 inline-flex w-full min-h-10 items-center justify-center gap-2 rounded-xl border text-xs font-extrabold transition disabled:opacity-60", s.controlGroup, s.controlIdle)}>
-                        <RotateCcw className="size-3.5" /> {t.resetSales}
+                    <div className={cn("product-detail-sale-actions -mx-4 mt-3 px-4 pb-1 pt-3", s.subPanel)}>
+                      <button type="button" onClick={handleSell}
+                        disabled={busy || (record.sizeStocks.length > 0 && availableSizes.length === 0)}
+                        className={cn("inline-flex w-full min-h-12 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-extrabold transition disabled:opacity-60", s.error)}>
+                        {busy ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
+                        {t.markSold}
                       </button>
-                    )}
+                      {record.soldQuantity > 0 && (
+                        <button type="button" onClick={handleResetSales} disabled={busy}
+                          className={cn("mt-2 inline-flex w-full min-h-10 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-extrabold transition disabled:opacity-60", s.controlGroup, s.controlIdle)}>
+                          <RotateCcw className="size-3.5" /> {t.resetSales}
+                        </button>
+                      )}
+                    </div>
                   </section>
                 ) : (
                   <section className={cn("rounded-xl border p-4", s.subPanel)}>

@@ -239,7 +239,15 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     touch-action: pan-y;
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  }
+
+  .product-detail-sale-actions {
+    position: sticky;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    z-index: 5;
+    border-top: 1px solid rgb(148 163 184 / 0.18);
   }
 
   @media (min-width: 640px) {
@@ -247,6 +255,16 @@
       height: calc(100vh - 2rem);
       height: calc(100dvh - 2rem);
       max-height: calc(100dvh - 2rem);
+    }
+
+    .product-detail-scroll {
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+      scroll-padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    }
+
+    .product-detail-sale-actions {
+      position: static;
+      border-top: 0;
     }
   }
 
