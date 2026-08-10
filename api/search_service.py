@@ -76,8 +76,9 @@ def _join(values: list[object]) -> str:
 def product_search_fields(record: ProductRecord, include_archive_fields: bool = False) -> list[SearchField]:
     parsed = record.parsed
     size_stock_text = _join([_join([stock.size, stock.qty]) for stock in record.sizeStocks])
+    size_code_text = _join([stock.code for stock in record.sizeStocks])
     fields = [
-        SearchField("product_code", "Product code", record.productCode, 160),
+        SearchField("product_code", "Product code", _join([record.productCode, size_code_text]), 160),
         SearchField("title", "Title", parsed.titleRaw, 120),
         SearchField("season", "Season", parsed.season, 110),
         SearchField("category", "Category", parsed.categorySuggestion, 100),

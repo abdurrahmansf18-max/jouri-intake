@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArchiveRestore, Box, CalendarDays, ExternalLink, ImageOff, Images, PackageCheck, Palette, Pencil, Ruler, Tag } from "lucide-react";
+import { ArchiveRestore, Box, CalendarDays, Copy, ExternalLink, ImageOff, Images, PackageCheck, Palette, Pencil, Ruler, Tag } from "lucide-react";
 import { productImageUrl, restoreProduct } from "../api";
 import { useApp } from "../context";
 import { COPY, cn, statusLabel } from "../i18n";
@@ -41,6 +41,12 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleCopyCode(e: React.MouseEvent, code: string) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(code);
+    showToast((t as any).copied || "Kopyalandı!", "success");
   }
 
   const p = record.parsed;
@@ -120,15 +126,16 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
 
       {/* ── İçerik ── */}
       <div className="p-3.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className={cn(
-            "inline-flex rounded-md border px-2 py-1 font-mono text-xs font-black tracking-wide",
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={(e) => handleCopyCode(e, record.productCode)} className={cn(
+            "inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-xs font-black tracking-wide transition active:scale-95",
             theme === "dark"
-              ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
-              : "border-emerald-700/15 bg-emerald-700/10 text-emerald-800",
+              ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20"
+              : "border-emerald-700/15 bg-emerald-700/10 text-emerald-800 hover:bg-emerald-700/15",
           )}>
             {record.productCode}
-          </span>
+            <Copy className="size-3" />
+          </button>
         </div>
         {/* Başlık — her zaman orijinal ad */}
         {p.titleRaw ? (
@@ -181,6 +188,24 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
               {sizeSummary}
             </MetaChip>
           )}
+          {record.sizeStocks.slice(0, 2).map((item) => item.code ? (
+            <button
+              key={`${item.size}-${item.code}`}
+              type="button"
+              onClick={(e) => handleCopyCode(e, item.code || "")}
+              className={cn(
+                "smart-chip inline-flex min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-extrabold transition active:scale-95",
+                theme === "dark"
+                  ? "border-emerald-300/15 bg-emerald-300/10 text-emerald-100"
+                  : "border-emerald-700/10 bg-emerald-700/[0.06] text-emerald-900",
+              )}
+              title={item.code}
+              dir="ltr"
+            >
+              <Copy className={cn("size-3 shrink-0", theme === "dark" ? "text-emerald-300" : "text-emerald-700")} />
+              <span className="min-w-0 truncate">{item.size}: {item.code}</span>
+            </button>
+          ) : null)}
           <MetaChip theme={theme} icon={<Box className="size-3" />} title={`${t.stockQuantity}: ${stockTotal}`}>
             {t.stockQuantity}: {stockTotal}
           </MetaChip>

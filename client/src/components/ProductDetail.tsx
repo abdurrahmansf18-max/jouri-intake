@@ -560,13 +560,30 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {p.titleRaw || record.folderName}
               </h2>
               {navIndex >= 0 && navList.length > 1 ? (
-                <div className={cn("mt-0.5 text-[11px] font-bold", s.muted)}>
-                  {record.productCode} · {t.productNavPosition(navIndex + 1, navList.length)}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(record.productCode)}
+                    className={cn("inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-[11px] font-black tracking-wide transition active:scale-95", s.controlGroup, s.controlIdle)}
+                    dir="ltr"
+                  >
+                    {record.productCode}
+                    <Copy className="size-3" />
+                  </button>
+                  <span className={cn("text-[11px] font-bold", s.muted)}>{t.productNavPosition(navIndex + 1, navList.length)}</span>
                 </div>
               ) : null}
             </div>
             {navIndex < 0 || navList.length <= 1 ? (
-              <span className="font-mono text-xs font-black tracking-wide text-emerald-400">{record.productCode}</span>
+              <button
+                type="button"
+                onClick={() => handleCopy(record.productCode)}
+                className={cn("inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 font-mono text-xs font-black tracking-wide transition active:scale-95", s.controlGroup, s.controlIdle)}
+                dir="ltr"
+              >
+                {record.productCode}
+                <Copy className="size-3" />
+              </button>
             ) : null}
             {onNavigate && navList.length > 1 ? (
               <div className={cn("inline-flex shrink-0 items-center gap-1 rounded-lg border p-0.5", s.controlGroup)}>
@@ -713,11 +730,12 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           <span className={cn("block mb-2 text-xs font-black", s.strong)}>{t.sizeStocksLabel}</span>
                           <div className="flex flex-wrap gap-1.5">
                             {record.sizeStocks.map((ss) => (
-                              <span key={ss.size} dir="ltr"
+                              <button key={ss.size} type="button" onClick={() => ss.code && handleCopy(ss.code)} dir="ltr"
                                 className={cn(
-                                  "inline-flex items-center overflow-hidden rounded-lg text-xs font-extrabold",
+                                  "inline-flex items-center overflow-hidden rounded-lg text-xs font-extrabold transition active:scale-95",
                                   ss.qty > 0 ? "ring-1 ring-emerald-400/30" : "ring-1 ring-slate-400/20",
-                                )}>
+                                )}
+                                title={ss.code || ss.size}>
                                 <span className={cn(
                                   "flex items-center gap-1 px-2 py-1",
                                   ss.qty > 0 ? "bg-emerald-400/15 text-emerald-400" : "bg-slate-400/10 text-slate-400 line-through",
@@ -731,7 +749,16 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                                 )}>
                                   ×{ss.qty}
                                 </span>
-                              </span>
+                                {ss.code && (
+                                  <span className={cn(
+                                    "flex items-center gap-1 border-s px-2 py-1 font-mono text-[10px]",
+                                    ss.qty > 0 ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : "border-slate-400/10 bg-slate-400/10 text-slate-400",
+                                  )}>
+                                    {ss.code}
+                                    <Copy className="size-2.5" />
+                                  </span>
+                                )}
+                              </button>
                             ))}
                           </div>
                         </div>
@@ -993,7 +1020,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                               <option value="">— {t.selectSizeForSale} —</option>
                               {availableSizes.map((ss) => (
                                 <option key={ss.size} value={ss.size}>
-                                  {t.sizeStockDisplay(ss.size, ss.qty)}
+                                  {t.sizeStockDisplay(ss.size, ss.qty)}{ss.code ? ` · ${ss.code}` : ""}
                                 </option>
                               ))}
                             </select>

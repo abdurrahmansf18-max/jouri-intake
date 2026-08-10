@@ -16,13 +16,17 @@ from models import (
     ShopifySyncInfo,
 )
 from parser import normalize_category, normalize_product_type
-from product_code import product_code
+from product_code import product_code, size_code
 
 
 def to_record(p: Product) -> ProductRecord:
     folder_path = Path(p.folder_path)
     image_folders = file_manager.build_image_folders(folder_path, p.folder_name, p.status)
     images = _existing_images(p)
+    size_stocks = [
+        SizeStock(**{**ss, "code": size_code(p.id, str(ss.get("size") or ""))})
+        for ss in (p.size_stocks or [])
+    ]
     return ProductRecord(
         id=p.id,
         productCode=product_code(p.id),
@@ -55,7 +59,7 @@ def to_record(p: Product) -> ProductRecord:
         soldQuantity=max(0, p.sold_quantity),
         lastSoldAt=p.last_sold_at.isoformat() if p.last_sold_at else None,
         saleHistory=[SaleRecord(**s) for s in (p.sale_history or [])],
-        sizeStocks=[SizeStock(**ss) for ss in (p.size_stocks or [])],
+        sizeStocks=size_stocks,
         soldSizes=[SoldSizeEntry(**ss) for ss in (p.sold_sizes or [])],
         relatedProducts=list(p.related_products or []),
         shopify=ShopifySyncInfo(

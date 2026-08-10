@@ -13,6 +13,7 @@ class ProductStatus(str, Enum):
 class SizeStock(BaseModel):
     size: str
     qty: int
+    code: str = ""
 
 
 class SoldSizeEntry(BaseModel):

@@ -37,6 +37,7 @@ export interface ImageFolders { originals: ImageFolder; enhanced: ImageFolder; }
 export interface SizeStock {
   size: string;
   qty: number;
+  code?: string;
 }
 
 export interface SoldSizeEntry {

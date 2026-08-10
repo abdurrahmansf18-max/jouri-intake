@@ -78,9 +78,10 @@ export function buildProductSearchFields(record: ProductRecord, includeArchiveFi
     p.sizesRaw,
     record.sizeStocks.map((s) => `${s.size} ${s.qty}`).join(" "),
   ].filter(Boolean).join(" ");
+  const sizeCodes = record.sizeStocks.map((s) => s.code).filter(Boolean).join(" ");
 
   const fields: SearchField[] = [
-    { key: "product_code", label: FIELD_LABELS.product_code, value: cleanValue(record.productCode), weight: 160 },
+    { key: "product_code", label: FIELD_LABELS.product_code, value: cleanValue([record.productCode, sizeCodes].filter(Boolean).join(" ")), weight: 160 },
     { key: "title", label: FIELD_LABELS.title, value: cleanValue(p.titleRaw), weight: 120 },
     { key: "season", label: FIELD_LABELS.season, value: cleanValue(p.season), weight: 110 },
     { key: "category", label: FIELD_LABELS.category, value: cleanValue(normalizeCategory(p.categorySuggestion)), weight: 100 },
