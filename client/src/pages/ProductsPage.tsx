@@ -306,6 +306,7 @@ export default function ProductsPage() {
             <div className="flex gap-2">
               <SmartSearchPanel
                 s={s}
+                t={t}
                 onBarcode={(code) => setSearch(code)}
                 onOpenProduct={(product) => openView(product.id)}
               />
