@@ -19,6 +19,7 @@ import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import SizeStockEditor, { type SizeStockRow } from "../components/SizeStockEditor";
 import BulkProductForm from "../components/BulkProductForm";
 import VariantSelector from "../components/VariantSelector";
+import BarcodeScanButton from "../components/BarcodeScanButton";
 import { useProductCacheActions, useProductsQuery } from "../queries";
 import type { ProductRecord } from "../types";
 
@@ -399,7 +400,7 @@ export default function AddProductPage() {
               <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} listId="category-options" />
               <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} listId="product-type-options" />
               <SeasonField label={t.season} s={s} value={draft.season} onChange={(v) => patch("season", v)} />
-              <Field label={t.barcodeOptional} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" />
+              <Field label={t.barcodeOptional} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" barcodeScanTitle={t.openCameraScanBarcode} />
             </div>
             {existingCategories.length > 0 && (
               <datalist id="category-options">
@@ -430,6 +431,7 @@ export default function AddProductPage() {
                 sizeQtyPlaceholder={t.sizeQtyPlaceholder}
                 addRowLabel={t.addSizeRow}
                 barcodePlaceholder={(t as any).sizeBarcodePlaceholder || "Beden barkodu (opsiyonel)"}
+                barcodeScanTitle={t.openCameraScanBarcode}
               />
             </div>
 
@@ -578,22 +580,22 @@ function getProviderNote(
 }
 
 function Field({
-  label, inputDir = "auto", listId, onChange, prefix, s, type = "text", value,
+  label, barcodeScanTitle, inputDir = "auto", listId, onChange, prefix, s, type = "text", value,
 }: {
-  label: string; onChange: (v: string) => void;
+  label: string; barcodeScanTitle?: string; onChange: (v: string) => void;
   s: ThemeStyles; type?: "number" | "text"; value: string; inputDir?: "auto" | "ltr" | "rtl"; listId?: string; prefix?: string;
 }) {
   return (
     <label className="grid gap-1.5">
       <span className={cn("text-xs font-black", s.strong)}>{label}</span>
-      <span className="relative block">
+      <span className={cn("relative flex gap-2", barcodeScanTitle ? "items-center" : "block")}>
         {prefix ? (
           <span className={cn("pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black", s.muted)}>
             {prefix}
           </span>
         ) : null}
         <input
-          className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", prefix && "pl-9", s.input)}
+          className={cn("min-h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", prefix && "pl-9", s.input)}
           type={type}
           list={listId}
           min={type === "number" ? 0 : undefined}
@@ -601,6 +603,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           dir={inputDir}
         />
+        {barcodeScanTitle && <BarcodeScanButton s={s} title={barcodeScanTitle} onDetected={onChange} className="size-11 rounded-xl" />}
       </span>
     </label>
   );

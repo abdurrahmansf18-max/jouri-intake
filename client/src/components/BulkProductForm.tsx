@@ -10,6 +10,7 @@ import { COPY, cn } from "../i18n";
 import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import { formatPrice } from "../format";
 import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
+import BarcodeScanButton from "./BarcodeScanButton";
 
 // ── Tipler ───────────────────────────────────────────────────────────────────
 
@@ -475,6 +476,7 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             s={s} disabled={busy}
             placeholder={t.barcodeManualPlaceholder}
             inputDir="ltr"
+            barcodeScanTitle={t.openCameraScanBarcode}
             className="col-span-2"
           />
           <BulkField
@@ -520,6 +522,7 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             sizeQtyPlaceholder={t.sizeQtyPlaceholder}
             addRowLabel={t.addSizeRow}
             barcodePlaceholder={t.sizeBarcodePlaceholder}
+            barcodeScanTitle={t.openCameraScanBarcode}
           />
         </div>
       </div>
@@ -529,7 +532,7 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
 
 // ── Yardımcı alan bileşeni ────────────────────────────────────────────────────
 
-function BulkField({ label, value, onChange, s, disabled, inputDir = "auto", placeholder, prefix, className }: {
+function BulkField({ label, value, onChange, s, disabled, inputDir = "auto", placeholder, prefix, className, barcodeScanTitle }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -539,11 +542,12 @@ function BulkField({ label, value, onChange, s, disabled, inputDir = "auto", pla
   placeholder?: string;
   prefix?: string;
   className?: string;
+  barcodeScanTitle?: string;
 }) {
   return (
     <label className={cn("grid gap-1", className)}>
       <span className={cn("text-[10px] font-black leading-none", s.strong)}>{label}</span>
-      <span className="relative block">
+      <span className={cn("relative flex gap-2", barcodeScanTitle ? "items-center" : "block")}>
         {prefix ? (
           <span className={cn("pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black", s.muted)}>
             {prefix}
@@ -551,7 +555,7 @@ function BulkField({ label, value, onChange, s, disabled, inputDir = "auto", pla
         ) : null}
         <input
           className={cn(
-            "min-h-9 w-full rounded-lg border px-2.5 text-xs font-semibold outline-none focus:ring-2",
+            "min-h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-xs font-semibold outline-none focus:ring-2",
             prefix && "pl-7",
             s.input,
           )}
@@ -561,6 +565,15 @@ function BulkField({ label, value, onChange, s, disabled, inputDir = "auto", pla
           placeholder={placeholder}
           dir={inputDir}
         />
+        {barcodeScanTitle && (
+          <BarcodeScanButton
+            s={s}
+            title={barcodeScanTitle}
+            onDetected={onChange}
+            disabled={disabled}
+            className="size-9 rounded-lg"
+          />
+        )}
       </span>
     </label>
   );

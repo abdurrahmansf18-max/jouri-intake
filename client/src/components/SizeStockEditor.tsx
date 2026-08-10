@@ -1,6 +1,7 @@
 import { Plus, X } from "lucide-react";
 import { cn } from "../i18n";
 import type { ThemeStyles } from "../theme";
+import BarcodeScanButton from "./BarcodeScanButton";
 
 export type SizeStockRow = { size: string; qty: string; barcode?: string };
 
@@ -12,10 +13,11 @@ interface Props {
   sizeQtyPlaceholder: string;
   addRowLabel: string;
   barcodePlaceholder?: string;
+  barcodeScanTitle?: string;
 }
 
 export default function SizeStockEditor({
-  value, onChange, s, sizeNamePlaceholder, sizeQtyPlaceholder, addRowLabel, barcodePlaceholder,
+  value, onChange, s, sizeNamePlaceholder, sizeQtyPlaceholder, addRowLabel, barcodePlaceholder, barcodeScanTitle,
 }: Props) {
   function updateRow(i: number, key: keyof SizeStockRow, val: string) {
     onChange(value.map((r, j) => j === i ? { ...r, [key]: val } : r));
@@ -68,18 +70,28 @@ export default function SizeStockEditor({
             </button>
           </div>
           {barcodePlaceholder && (
-            <input
-              type="text"
-              inputMode="numeric"
-              value={row.barcode || ""}
-              onChange={(e) => updateRow(i, "barcode", e.target.value)}
-              placeholder={barcodePlaceholder}
-              className={cn(
-                "min-h-10 w-full rounded-xl border px-3 font-mono text-xs font-semibold outline-none focus:ring-4",
-                s.input,
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={row.barcode || ""}
+                onChange={(e) => updateRow(i, "barcode", e.target.value)}
+                placeholder={barcodePlaceholder}
+                className={cn(
+                  "min-h-10 min-w-0 flex-1 rounded-xl border px-3 font-mono text-xs font-semibold outline-none focus:ring-4",
+                  s.input,
+                )}
+                dir="ltr"
+              />
+              {barcodeScanTitle && (
+                <BarcodeScanButton
+                  s={s}
+                  title={barcodeScanTitle}
+                  onDetected={(code) => updateRow(i, "barcode", code)}
+                  className="size-10 rounded-xl"
+                />
               )}
-              dir="ltr"
-            />
+            </div>
           )}
         </div>
       ))}

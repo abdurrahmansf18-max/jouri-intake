@@ -20,6 +20,7 @@ import { statusActiveBadge, statusBadge } from "./ProductCard";
 import ImageLightbox from "./ImageLightbox";
 import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
 import VariantSelector from "./VariantSelector";
+import BarcodeScanButton from "./BarcodeScanButton";
 
 const ACTIVE_STATUSES: ProductStatus[] = ["pending", "ai_enhanced", "published"];
 
@@ -1350,7 +1351,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     </label>
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />
                     <DetailField label={t.productType}         s={s} value={draft.productTypeSuggestion}  onChange={(v) => patch("productTypeSuggestion", v)} />
-                    <DetailField label={t.barcodeOptional} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" />
+                    <DetailField label={t.barcodeOptional} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" barcodeScanTitle={t.openCameraScanBarcode} />
                   </div>
 
                   <div className={cn("mt-4 rounded-xl border p-3", s.panelBorder)}>
@@ -1432,6 +1433,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       sizeQtyPlaceholder={t.sizeQtyPlaceholder}
                       addRowLabel={t.addSizeRow}
                       barcodePlaceholder={(t as any).sizeBarcodePlaceholder || "Beden barkodu (opsiyonel)"}
+                      barcodeScanTitle={t.openCameraScanBarcode}
                     />
                   </div>
 
@@ -1784,21 +1786,22 @@ function canonicalSeasonValue(value: string): string {
   return "";
 }
 
-function DetailField({ label, inputDir = "auto", onChange, prefix, s, type = "text", value }: {
-  label: string; onChange: (v: string) => void; s: ThemeStyles; type?: "number" | "text"; value: string; inputDir?: "auto" | "ltr" | "rtl"; prefix?: string;
+function DetailField({ label, barcodeScanTitle, inputDir = "auto", onChange, prefix, s, type = "text", value }: {
+  label: string; barcodeScanTitle?: string; onChange: (v: string) => void; s: ThemeStyles; type?: "number" | "text"; value: string; inputDir?: "auto" | "ltr" | "rtl"; prefix?: string;
 }) {
   return (
     <label className="grid gap-1.5">
       <span className={cn("text-xs font-black", s.strong)}>{label}</span>
-      <span className="relative block">
+      <span className={cn("relative flex gap-2", barcodeScanTitle ? "items-center" : "block")}>
         {prefix ? (
           <span className={cn("pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black", s.muted)}>
             {prefix}
           </span>
         ) : null}
-        <input className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", prefix && "pl-9", s.input)}
+        <input className={cn("min-h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", prefix && "pl-9", s.input)}
           type={type} min={type === "number" ? 0 : undefined}
           value={value} onChange={(e) => onChange(e.target.value)} dir={inputDir} />
+        {barcodeScanTitle && <BarcodeScanButton s={s} title={barcodeScanTitle} onDetected={onChange} className="size-11 rounded-xl" />}
       </span>
     </label>
   );
