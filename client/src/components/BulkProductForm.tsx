@@ -21,6 +21,7 @@ type BulkDraft = {
   season: string;
   categorySuggestion: string;
   productTypeSuggestion: string;
+  barcode: string;
   description: string;
   notes: string;
   files: File[];
@@ -39,6 +40,7 @@ function makeDraft(): BulkDraft {
     season: "",
     categorySuggestion: "",
     productTypeSuggestion: "",
+    barcode: "",
     description: "",
     notes: "",
     files: [],
@@ -156,7 +158,7 @@ export default function BulkProductForm({ initialCards }: { initialCards?: BulkD
       try {
         const validSizes = card.sizeRows
           .filter((r) => r.size.trim())
-          .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0) }));
+          .map((r) => ({ size: r.size.trim(), qty: Math.max(0, parseInt(r.qty, 10) || 0), barcode: r.barcode?.trim() || "" }));
 
         const description = card.description.trim() ||
           [card.titleRaw, card.colorRaw, card.priceAmount && formatPrice(card.priceAmount, "EUR")]
@@ -164,6 +166,7 @@ export default function BulkProductForm({ initialCards }: { initialCards?: BulkD
 
         await createProduct(description, card.files, {
           notes: card.notes,
+          barcodes: card.barcode.trim() ? [card.barcode.trim()] : [],
           sizeStocks: validSizes,
           parsed: {
             titleRaw: card.titleRaw,
@@ -466,6 +469,15 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             className="col-span-2"
           />
           <BulkField
+            label={t.barcodeOptional}
+            value={card.barcode}
+            onChange={(v) => onPatch({ barcode: v })}
+            s={s} disabled={busy}
+            placeholder={t.barcodeManualPlaceholder}
+            inputDir="ltr"
+            className="col-span-2"
+          />
+          <BulkField
             label={t.notes}
             value={card.notes}
             onChange={(v) => onPatch({ notes: v })}
@@ -507,6 +519,7 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             sizeNamePlaceholder={t.sizeNamePlaceholder}
             sizeQtyPlaceholder={t.sizeQtyPlaceholder}
             addRowLabel={t.addSizeRow}
+            barcodePlaceholder={t.sizeBarcodePlaceholder}
           />
         </div>
       </div>

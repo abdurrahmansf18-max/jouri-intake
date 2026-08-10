@@ -399,7 +399,7 @@ export default function AddProductPage() {
               <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} listId="category-options" />
               <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} listId="product-type-options" />
               <SeasonField label={t.season} s={s} value={draft.season} onChange={(v) => patch("season", v)} />
-              <Field label={(t as any).barcode || "Barkod"} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" />
+              <Field label={t.barcodeOptional} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" />
             </div>
             {existingCategories.length > 0 && (
               <datalist id="category-options">

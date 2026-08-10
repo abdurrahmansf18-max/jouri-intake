@@ -1350,7 +1350,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     </label>
                     <DetailField label={t.category}            s={s} value={draft.categorySuggestion}     onChange={(v) => patch("categorySuggestion", v)} />
                     <DetailField label={t.productType}         s={s} value={draft.productTypeSuggestion}  onChange={(v) => patch("productTypeSuggestion", v)} />
-                    <DetailField label={(t as any).barcode || "Barkod"} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" />
+                    <DetailField label={t.barcodeOptional} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" />
                   </div>
 
                   <div className={cn("mt-4 rounded-xl border p-3", s.panelBorder)}>
