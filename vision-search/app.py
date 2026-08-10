@@ -12,6 +12,7 @@ from transformers import AutoModel, AutoProcessor
 
 
 MODEL_NAME = os.getenv("VISION_MODEL", "Marqo/marqo-fashionSigLIP")
+MODEL_REVISION = os.getenv("VISION_MODEL_REVISION", "c56244cc94f92419e8369fa71efdaf403b124ce8")
 MAX_IMAGES_PER_PRODUCT = int(os.getenv("MAX_IMAGES_PER_PRODUCT", "3"))
 
 app = FastAPI(title="Jouri Vision Search")
@@ -22,7 +23,7 @@ _cache: dict[str, tuple[float, torch.Tensor]] = {}
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "model": MODEL_NAME, "loaded": _model is not None}
+    return {"ok": True, "model": MODEL_NAME, "revision": MODEL_REVISION, "loaded": _model is not None}
 
 
 @app.post("/search")
@@ -57,8 +58,8 @@ def _load_model() -> tuple[Any, Any]:
     global _model, _processor
     if _model is None or _processor is None:
         torch.set_num_threads(max(1, min(4, os.cpu_count() or 1)))
-        _processor = AutoProcessor.from_pretrained(MODEL_NAME, trust_remote_code=True)
-        _model = AutoModel.from_pretrained(MODEL_NAME, trust_remote_code=True)
+        _processor = AutoProcessor.from_pretrained(MODEL_NAME, revision=MODEL_REVISION, trust_remote_code=True)
+        _model = AutoModel.from_pretrained(MODEL_NAME, revision=MODEL_REVISION, trust_remote_code=True)
         _model.eval()
     return _model, _processor
 
