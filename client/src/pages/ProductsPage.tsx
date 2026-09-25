@@ -57,20 +57,20 @@ export default function ProductsPage() {
   const cacheActions = useProductCacheActions();
 
   const allProducts: ProductRecord[] = productsQuery.data ?? [];
-  const records = useMemo<ProductRecord[]>(() => allProducts.filter((p: ProductRecord) => p.status !== "sold_archive"), [allProducts]);
+  // Aktif ürünler (sold_archive hariç)
+  const activeRecords = useMemo<ProductRecord[]>(() => allProducts.filter((p: ProductRecord) => p.status !== "sold_archive"), [allProducts]);
+  // Satılan ürünler
+  const soldRecords = useMemo<ProductRecord[]>(() => allProducts.filter((p: ProductRecord) => p.status === "sold_archive"), [allProducts]);
+  // hideSold=false ise sold_archive da dahil edilir
+  const records = useMemo<ProductRecord[]>(() => hideSold ? activeRecords : allProducts, [activeRecords, allProducts, hideSold]);
   const loading = productsQuery.isLoading;
 
-  // counts: "Tükenenleri Gizle" aktifken sadece stoktaki ürünleri sayar — gösterilen liste ile tutarlı
-  const visibleRecords = useMemo<ProductRecord[]>(
-    () => hideSold ? records.filter((r: ProductRecord) => r.stockQuantity > 0) : records,
-    [records, hideSold]
-  );
   const counts: Record<StatusFilter, number> = {
-    all: visibleRecords.length,
-    pending: visibleRecords.filter((r: ProductRecord) => r.status === "pending").length,
-    ai_enhanced: visibleRecords.filter((r: ProductRecord) => r.status === "ai_enhanced").length,
-    published: visibleRecords.filter((r: ProductRecord) => r.status === "published").length,
-    sold_archive: 0,
+    all: records.length,
+    pending: activeRecords.filter((r: ProductRecord) => r.status === "pending").length,
+    ai_enhanced: activeRecords.filter((r: ProductRecord) => r.status === "ai_enhanced").length,
+    published: activeRecords.filter((r: ProductRecord) => r.status === "published").length,
+    sold_archive: hideSold ? 0 : soldRecords.length,
   };
   const unsyncedPublishedCount = records.filter((r: ProductRecord) => r.status === "published" && !r.shopify?.productId).length;
 
@@ -86,8 +86,8 @@ export default function ProductsPage() {
   );
 
   const statusRecords = useMemo<ProductRecord[]>(
-    () => records.filter((r: ProductRecord) => filter === "all" || r.status === filter),
-    [records, filter],
+    () => activeRecords.filter((r: ProductRecord) => filter === "all" || r.status === filter),
+    [activeRecords, filter],
   );
 
   const recordsForCategoryCounts = useMemo(
@@ -187,7 +187,6 @@ export default function ProductsPage() {
   const searchResults = useMemo(() => {
     const filterScoped = records.filter((r: ProductRecord) => {
       if (filter !== "all" && r.status !== filter) return false;
-      if (hideSold && r.stockQuantity === 0) return false;
       if (onlyUnsynced && (r.status !== "published" || r.shopify?.productId)) return false;
 
       const cat = normalizeCategory(r.parsed?.categorySuggestion ?? "");
@@ -309,8 +308,8 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={() => setHideSold(!hideSold)}
-                className={cn(s.controlGroup, "px-3 py-1.5 text-xs font-extrabold rounded-lg transition-colors", hideSold ? s.filterActive : s.filterIdle)}>
-                {hideSold ? "Tükenenleri Göster" : "Tükenenleri Gizle"}
+                className={cn(s.controlGroup, "px-3 py-1.5 text-xs font-extrabold rounded-lg transition-colors", !hideSold ? s.filterActive : s.filterIdle)}>
+                {hideSold ? "Satılanları Göster" : "Satılanları Gizle"}
               </button>
             </div>
             <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
