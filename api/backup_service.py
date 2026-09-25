@@ -222,7 +222,9 @@ def run_manual_backup(db: Session) -> dict:
         }
         status_data["storage"] = _storage_overview(
             status_data,
-            local_backup_count=len(backups_list),
+            _cleanup_old_backups(15)
+        backups_list = [_backup_entry(e) for e in sorted(BACKUP_ROOT.iterdir(), reverse=True) if e.is_dir() and e.name.startswith("20")]
+        local_backup_count=len(backups_list),
             drive_backup_count=len(_list_drive_backups()),
         )
         (BACKUP_ROOT / "status.json").write_text(
@@ -914,3 +916,23 @@ def _summarize_rclone_error(output: str) -> str:
         return "Google Drive senkronu zaman aşımına uğradı."
 
     return compact[:240] if compact else "Google Drive senkronu başarısız oldu."
+
+
+def _cleanup_old_backups(days: int = 15) -> None:
+    from datetime import datetime, timezone, timedelta
+    if not BACKUP_ROOT.exists():
+        return
+        
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_str = cutoff_date.strftime("%Y-%m-%d")
+    
+    for entry in BACKUP_ROOT.iterdir():
+        if not entry.is_dir() or not entry.name.startswith("20"):
+            continue
+        try:
+            # name format is like 2026-09-25T15_42_11 or similar, or just YYYY-MM-DD
+            if entry.name[:10] < cutoff_str:
+                import shutil
+                shutil.rmtree(entry, ignore_errors=True)
+        except Exception:
+            pass

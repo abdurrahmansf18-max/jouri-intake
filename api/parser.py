@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 import json
 from dotenv import load_dotenv

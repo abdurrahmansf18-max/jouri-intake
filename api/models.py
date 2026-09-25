@@ -200,6 +200,7 @@ class SellProductRequest(BaseModel):
     sizes: Optional[list[str]] = None
     sizeQuantities: Optional[list[dict]] = None
     note: Optional[str] = None
+    source: Optional[str] = "physical"
 
 
 class ResetSalesRequest(BaseModel):

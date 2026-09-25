@@ -194,6 +194,7 @@ export async function sellProduct(
   quantity = 1,
   size: string | string[] | { size: string; quantity: number }[] = "",
   note = "",
+  source = "physical",
 ): Promise<ProductRecord> {
   const sizes = Array.isArray(size) ? size.filter(Boolean) : [];
   const sizeQuantities = Array.isArray(size) && sizes.length > 0 && typeof sizes[0] === "object"
@@ -208,6 +209,7 @@ export async function sellProduct(
       sizes: sizes.length && typeof sizes[0] === "string" ? sizes : undefined,
       sizeQuantities: sizeQuantities.length ? sizeQuantities : undefined,
       note,
+      source,
     }),
   });
   return handleResponse<ProductRecord>(res);

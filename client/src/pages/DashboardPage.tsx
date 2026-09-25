@@ -206,11 +206,6 @@ export default function DashboardPage() {
     || smart.lowStock > 0 || smart.outOfStock > 0
     || smart.aiReadyPending > 0 || smart.publishedUnsynced > 0;
 
-  // Sisteme en son eklenen 6 ürünü tarihlerine göre azalan şekilde (en yeniler en başta) sıralayıp alıyoruz. (Arşivdekiler hariç)
-  const recentProducts = [...active]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 6);
-
   // İş Akışı Boru Hattı (Workflow Pipeline) için ürün durumlarının sayıları ve renk tasarımları
   const activeTotal = counts.pending + counts.ai_enhanced + counts.published;
   const workflowSteps = [
@@ -475,56 +470,6 @@ export default function DashboardPage() {
 
       {/* ── 7. SON EKLENEN ÜRÜNLER KARTLARI ── */}
       {/* Sisteme en son dahil edilen 6 ürünü görseli, fiyatı ve durumuyla beraber küçük kartlar halinde dizer */}
-      {recentProducts.length > 0 && (
-        <div className={cn("rounded-xl border", s.panel)}>
-          <div className={cn("flex items-center gap-3 border-b px-4 sm:px-5 py-3 sm:py-4", s.panelBorder)}>
-            <PackageCheck className="size-5 text-emerald-400" />
-            <h2 className={cn("text-base font-extrabold", s.title)}>{t.dashRecentProducts}</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
-            {recentProducts.map((p) => {
-              const firstImg = p.images[0]; // Ürünün ilk görselini al
-              return (
-                <div key={p.id} className={cn("overflow-hidden rounded-xl border", s.subPanel)}>
-                  {firstImg ? (
-                    // Görseli göster
-                    <img
-                      src={productImageUrl(p.id, firstImg.fileName, undefined, firstImg.folder)}
-                      alt={firstImg.originalName}
-                      className="aspect-video w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    // Görsel yoksa boş bir alan göster
-                    <div className="flex aspect-video items-center justify-center bg-black/10">
-                      <Images className="size-6 opacity-20" />
-                    </div>
-                  )}
-                  <div className="p-2.5">
-                    {/* Ürün İsmi (veya klasör ismi) */}
-                    <p className={cn("line-clamp-1 text-xs font-extrabold", s.title)} dir="auto">
-                      {p.parsed.titleRaw || p.folderName}
-                    </p>
-                    <div className="mt-1 flex items-center justify-between gap-1">
-                      {/* Ürün Fiyatı */}
-                      {p.parsed.priceAmount && (
-                        <span className="text-[10px] font-black text-emerald-400">
-                          {formatPrice(p.parsed.priceAmount, p.parsed.currency)}
-                        </span>
-                      )}
-                      {/* Ürünün Mevcut Durumu (Bekliyor, Yayınlandı vb.) */}
-                      <span className={cn("rounded-md border px-1.5 py-0.5 text-[9px] font-black", statusBadge(p.status, s))}>
-                        {statusLabel(p.status, locale)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ── 8. SON İŞLEMLER (LOGS) ── */}
       {/* Sistemdeki her hareketin (Ekleme, Silme, Güncelleme) listelendiği aktivite günlüğü */}
       <div className={cn("rounded-xl border min-w-0 overflow-hidden", s.panel)}>

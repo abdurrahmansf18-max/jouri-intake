@@ -33,11 +33,11 @@ type Draft = {
   compareAtPriceAmount: string;
   discountNote: string;
   colorRaw: string; colorGermanSuggestion: string;
-  season: string;
+  season: string; fabricType: string;
   notes: string; description: string;
   barcode: string;
   restoreStock: string;
-  saleQuantity: string; saleNote: string;
+  saleQuantity: string; saleNote: string; saleSource: string;
   saleSize: string;
   saleSizes: string[];
   saleSizeQuantities: Record<string, string>;
@@ -56,13 +56,13 @@ function recordToDraft(r: ProductRecord): Draft {
     discountNote: r.discountNote || "",
     colorRaw: r.parsed.colorRaw,
     colorGermanSuggestion: r.parsed.colorGermanSuggestion,
-    season: r.parsed.season || "",
+    season: r.parsed.season || "", fabricType: r.parsed.fabricType || "",
     notes: r.notes || "",
     description: r.description || "",
     barcode: (r.barcodes || [])[0] || "",
     restoreStock: String(Math.max(1, r.stockQuantity || 1)),
     saleQuantity: "1",
-    saleNote: "",
+    saleNote: "", saleSource: "physical",
     saleSize: "",
     saleSizes: [],
     saleSizeQuantities: {},
@@ -304,6 +304,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
           colorRaw: draft.colorRaw,
           colorGermanSuggestion: draft.colorGermanSuggestion,
           season: draft.season,
+          fabricType: draft.fabricType,
         },
       });
 
@@ -354,7 +355,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
         size,
         quantity: num(draft.saleSizeQuantities[size] || draft.saleQuantity, 1),
       }));
-      const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), sizeQuantities, draft.saleNote);
+      const updated = await sellProduct(record.id, num(draft.saleQuantity, 1), sizeQuantities, draft.saleNote, draft.saleSource);
       onReplace(updated);
       showToast(t.toastSold, "success");
       patch("saleQuantity", "1");
@@ -755,6 +756,14 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       </span>
                     </InfoRow>}
 
+                    {/* Kumaş Türü */}
+                    {p.fabricType && <InfoRow label={(t as any).fabricType || "Kumaş Türü"} s={s}>
+                      <span className="inline-flex items-center gap-1">
+                        <Tag className="size-3 text-indigo-400" />
+                        <span dir="auto">{p.fabricType}</span>
+                      </span>
+                    </InfoRow>}
+
                     {/* Bedenler + Toplam stok — yan yana */}
                     {record.sizeStocks.length > 0 ? (
                       <div className="grid grid-cols-2 gap-0 py-2.5">
@@ -1133,6 +1142,10 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         )}
                         <label className="grid gap-1.5">
                           <span className={cn("text-xs font-black", s.strong)}>{t.saleNote}</span>
+                          <div className="flex gap-2 mb-2">
+                            <button type="button" onClick={() => patch("saleSource", "physical")} className={cn("flex-1 min-h-9 rounded-lg border text-xs font-bold transition", draft.saleSource === "physical" ? s.primary : s.controlIdle)}>{(t as any).saleSourcePhysical || "Fiziksel Mağaza"}</button>
+                            <button type="button" onClick={() => patch("saleSource", "online")} className={cn("flex-1 min-h-9 rounded-lg border text-xs font-bold transition", draft.saleSource === "online" ? s.primary : s.controlIdle)}>{(t as any).saleSourceOnline || "İnternet"}</button>
+                          </div>
                           <input value={draft.saleNote} onChange={(e) => patch("saleNote", e.target.value)}
                             placeholder={t.saleNotePlaceholder} dir="auto"
                             className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)} />
@@ -1219,6 +1232,8 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                             {new Date(sale.soldAt).toLocaleString(dateLocale)}
                             <span className="text-emerald-400">·</span>
                             <span>{sale.quantity} {t.soldQuantity.toLowerCase()}</span>
+                            {sale.source === "online" && <span className="ml-auto rounded bg-sky-400/10 px-1 py-0.5 text-[10px] uppercase text-sky-400">{(t as any).saleSourceOnline || "İnternet"}</span>}
+                            {sale.source === "physical" && <span className="ml-auto rounded bg-orange-400/10 px-1 py-0.5 text-[10px] uppercase text-orange-400">{(t as any).saleSourcePhysical || "Fiziksel"}</span>}
                             {sale.size && (
                               <>
                                 <span className="text-emerald-400">·</span>
@@ -1340,6 +1355,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <DetailField label={t.price}               s={s} value={draft.priceAmount}            onChange={(v) => patch("priceAmount", v)} prefix="€" inputDir="ltr" />
                     <DetailField label={(t as any).compareAtPrice} s={s} value={draft.compareAtPriceAmount} onChange={(v) => patch("compareAtPriceAmount", v)} prefix="€" inputDir="ltr" />
                     <DetailField label={t.color}               s={s} value={draft.colorRaw}               onChange={(v) => patch("colorRaw", v)} />
+                    <DetailField label={(t as any).fabricType || "Kumaş Türü"} s={s} value={draft.fabricType} onChange={(v) => patch("fabricType", v)} />
                     <label className="grid gap-1.5">
                       <span className={cn("text-xs font-black", s.strong)}>{(t as any).season || "Mevsim"}</span>
                       <select value={canonicalSeasonValue(draft.season)} onChange={(e) => patch("season", e.target.value)} className={cn("min-h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}>

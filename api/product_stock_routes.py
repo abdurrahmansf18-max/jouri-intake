@@ -113,7 +113,7 @@ def sell_product(
                 "size": detail["size"],
                 "soldAt": now.isoformat(),
                 "note": (body.note or "").strip(),
-                "source": "manual",
+                "source": body.source or "manual",
             })
         p.sold_sizes = sold_sizes_list
     else:
@@ -131,7 +131,7 @@ def sell_product(
             "quantity": int(detail["quantity"]),
             "size": detail["size"],
             "note": (body.note or "").strip(),
-            "source": "manual",
+            "source": body.source or "manual",
         }
         for detail in sold_details
     ]

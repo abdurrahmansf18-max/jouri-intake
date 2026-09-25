@@ -30,6 +30,7 @@ type Draft = {
   priceAmount: string;
   colorRaw: string;
   season: string;
+  fabricType: string;
   notes: string;
   barcode: string;
 };
@@ -47,6 +48,7 @@ function emptyDraft(): Draft {
     priceAmount: "",
     colorRaw: "",
     season: "",
+    fabricType: "",
     notes: "",
     barcode: "",
   };
@@ -126,6 +128,7 @@ export default function AddProductPage() {
           priceAmount: draft.priceAmount,
           colorRaw: draft.colorRaw,
           season: draft.season,
+          fabricType: draft.fabricType,
         },
       });
       showToast(t.toastCreated, "success");
@@ -167,6 +170,7 @@ export default function AddProductPage() {
                  priceAmount: parsed.priceAmount || "",
                  colorRaw: v.color || "",
                  season: parsed.season || "",
+                 fabricType: parsed.fabricType || "",
                  categorySuggestion: parsed.categorySuggestion || "",
                  productTypeSuggestion: parsed.productTypeSuggestion || "",
                  description: result.description || "",
@@ -185,6 +189,7 @@ export default function AddProductPage() {
          if (parsed.priceAmount) patch("priceAmount", parsed.priceAmount);
          if (parsed.colorRaw) patch("colorRaw", parsed.colorRaw);
          if (parsed.season) patch("season", parsed.season);
+         if (parsed.fabricType) patch("fabricType", parsed.fabricType);
          if (parsed.categorySuggestion) patch("categorySuggestion", parsed.categorySuggestion);
          if (parsed.productTypeSuggestion) patch("productTypeSuggestion", parsed.productTypeSuggestion);
          if (aiImage && files.length === 0) handleFiles([aiImage]);
@@ -400,6 +405,7 @@ export default function AddProductPage() {
               <Field label={t.category}               s={s} value={draft.categorySuggestion}    onChange={(v) => patch("categorySuggestion", v)} listId="category-options" />
               <Field label={t.productType}            s={s} value={draft.productTypeSuggestion} onChange={(v) => patch("productTypeSuggestion", v)} listId="product-type-options" />
               <SeasonField label={t.season} s={s} value={draft.season} onChange={(v) => patch("season", v)} />
+              <Field label={(t as any).fabricType || "Kumaş"} s={s} value={draft.fabricType} onChange={(v) => patch("fabricType", v)} />
               <Field label={t.barcodeOptional} s={s} value={draft.barcode} onChange={(v) => patch("barcode", v)} inputDir="ltr" barcodeScanTitle={t.openCameraScanBarcode} />
             </div>
             {existingCategories.length > 0 && (

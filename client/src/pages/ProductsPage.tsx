@@ -31,6 +31,7 @@ export default function ProductsPage() {
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [seasonFilter, setSeasonFilter] = useState<string>("all");
   const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
+  const [bulkStatusMenuOpen, setBulkStatusMenuOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pushLoading, setPushLoading] = useState(false);
@@ -584,8 +585,43 @@ export default function ProductsPage() {
                   </span>
                 </button>
                 )}
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromptConfig({
+                      title: "Durum Değiştir",
+                      description: "Seçili ürünlerin durumunu değiştir.",
+                      options: [
+                        { value: "pending", label: t.dashPending },
+                        { value: "ai_enhanced", label: t.dashAiEnhanced },
+                        { value: "published", label: t.dashPublished },
+                        { value: "sold_archive", label: (t as any).dashArchive || "Satılanlar" }
+                      ],
+                      initialValue: "",
+                      onConfirm: async (newStatus) => {
+                        setPromptConfig(null);
+                        if (!newStatus) return;
+                        setStatusBulkLoading(newStatus as any);
+                        try {
+                          const updatedRecords = await bulkUpdateStatus(selectedIds, newStatus as any);
+                          const skipped = selectedIds.length - updatedRecords.length;
+                          showToast(skipped > 0 ? t.bulkStatusPartial(updatedRecords.length, skipped) : t.bulkStatusSuccess(updatedRecords.length), skipped > 0 ? "error" : "success");
+                          setTimeout(() => window.location.reload(), 1000);
+                        } catch (e) {
+                          showToast(t.errors.ERR_GENERAL, "error");
+                        }
+                      },
+                      onCancel: () => setPromptConfig(null)
+                    });
+                  }}
+                  className={cn("min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors bg-emerald-600 hover:bg-emerald-500")}
+                >
+                  <span className="block min-w-0 text-center leading-tight">{(t as any).changeStatus || "Durum Değiştir"} ({selectedIds.length})</span>
+                </button>
                 {showBulkEditSeason && (
                 <button
+
                   type="button"
                   className="min-h-11 min-w-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-500 sm:col-span-2 lg:col-span-1"
                   onClick={async () => {
@@ -613,36 +649,8 @@ export default function ProductsPage() {
                   <span className="block min-w-0 text-center leading-tight">{t.bulkEditSelected(selectedIds.length)}</span>
                 </button>
                 )}
-                {showBulkMarkAiEnhanced && (
-                <button
-                  type="button"
-                  disabled={statusBulkLoading !== null}
-                  className={cn(
-                    "min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
-                    statusBulkLoading !== null ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500"
-                  )}
-                  onClick={() => handleBulkStatusChange("ai_enhanced")}
-                >
-                  <span className="block min-w-0 text-center leading-tight">
-                    {statusBulkLoading === "ai_enhanced" ? t.bulkStatusWorking : t.bulkMarkAiEnhanced(selectedIds.length)}
-                  </span>
-                </button>
-                )}
-                {showBulkMarkPublished && (
-                <button
-                  type="button"
-                  disabled={statusBulkLoading !== null}
-                  className={cn(
-                    "min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors",
-                    statusBulkLoading !== null ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500"
-                  )}
-                  onClick={() => handleBulkStatusChange("published")}
-                >
-                  <span className="block min-w-0 text-center leading-tight">
-                    {statusBulkLoading === "published" ? t.bulkStatusWorking : t.bulkMarkPublished(selectedIds.length)}
-                  </span>
-                </button>
-                )}
+                
+                
               </div>
             )}
           </div>
