@@ -430,7 +430,7 @@ export const COPY = {
     backupDriveRestorePoints: "Drive kayıtları",
     backupLiveStatusTitle: "Yedekleme canlı durumu",
     backupStorageTitle: "Yedek yapısı ve saklanan veriler",
-    backupStorageSubtitle: "Canlı veritabanı, VPS snapshot'ı ve Drive yedeği ayrı katmanlar olarak takip edilir.",
+    backupStorageSubtitle: "Canlı veritabanı, VPS snapshot'ı ve Drive yedeği ayrı katmanlar olarak takip edilir. (VPS üzerindeki yedekler diskte yer kaplamaması için otomatik olarak sadece son 15 gün tutulur).",
     backupStorageDatabase: "Veritabanı",
     backupStorageVps: "VPS yedeği",
     backupStorageDrive: "Drive yedeği",

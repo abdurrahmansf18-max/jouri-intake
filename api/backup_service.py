@@ -45,6 +45,7 @@ def get_backup_overview() -> dict:
         status["running_step"] = running_status.get("step")
         status["running_updated_at"] = running_status.get("updated_at")
 
+    _cleanup_old_backups(15)
     backups = []
     if BACKUP_ROOT.exists():
         for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):

@@ -257,6 +257,12 @@ export async function bulkUpdateStatus(ids: string[], status: ProductStatus): Pr
     headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify({ productIds: ids, status }),
   });
+  if (res.status === 403) {
+    const data = await res.json().catch(() => ({}));
+    if (data.detail === "ERR_PIN_REQUIRED") {
+      throw new Error("ERR_PIN_REQUIRED");
+    }
+  }
   return handleResponse<ProductRecord[]>(res);
 }
 

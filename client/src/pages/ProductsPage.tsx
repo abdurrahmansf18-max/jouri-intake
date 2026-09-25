@@ -11,7 +11,7 @@ import Pagination from "../components/Pagination";
 import { PromptModal } from "../components/PromptModal";
 import SmartSearchPanel from "../components/SmartSearchPanel";
 import { useProductCacheActions, useProductsQuery } from "../queries";
-import { bulkUpdateProducts, bulkUpdateStatus, bulkPushToShopify } from "../api";
+import { bulkUpdateProducts, bulkUpdateStatus, verifyEditLock, bulkPushToShopify } from "../api";
 
 const PAGE_SIZE = 30;
 
@@ -24,6 +24,7 @@ export default function ProductsPage() {
   const s = theme === "dark" ? DARK : LIGHT;
 
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [hideSold, setHideSold] = useState(true);
   const [onlyUnsynced, setOnlyUnsynced] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
@@ -176,11 +177,12 @@ export default function ProductsPage() {
   }, [recordsForSeasonCounts]);
 
   // Filtre veya arama değişince sayfa 1'e dön
-  useEffect(() => { setPage(1); }, [filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter]);
+  useEffect(() => { setPage(1); }, [filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold]);
 
   const searchResults = useMemo(() => {
     const filterScoped = records.filter((r: ProductRecord) => {
       if (filter !== "all" && r.status !== filter) return false;
+      if (hideSold && r.stockQuantity === 0) return false;
       if (onlyUnsynced && (r.status !== "published" || r.shopify?.productId)) return false;
 
       const cat = normalizeCategory(r.parsed?.categorySuggestion ?? "");
@@ -198,7 +200,7 @@ export default function ProductsPage() {
       return true;
     });
     return searchProducts(filterScoped, search);
-  }, [records, filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter]);
+  }, [records, filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold]);
 
   const filtered = useMemo(() => searchResults.map((result) => result.record), [searchResults]);
   const searchMatchesById = useMemo(
@@ -294,6 +296,13 @@ export default function ProductsPage() {
                 className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition",
                   onlyUnsynced ? s.filterActive : s.filterIdle)}>
                 {t.filterUnsynced}
+              </button>
+              <button
+                type="button"
+                onClick={() => setHideSold(!hideSold)}
+                className={cn(s.controlGroup, "min-h-11 min-w-0 transition-colors", hideSold ? s.filterActive : s.filterIdle)}>
+                {hideSold ? "Tükenenleri Göster" : "Tükenenleri Gizle"}
+              </button>
                 <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black",
                   onlyUnsynced ? "bg-white/20" : "bg-amber-400/20 text-amber-400")}>
                   {unsyncedPublishedCount}
@@ -612,7 +621,33 @@ export default function ProductsPage() {
                           const skipped = selectedIds.length - updatedRecords.length;
                           showToast(skipped > 0 ? t.bulkStatusPartial(updatedRecords.length, skipped) : t.bulkStatusSuccess(updatedRecords.length), skipped > 0 ? "error" : "success");
                           setTimeout(() => window.location.reload(), 1000);
-                        } catch (e) {
+                        } catch (e: any) {
+                          if (e.message === "ERR_PIN_REQUIRED") {
+                            setPromptConfig({
+                              isOpen: true,
+                              type: "password",
+                              title: "Kilit Kodu Gerekli",
+                              description: "Bu durum değişikliği yetki gerektiriyor.",
+                              onConfirm: async (pin) => {
+                                setPromptConfig(null);
+                                const ok = await verifyEditLock(pin);
+                                if (ok) {
+                                  try {
+                                    const updatedRecords = await bulkUpdateStatus(selectedIds, newStatus as any);
+                                    const skipped = selectedIds.length - updatedRecords.length;
+                                    showToast(skipped > 0 ? t.bulkStatusPartial(updatedRecords.length, skipped) : t.bulkStatusSuccess(updatedRecords.length), skipped > 0 ? "error" : "success");
+                                    setTimeout(() => window.location.reload(), 1000);
+                                  } catch(e2) {
+                                    showToast(t.errors.ERR_GENERAL, "error");
+                                  }
+                                } else {
+                                  showToast((t as any).unlockWrongCode || "Yanlış kilit kodu", "error");
+                                }
+                              },
+                              onCancel: () => setPromptConfig(null)
+                            });
+                            return;
+                          }
                           showToast(t.errors.ERR_GENERAL, "error");
                         }
                       },
