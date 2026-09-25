@@ -22,7 +22,7 @@ def upgrade() -> None:
     for pid, sale_history, sold_sizes in products:
         changed = False
         
-        sh_list = json.loads(sale_history) if sale_history else []
+        sh_list = sale_history if isinstance(sale_history, list) else (json.loads(sale_history) if sale_history else [])
         new_sh = []
         for sh in sh_list:
             if not sh.get("source") or sh.get("source") == "manual":
