@@ -45,7 +45,8 @@ export default function ProductsPage() {
     title: string;
     description?: string;
     placeholder?: string;
-    type?: "text" | "password";
+    type?: "text" | "password" | "select";
+    options?: { value: string; label: string }[];
     onConfirm: (v: string) => void;
     onCancel: () => void;
   } | null>(null);

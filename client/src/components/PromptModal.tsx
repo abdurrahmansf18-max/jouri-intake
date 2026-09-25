@@ -6,7 +6,8 @@ interface PromptModalProps {
   description?: string;
   placeholder?: string;
   defaultValue?: string;
-  type?: "text" | "password";
+  type?: "text" | "password" | "select";
+  options?: { value: string; label: string }[];
   confirmText?: string;
   cancelText?: string;
   onConfirm: (value: string) => void;
@@ -22,6 +23,7 @@ export function PromptModal({
   type = "text",
   confirmText = "Tamam",
   cancelText = "İptal",
+  options,
   onConfirm,
   onCancel,
 }: PromptModalProps) {
@@ -38,33 +40,35 @@ export function PromptModal({
       <div className="w-full max-w-sm rounded-2xl bg-[#1b1c16] p-6 shadow-2xl shadow-black/35 border border-emerald-300/15" dir="auto">
         <h3 className="mb-2 text-lg font-bold text-white">{title}</h3>
         {description && <p className="mb-4 text-sm text-gray-400">{description}</p>}
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={placeholder}
-          className="mb-6 w-full rounded-lg bg-black/35 border border-white/10 px-4 py-3 text-white placeholder-gray-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all"
-          autoFocus
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              onConfirm(value);
-            }
-          }}
-        />
+        
+        {type === "select" && options ? (
+          <select
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="mb-6 w-full rounded-lg bg-black/35 border border-white/10 px-4 py-3 text-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all"
+            autoFocus
+          >
+            <option value="" disabled>{placeholder || "Seçiniz"}</option>
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type={type}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={placeholder}
+            className="mb-6 w-full rounded-lg bg-black/35 border border-white/10 px-4 py-3 text-white placeholder-gray-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onConfirm(value);
+              }
+            }}
+          />
+        )}
         <div className="flex justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
-          >
-            {cancelText}
-          </button>
-          <button
-            onClick={() => onConfirm(value)}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-500/20"
-          >
-            {confirmText}
-          </button>
-        </div>
       </div>
     </div>
   );

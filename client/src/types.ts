@@ -11,6 +11,7 @@ export interface ParsedProduct {
   colorGermanSuggestion: string;
   sizesRaw: string;
   tags: string[];
+  fabricType?: string;
 }
 
 export interface SavedImage {
