@@ -296,17 +296,16 @@ export default function ProductsPage() {
                 className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition",
                   onlyUnsynced ? s.filterActive : s.filterIdle)}>
                 {t.filterUnsynced}
-              </button>
-              <button
-                type="button"
-                onClick={() => setHideSold(!hideSold)}
-                className={cn(s.controlGroup, "min-h-11 min-w-0 transition-colors", hideSold ? s.filterActive : s.filterIdle)}>
-                {hideSold ? "Tükenenleri Göster" : "Tükenenleri Gizle"}
-              </button>
                 <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black",
                   onlyUnsynced ? "bg-white/20" : "bg-amber-400/20 text-amber-400")}>
                   {unsyncedPublishedCount}
                 </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHideSold(!hideSold)}
+                className={cn(s.controlGroup, "px-3 py-1.5 text-xs font-extrabold rounded-lg transition-colors", hideSold ? s.filterActive : s.filterIdle)}>
+                {hideSold ? "Tükenenleri Göster" : "Tükenenleri Gizle"}
               </button>
             </div>
             <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
