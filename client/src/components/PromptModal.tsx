@@ -68,8 +68,22 @@ export function PromptModal({
             }}
           />
         )}
-        <div className="flex justify-end gap-3">
+                <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={() => onConfirm(value)}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-500/20"
+          >
+            {confirmText}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+
