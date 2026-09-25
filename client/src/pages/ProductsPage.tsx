@@ -592,6 +592,8 @@ export default function ProductsPage() {
                   type="button"
                   onClick={() => {
                     setPromptConfig({
+                      isOpen: true,
+                      type: "select",
                       title: "Durum Değiştir",
                       description: "Seçili ürünlerin durumunu değiştir.",
                       options: [
