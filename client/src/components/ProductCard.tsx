@@ -74,9 +74,16 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
         "focus-within:border-emerald-400/50",
         "select-none relative",
         s.subPanel,
+        record.status === "sold_archive" && "opacity-50 grayscale",
       )}
       onClick={onOpen}
     >
+      {/* ── Satıldı overlay banner ── */}
+      {record.status === "sold_archive" && (
+        <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-center bg-stone-700/80 py-1 text-[10px] font-black tracking-widest text-stone-200 uppercase">
+          ✓ Satıldı
+        </div>
+      )}
       {/* ── Görsel şeridi ── */}
       {selectable && (
         <div className="absolute top-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
