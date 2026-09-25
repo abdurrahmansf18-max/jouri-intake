@@ -60,11 +60,16 @@ export default function ProductsPage() {
   const records = useMemo<ProductRecord[]>(() => allProducts.filter((p: ProductRecord) => p.status !== "sold_archive"), [allProducts]);
   const loading = productsQuery.isLoading;
 
+  // counts: "Tükenenleri Gizle" aktifken sadece stoktaki ürünleri sayar — gösterilen liste ile tutarlı
+  const visibleRecords = useMemo<ProductRecord[]>(
+    () => hideSold ? records.filter((r: ProductRecord) => r.stockQuantity > 0) : records,
+    [records, hideSold]
+  );
   const counts: Record<StatusFilter, number> = {
-    all: records.length,
-    pending: records.filter((r: ProductRecord) => r.status === "pending").length,
-    ai_enhanced: records.filter((r: ProductRecord) => r.status === "ai_enhanced").length,
-    published: records.filter((r: ProductRecord) => r.status === "published").length,
+    all: visibleRecords.length,
+    pending: visibleRecords.filter((r: ProductRecord) => r.status === "pending").length,
+    ai_enhanced: visibleRecords.filter((r: ProductRecord) => r.status === "ai_enhanced").length,
+    published: visibleRecords.filter((r: ProductRecord) => r.status === "published").length,
     sold_archive: 0,
   };
   const unsyncedPublishedCount = records.filter((r: ProductRecord) => r.status === "published" && !r.shopify?.productId).length;
@@ -713,6 +718,7 @@ export default function ProductsPage() {
                 onReplace={replaceRecord}
                 searchQuery={search}
                 searchMatches={searchMatchesById.get(record.id) ?? []}
+                showSoldSizes={true}
                 selectable={bulkMode}
                 selected={selectedIds.includes(record.id)}
                 onToggleSelect={(id, isSelected) => {
