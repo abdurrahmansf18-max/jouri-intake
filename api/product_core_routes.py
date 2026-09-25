@@ -318,8 +318,7 @@ def bulk_update_status(
         if old_status == new_status:
             continue
         if _status_change_requires_unlock(old_status, new_status) and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
-            skipped_ids.append(p.id)
-            continue
+            raise HTTPException(403, "ERR_PIN_REQUIRED")
         _apply_status_change(p, new_status)
         activity_logger.log(
             db, "status_change",
