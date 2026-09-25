@@ -46,6 +46,7 @@ export default function ProductsPage() {
     description?: string;
     placeholder?: string;
     type?: "text" | "password" | "select";
+    defaultValue?: string;
     options?: { value: string; label: string }[];
     onConfirm: (v: string) => void;
     onCancel: () => void;
@@ -599,7 +600,7 @@ export default function ProductsPage() {
                         { value: "published", label: t.dashPublished },
                         { value: "sold_archive", label: (t as any).dashArchive || "Satılanlar" }
                       ],
-                      initialValue: "",
+                      defaultValue: "",
                       onConfirm: async (newStatus) => {
                         setPromptConfig(null);
                         if (!newStatus) return;
