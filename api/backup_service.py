@@ -220,11 +220,12 @@ def run_manual_backup(db: Session) -> dict:
             "running_started_at": None,
             "backups": backups_list,
         }
+        
+        _cleanup_old_backups(15)
+        backups_list = [_backup_entry(e) for e in sorted(BACKUP_ROOT.iterdir(), reverse=True) if e.is_dir() and e.name.startswith("20")]
         status_data["storage"] = _storage_overview(
             status_data,
-            _cleanup_old_backups(15)
-        backups_list = [_backup_entry(e) for e in sorted(BACKUP_ROOT.iterdir(), reverse=True) if e.is_dir() and e.name.startswith("20")]
-        local_backup_count=len(backups_list),
+            local_backup_count=len(backups_list),
             drive_backup_count=len(_list_drive_backups()),
         )
         (BACKUP_ROOT / "status.json").write_text(
