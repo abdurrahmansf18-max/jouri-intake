@@ -45,14 +45,15 @@ def get_backup_overview() -> dict:
         status["running_step"] = running_status.get("step")
         status["running_updated_at"] = running_status.get("updated_at")
 
-    _cleanup_old_backups(15)
+    drive_backups = _list_drive_backups()
+    _cleanup_old_backups(15, drive_backups)
+    
     backups = []
     if BACKUP_ROOT.exists():
         for entry in sorted(BACKUP_ROOT.iterdir(), reverse=True):
             if not entry.is_dir() or not entry.name.startswith("20"):
                 continue
             backups.append(_backup_entry(entry))
-    drive_backups = _list_drive_backups()
 
     db = SessionLocal()
     try:
@@ -920,21 +921,37 @@ def _summarize_rclone_error(output: str) -> str:
     return compact[:240] if compact else "Google Drive senkronu başarısız oldu."
 
 
-def _cleanup_old_backups(days: int = 15) -> None:
+import threading
+
+def _cleanup_old_backups(days: int = 15, drive_backups: list[str] | None = None) -> None:
     from datetime import datetime, timezone, timedelta
-    if not BACKUP_ROOT.exists():
-        return
-        
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
     cutoff_str = cutoff_date.strftime("%Y-%m-%d")
     
-    for entry in BACKUP_ROOT.iterdir():
-        if not entry.is_dir() or not entry.name.startswith("20"):
-            continue
-        try:
-            # name format is like 2026-09-25T15_42_11 or similar, or just YYYY-MM-DD
-            if entry.name[:10] < cutoff_str:
-                import shutil
-                shutil.rmtree(entry, ignore_errors=True)
-        except Exception:
-            pass
+    if BACKUP_ROOT.exists():
+        for entry in BACKUP_ROOT.iterdir():
+            if not entry.is_dir() or not entry.name.startswith("20"):
+                continue
+            try:
+                if entry.name[:10] < cutoff_str:
+                    import shutil
+                    shutil.rmtree(entry, ignore_errors=True)
+            except Exception:
+                pass
+                
+    if drive_backups:
+        old_drive_backups = [d for d in drive_backups if d < cutoff_str]
+        if old_drive_backups:
+            def clean_remote():
+                for date in old_drive_backups:
+                    try:
+                        delete_drive_backup(date)
+                    except Exception:
+                        pass
+            # Avoid running multiple threads if one is already doing it
+            # But a simple thread per call is fine since it's just `rclone purge` and only runs if user loads the page
+            t = threading.Thread(target=clean_remote, daemon=True)
+            t.start()
+            # Also modify the passed list so it reflects in the UI immediately without waiting for thread to finish
+            drive_backups[:] = [d for d in drive_backups if d >= cutoff_str]
+
