@@ -30,7 +30,7 @@ def upgrade() -> None:
                 changed = True
             new_sh.append(sh)
             
-        ss_list = json.loads(sold_sizes) if sold_sizes else []
+        ss_list = sold_sizes if isinstance(sold_sizes, list) else (json.loads(sold_sizes) if sold_sizes else [])
         new_ss = []
         for ss in ss_list:
             if not ss.get("source") or ss.get("source") == "manual":
