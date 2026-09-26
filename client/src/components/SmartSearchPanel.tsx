@@ -77,34 +77,36 @@ export default function SmartSearchPanel({ s, t, onBarcode, onOpenProduct }: Pro
       )}
 
       {visualOpen && (
-        <div className="fixed inset-0 z-[70] grid place-items-end bg-black/60 p-3 sm:place-items-center" onClick={() => setVisualOpen(false)}>
-          <div className={cn("smart-pop max-h-[86dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border p-4 shadow-2xl", s.panel)} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" onClick={() => setVisualOpen(false)}>
+          <div className={cn("flex w-full max-w-2xl flex-col rounded-2xl border shadow-2xl", s.panel)} style={{ maxHeight: "min(86dvh, 600px)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
               <h3 className={cn("flex items-center gap-2 text-sm font-black", s.title)}><ImageUp className="size-4 text-emerald-400" /> {t.visualSearchResultsTitle}</h3>
               <button type="button" onClick={() => setVisualOpen(false)} className={cn("grid size-8 place-items-center rounded-lg border", s.controlGroup, s.controlIdle)}>
                 <X className="size-4" />
               </button>
             </div>
-            {visualBusy ? (
-              <div className="grid place-items-center py-12"><Loader2 className="size-8 animate-spin text-emerald-400" /></div>
-            ) : (
-              <div className="grid gap-2">
-                {visualResults.map((result) => {
-                  const image = result.record.images[0];
-                  return (
-                    <button key={result.record.id} type="button" onClick={() => { onOpenProduct(result.record); setVisualOpen(false); }}
-                      className={cn("flex items-center gap-3 rounded-xl border p-2 text-start transition active:scale-[0.99]", s.controlGroup, s.controlIdle)}>
-                      {image ? <img src={productImageUrl(result.record.id, image.fileName, undefined, image.folder)} className="size-16 rounded-lg object-cover" /> : <div className={cn("size-16 rounded-lg", s.subPanel)} />}
-                      <span className="min-w-0 flex-1">
-                        <span className={cn("block truncate text-sm font-black", s.title)}>{result.record.parsed.titleRaw}</span>
-                        <span className="mt-1 block font-mono text-xs font-black text-emerald-400">{result.record.productCode}</span>
-                      </span>
-                      <span className="rounded-lg bg-emerald-400/15 px-2 py-1 text-xs font-black text-emerald-400">{result.score}%</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {visualBusy ? (
+                <div className="grid place-items-center py-12"><Loader2 className="size-8 animate-spin text-emerald-400" /></div>
+              ) : (
+                <div className="grid gap-2">
+                  {visualResults.map((result) => {
+                    const image = result.record.images[0];
+                    return (
+                      <button key={result.record.id} type="button" onClick={() => { onOpenProduct(result.record); setVisualOpen(false); }}
+                        className={cn("flex items-center gap-3 rounded-xl border p-2 text-start transition active:scale-[0.99]", s.controlGroup, s.controlIdle)}>
+                        {image ? <img src={productImageUrl(result.record.id, image.fileName, undefined, image.folder)} className="size-16 shrink-0 rounded-lg object-cover" /> : <div className={cn("size-16 shrink-0 rounded-lg", s.subPanel)} />}
+                        <span className="min-w-0 flex-1">
+                          <span className={cn("block truncate text-sm font-black", s.title)}>{result.record.parsed.titleRaw}</span>
+                          <span className="mt-1 block font-mono text-xs font-black text-emerald-400">{result.record.productCode}</span>
+                        </span>
+                        <span className="shrink-0 rounded-lg bg-emerald-400/15 px-2 py-1 text-xs font-black text-emerald-400">{result.score}%</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
