@@ -173,6 +173,7 @@ async def visual_search_products_endpoint(
 async def create_product(
     _: Annotated[None, Depends(verify_access)],
     db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks,
     description: Annotated[str, Form()] = "",
     images: Annotated[list[UploadFile], File()] = [],
     titleRaw: Annotated[str | None, Form()] = None,
@@ -297,7 +298,9 @@ async def create_product(
     )
     db.commit()
     db.refresh(product)
-    return product_service.to_record(product)
+    record = product_service.to_record(product)
+    background_tasks.add_task(ws_manager.broadcast, {"type": "product_created", "product": record.model_dump(mode="json")})
+    return record
 
 
 @router.patch("/api/products/bulk/status", response_model=list[ProductRecord])
