@@ -603,15 +603,19 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
 
       if (record.images.length > 0 && navigator.canShare) {
         try {
-          const img = record.images[0];
-          const response = await fetch(productImageUrl(record.id, img.fileName, undefined, img.folder));
-          const blob = await response.blob();
-          const file = new File([blob], `product-${record.id}.jpg`, { type: blob.type || 'image/jpeg' });
-          if (navigator.canShare({ files: [file] })) {
-            shareData.files = [file];
+          const files = await Promise.all(record.images.map(async (img, i) => {
+            const response = await fetch(productImageUrl(record.id, img.fileName, undefined, img.folder));
+            const blob = await response.blob();
+            return new File([blob], `product-${record.id}-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' });
+          }));
+          
+          if (navigator.canShare({ files })) {
+            shareData.files = files;
+          } else if (files.length > 0 && navigator.canShare({ files: [files[0]] })) {
+            shareData.files = [files[0]];
           }
         } catch (err) {
-          console.warn("Could not attach image to share:", err);
+          console.warn("Could not attach images to share:", err);
         }
       }
 
