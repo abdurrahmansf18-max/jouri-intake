@@ -898,6 +898,12 @@ const shareConfigLabels: Record<string, string> = {
                         <span dir="auto">{p.season}</span>
                       </span>
                     </InfoRow>}
+                    {p.fabricType && <InfoRow label={(t as any).fabricType || "Kumaş Türü"} s={s}>
+                      <span className="inline-flex items-center gap-1">
+                        <Tag className="size-3 text-indigo-400" />
+                        <span dir="auto">{p.fabricType}</span>
+                      </span>
+                    </InfoRow>}
 
                     {/* Kumaş Türü */}
                     {p.fabricType && <InfoRow label={(t as any).fabricType || "Kumaş Türü"} s={s}>

@@ -53,6 +53,7 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
   const category = p.categorySuggestion?.trim();
   const productType = p.productTypeSuggestion?.trim();
   const season = p.season?.trim();
+  const fabricType = p.fabricType?.trim();
   const color = (p.colorRaw || p.colorGermanSuggestion)?.trim();
   const stockTotal = record.sizeStocks.length
     ? record.sizeStocks.reduce((sum, item) => sum + Math.max(0, item.qty), 0)
@@ -183,6 +184,11 @@ export default function ProductCard({ record, onOpen, onEdit, onReplace, showRes
           {season && (
             <MetaChip theme={theme} icon={<CalendarDays className="size-3" />} title={season}>
               {season}
+            </MetaChip>
+          )}
+          {fabricType && (
+            <MetaChip theme={theme} icon={<Tag className="size-3" />} title={fabricType}>
+              {fabricType}
             </MetaChip>
           )}
           {color && (
