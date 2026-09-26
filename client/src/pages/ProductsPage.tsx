@@ -326,13 +326,13 @@ export default function ProductsPage() {
                 type="button"
                 onClick={() => setHideSold(!hideSold)}
                 className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", !hideSold ? s.filterActive : s.filterIdle)}>
-                {hideSold ? "Satılanları Göster" : "Satılanları Gizle"}
+                {hideSold ? ((t as any).showSold || "Satılanları Göster") : ((t as any).hideSold || "Satılanları Gizle")}
               </button>
               <button
                 type="button"
                 onClick={() => setHideDiscounted(!hideDiscounted)}
                 className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", hideDiscounted ? s.filterActive : s.filterIdle)}>
-                {hideDiscounted ? "Tümünü Göster" : "İndirimli Ürünler"}
+                {hideDiscounted ? ((t as any).showAll || "Tümünü Göster") : ((t as any).discountedProducts || "İndirimli Ürünler")}
                 <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black",
                   hideDiscounted ? "bg-white/20" : "bg-white/5")}>
                   {discountedCount}

@@ -370,6 +370,13 @@ export const COPY = {
     shareFailed: "Paylaşım başarısız oldu.",
     shareDesktopHint: "Bilgisayarda direkt paylaşım desteklenmiyor. Ürün bilgileri panoya kopyalandı. Aşağıdan da kopyalayabilirsiniz:",
     bulkShareBtn: "Paylaş",
+    // Filters & Sales
+    showSold: "Satılanları Göster",
+    hideSold: "Satılanları Gizle",
+    showAll: "Tümünü Göster",
+    discountedProducts: "İndirimli Ürünler",
+    saleSourcePhysical: "Fiziksel Mağaza",
+    saleSourceOnline: "İnternet",
     // Backup page
     archiveCount: (n: number) => `${n} satış kaydı`,
     archiveSummary: (full: number, partial: number) => `${full} tam satıldı · ${partial} kısmi satış`,
@@ -909,6 +916,13 @@ export const COPY = {
     shareFailed: "فشلت المشاركة.",
     shareDesktopHint: "المشاركة المباشرة غير مدعومة على الكمبيوتر. تم نسخ المعلومات. يمكنك أيضاً النسخ من هنا:",
     bulkShareBtn: "مشاركة",
+    // Filters & Sales
+    showSold: "إظهار المباع",
+    hideSold: "إخفاء المباع",
+    showAll: "إظهار الكل",
+    discountedProducts: "منتجات مخفضة",
+    saleSourcePhysical: "متجر فعلي",
+    saleSourceOnline: "إنترنت",
     // Backup page
     archiveCount: (n: number) => `${n} سجل بيع`,
     archiveSummary: (full: number, partial: number) => `${full} مباع بالكامل · ${partial} بيع جزئي`,
