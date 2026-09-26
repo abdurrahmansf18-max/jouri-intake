@@ -574,15 +574,46 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   // Satış için geçerli bedenler (stok > 0)
   const availableSizes = record.sizeStocks.filter((ss) => ss.qty > 0);
 
+
   const [shareBusy, setShareBusy] = useState(false);
   const [shareClipboardText, setShareClipboardText] = useState<string | null>(null);
+  const [shareOptionsOpen, setShareOptionsOpen] = useState(false);
+
+const shareConfigLabels: Record<string, string> = {
+  title: "Başlık",
+  productCode: "Ürün Kodu/Barkod",
+  price: "Fiyat",
+  category: "Kategori",
+  productType: "Tür",
+  color: "Renk",
+  season: "Mevsim",
+  fabric: "Kumaş",
+  sizes: "Bedenler",
+  description: "Açıklama",
+  notes: "Notlar"
+};
+
+  const [shareConfig, setShareConfig] = useState({
+    title: true,
+    productCode: true,
+    price: true,
+    category: true,
+    productType: true,
+    color: true,
+    season: true,
+    fabric: true,
+    sizes: true,
+    description: true,
+    notes: true,
+  });
+  const [shareImages, setShareImages] = useState<string[]>([]);
 
   function buildShareText(): string {
     const textParts: string[] = [];
-    if (p.titleRaw) textParts.push(`*${p.titleRaw}*`);
-    if (record.productCode) textParts.push(`${(t as any).shareProductCode || "Ürün Kodu"}: ${record.productCode}`);
+    if (shareConfig.title && p.titleRaw) textParts.push(`*${p.titleRaw}*`);
+    if (shareConfig.productCode && record.productCode) textParts.push(`${(t as any).shareProductCode || "Ürün Kodu"}: ${record.productCode}`);
 
-    if (p.priceAmount) {
+    if (shareConfig.price && p.priceAmount) {
       let priceStr = `${(t as any).sharePrice || "Fiyat"}: ${p.priceAmount} EUR`;
       if (record.isDiscounted && record.compareAtPriceAmount) {
         priceStr += ` (${(t as any).shareDiscounted || "İndirimli"}! ${(t as any).shareOriginalPrice || "Normal fiyat"}: ${record.compareAtPriceAmount} EUR)`;
@@ -590,24 +621,35 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       textParts.push(priceStr);
     }
 
-    if (p.categorySuggestion && p.categorySuggestion !== "Diğer") textParts.push(`${(t as any).shareCategory || "Kategori"}: ${p.categorySuggestion}`);
-    if (p.productTypeSuggestion && p.productTypeSuggestion !== "Diğer") textParts.push(`${(t as any).shareType || "Tür"}: ${p.productTypeSuggestion}`);
-    if (p.colorRaw) textParts.push(`${(t as any).shareColor || "Renk"}: ${p.colorRaw}`);
-    if (p.season) textParts.push(`${(t as any).shareSeason || "Mevsim"}: ${p.season}`);
-    if (p.fabricType) textParts.push(`${(t as any).shareFabric || "Kumaş"}: ${p.fabricType}`);
+    if (shareConfig.category && p.categorySuggestion && p.categorySuggestion !== "Diğer") textParts.push(`${(t as any).shareCategory || "Kategori"}: ${p.categorySuggestion}`);
+    if (shareConfig.productType && p.productTypeSuggestion && p.productTypeSuggestion !== "Diğer") textParts.push(`${(t as any).shareType || "Tür"}: ${p.productTypeSuggestion}`);
+    if (shareConfig.color && p.colorRaw) textParts.push(`${(t as any).shareColor || "Renk"}: ${p.colorRaw}`);
+    if (shareConfig.season && p.season) textParts.push(`${(t as any).shareSeason || "Mevsim"}: ${p.season}`);
+    if (shareConfig.fabric && p.fabricType) textParts.push(`${(t as any).shareFabric || "Kumaş"}: ${p.fabricType}`);
 
-    if (availableSizes.length > 0) {
+    if (shareConfig.sizes && availableSizes.length > 0) {
       const sizesStr = availableSizes.map(sz => `${sz.size} (${sz.qty} ${(t as any).sharePcs || "adet"})`).join(", ");
       textParts.push(`${(t as any).shareSizes || "Mevcut Bedenler"}: ${sizesStr}`);
     }
 
-    if (record.description) textParts.push(`\n${(t as any).shareDescription || "Açıklama"}:\n${record.description}`);
-    if (record.notes) textParts.push(`\n${(t as any).shareNotes || "Notlar"}:\n${record.notes}`);
+    if (shareConfig.description && record.description) textParts.push(`
+${(t as any).shareDescription || "Açıklama"}:
+${record.description}`);
+    if (shareConfig.notes && record.notes) textParts.push(`
+${(t as any).shareNotes || "Notlar"}:
+${record.notes}`);
 
-    return textParts.join("\n");
+    return textParts.join("
+");
   }
 
-  async function handleShare() {
+  function openShareOptions() {
+    setShareImages(record.images.map(img => img.fileName));
+    setShareOptionsOpen(true);
+  }
+
+  async function handleShareExec() {
+    setShareOptionsOpen(false);
     if (shareBusy) return;
     setShareBusy(true);
     try {
@@ -618,11 +660,13 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
       if (navigator.share) {
         const shareData: ShareData = { title, text: shareText };
 
-        // Try to attach ALL product images as files
-        if (record.images.length > 0 && navigator.canShare) {
+        const imagesToShare = record.images.filter(img => shareImages.includes(img.fileName));
+        
+        // Try to attach selected product images as files
+        if (imagesToShare.length > 0 && navigator.canShare) {
           try {
             const files = await Promise.all(
-              record.images.map(async (img, idx) => {
+              imagesToShare.map(async (img, idx) => {
                 const response = await fetch(productImageUrl(record.id, img.fileName, undefined, img.folder));
                 const blob = await response.blob();
                 const ext = blob.type.includes("png") ? "png" : "jpg";
@@ -753,7 +797,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
               </button>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={handleShare} disabled={shareBusy}
+              <button type="button" onClick={openShareOptions} disabled={shareBusy}
                 className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition disabled:opacity-60", s.controlGroup, s.controlIdle)}
                 title={(t as any).shareBtn || "Paylaş"}>
                 {shareBusy ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
@@ -1909,6 +1953,112 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                   {busy ? <Loader2 className="size-4 animate-spin" /> : (shopifySynced ? t.shopifyUpdateConfirm : t.shopifyConfirm)}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Options Modal */}
+      {shareOptionsOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setShareOptionsOpen(false)}>
+          <div className={cn("w-full max-w-lg rounded-2xl border shadow-2xl flex flex-col max-h-[90vh]", s.panel)} onClick={(e) => e.stopPropagation()}>
+            <div className={cn("flex items-center justify-between border-b px-5 py-4", s.panelBorder)}>
+              <h2 className={cn("text-base font-extrabold flex items-center gap-2 tracking-tight", s.title)}>
+                <Share2 className="size-4 text-emerald-500" />
+                {(t as any).shareOptionsTitle || "Paylaşım Seçenekleri"}
+              </h2>
+              <button type="button" onClick={() => setShareOptionsOpen(false)} className={cn("rounded-lg p-2 transition", s.controlIdle)}>
+                <X className="size-4" />
+              </button>
+            </div>
+            
+            <div className="p-5 overflow-y-auto space-y-6">
+              {/* Info Options */}
+              <div className="space-y-3">
+                <h3 className={cn("text-xs font-bold uppercase tracking-wider", s.muted)}>{(t as any).shareInfoTitle || "Eklenecek Bilgiler"}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {Object.entries(shareConfig).map(([k, v]) => (
+                    <label key={k} className={cn("flex items-center gap-2 p-2 rounded-xl border cursor-pointer transition select-none", v ? "border-emerald-500/50 bg-emerald-500/10" : s.panelBorder)}>
+                      <input 
+                        type="checkbox" 
+                        className="hidden"
+                        checked={v}
+                        onChange={(e) => setShareConfig(prev => ({ ...prev, [k]: e.target.checked }))}
+                      />
+                      <div className={cn("size-4 rounded-md flex items-center justify-center border transition-colors", v ? "bg-emerald-500 border-emerald-500 text-white" : s.panelBorder)}>
+                        {v && <Check className="size-3" />}
+                      </div>
+                      <span className={cn("text-xs font-semibold capitalize", v ? s.title : s.muted)}>
+                        {(t as any)["shareConfig_" + k] || shareConfigLabels[k] || k}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Image Options */}
+              {record.images.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className={cn("text-xs font-bold uppercase tracking-wider", s.muted)}>{(t as any).shareImagesTitle || "Eklenecek Görseller"}</h3>
+                    <button 
+                      type="button" 
+                      className={cn("text-[10px] font-bold uppercase px-2 py-1 rounded-md transition", s.controlIdle)}
+                      onClick={() => {
+                        if (shareImages.length === record.images.length) setShareImages([]);
+                        else setShareImages(record.images.map(img => img.fileName));
+                      }}
+                    >
+                      {shareImages.length === record.images.length ? "Tümünü Kaldır" : "Tümünü Seç"}
+                    </button>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
+                    {record.images.map((img) => {
+                      const selected = shareImages.includes(img.fileName);
+                      return (
+                        <div 
+                          key={img.fileName} 
+                          onClick={() => {
+                            if (selected) setShareImages(prev => prev.filter(i => i !== img.fileName));
+                            else setShareImages(prev => [...prev, img.fileName]);
+                          }}
+                          className={cn(
+                            "relative size-24 shrink-0 rounded-xl overflow-hidden border-2 cursor-pointer snap-start transition-all",
+                            selected ? "border-emerald-500 ring-4 ring-emerald-500/20" : s.panelBorder
+                          )}
+                        >
+                          <img 
+                            src={productImageUrl(record.id, img.fileName, 200, img.folder)} 
+                            className="size-full object-cover"
+                            alt="preview"
+                          />
+                          <div className={cn("absolute top-1 right-1 size-5 rounded-full flex items-center justify-center shadow-sm transition-colors", selected ? "bg-emerald-500 text-white" : "bg-white/80 dark:bg-black/80 text-transparent")}>
+                            {selected && <Check className="size-3" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className={cn("p-4 border-t flex justify-end gap-2", s.panelBorder)}>
+              <button 
+                type="button" 
+                onClick={() => setShareOptionsOpen(false)} 
+                className={cn("px-4 py-2.5 text-xs font-bold rounded-xl transition", s.controlIdle)}
+              >
+                {t.cancel}
+              </button>
+              <button 
+                type="button" 
+                onClick={handleShareExec}
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition active:scale-95 shadow-lg shadow-emerald-500/20"
+              >
+                {shareBusy ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
+                {(t as any).shareBtn || "Paylaş"}
+              </button>
             </div>
           </div>
         </div>
