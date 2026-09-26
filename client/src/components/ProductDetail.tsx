@@ -18,7 +18,6 @@ import { DARK, LIGHT, type ThemeStyles } from "../theme";
 import type { ProductRecord, ProductStatus, SavedImage, SizeStock } from "../types";
 import { formatPrice } from "../format";
 import { statusActiveBadge, statusBadge } from "./ProductCard";
-import { AI_PROMPTS } from "../constants/aiPrompts";
 import ImageLightbox from "./ImageLightbox";
 import SizeStockEditor, { type SizeStockRow } from "./SizeStockEditor";
 import VariantSelector from "./VariantSelector";
@@ -201,8 +200,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const [aiImageForm, setAiImageForm] = useState({ gender: "", age: "", size: "", instructions: "" });
   const [manualAiBusy, setManualAiBusy] = useState(false);
   const [rewriteBusy, setRewriteBusy] = useState(false);
-  const [showManualPrompts, setShowManualPrompts] = useState(false);
-  const [selectedPromptIndex, setSelectedPromptIndex] = useState<number>(1);
+  const [manualAiPrompts, setManualAiPrompts] = useState<Record<string, string> | null>(null);
   const navList = navigationProducts ?? [];
   const navIndex = navList.findIndex((product) => product.id === record.id);
   const prevProduct = navIndex > 0 ? navList[navIndex - 1] : null;
@@ -423,7 +421,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   function openAiImagePanel(img: SavedImage) {
     const sizeText = aiImageSizeText(record);
     setAiImageSource(img);
-    setShowManualPrompts(false);
+    setManualAiPrompts(null);
     setAiImageForm({
       gender: inferAiAudience(record),
       age: inferAiAgeFromSizes(sizeText),
@@ -455,29 +453,25 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     }
   }
 
-  function getGeneratedPrompt(index: number): string {
-    const rawPrompt = (AI_PROMPTS as any)[`prompt${index}`] || "";
-    if (index !== 2 && index !== 6) return rawPrompt;
-
-    // Build garment info
-    const parts = [];
-    if (record.parsed.titleRaw) parts.push(`Garment: ${record.parsed.titleRaw}`);
-    if (aiImageForm.gender) parts.push(`Target Gender: ${aiImageForm.gender}`);
-    if (aiImageForm.age) parts.push(`Target Age: ${aiImageForm.age}`);
-    if (aiImageForm.size) parts.push(`Size: ${aiImageForm.size}`);
-    if (record.parsed.colorRaw) parts.push(`Color: ${record.parsed.colorRaw}`);
-    if (record.parsed.fabricType) parts.push(`Fabric: ${record.parsed.fabricType}`);
-    if (record.parsed.season) parts.push(`Season: ${record.parsed.season}`);
-    
-    const infoText = parts.length > 0 ? parts.join("\\n") : "No specific garment information provided.";
-    
-    if (index === 2) {
-      return rawPrompt.replace("[Buraya kıyafetin ürün bilgilerini ekle]", infoText);
+  async function handleFetchAiPrompts() {
+    if (!aiImageSource) return;
+    setManualAiBusy(true);
+    try {
+      const prompts = await getAiPrompts(
+        record.id,
+        aiImageSource.fileName,
+        aiImageForm.instructions,
+        aiImageForm.gender,
+        aiImageForm.age,
+        aiImageForm.size
+      );
+      setManualAiPrompts(prompts);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "ERR_GENERAL";
+      showToast(t.errors[code] ?? t.errors.ERR_GENERAL, "error");
+    } finally {
+      setManualAiBusy(false);
     }
-    if (index === 6) {
-      return rawPrompt.replace("[INSERT GARMENT INFORMATION HERE]", infoText);
-    }
-    return rawPrompt;
   }
 
   async function handleRewriteDescription() {
@@ -1049,7 +1043,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           )
                         )}
                         {record.status === "published" && (
-                          <button type="button" onClick={() => setShowShopifyPreview(true)} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-md transition disabled:opacity-50 shadow-sm">
+                          <button type="button" onClick={() => setShowShopifyPreview(true)} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-purple-500 px-2.5 py-1 rounded-md transition disabled:opacity-50 shadow-sm">
                             <ShoppingBag className="size-3" /> {shopifySynced ? t.shopifyUpdateBtn : t.shopifyBtn}
                           </button>
                         )}
@@ -1530,7 +1524,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <div className="flex items-center justify-between">
                       <span className={cn("text-xs font-black", s.strong)}>{t.description}</span>
                       <button type="button" onClick={handleRewriteDescription} disabled={rewriteBusy}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-black text-emerald-500 transition hover:bg-emerald-500/20 disabled:opacity-50">
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-black text-emerald-500 transition hover:bg-purple-500/20 disabled:opacity-50">
                         {rewriteBusy ? <Loader2 className="size-3 animate-spin" /> : <Wand2 className="size-3" />}
                         {(t as any).rewriteDescriptionAi || "✨ Açıklamayı Yenile (AI)"}
                       </button>
@@ -1586,7 +1580,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                               className="aspect-square w-full object-cover" loading="lazy" />
                           </button>
                           {img.folder === "enhanced" && (
-                            <span className="absolute start-1 top-1 rounded-md bg-emerald-600/90 px-1.5 py-0.5 text-[10px] font-black text-white">
+                            <span className="absolute start-1 top-1 rounded-md bg-purple-600/90 px-1.5 py-0.5 text-[10px] font-black text-white">
                               AI
                             </span>
                           )}
@@ -1603,7 +1597,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                               {img.folder !== "enhanced" && (
                                 <button type="button"
                                   onClick={() => openAiImagePanel(img)}
-                                  className="absolute bottom-1 start-1 flex size-7 items-center justify-center rounded-full bg-emerald-600/90 text-white transition hover:bg-emerald-500 active:scale-95"
+                                  className="absolute bottom-1 start-1 flex size-7 items-center justify-center rounded-full bg-purple-600/90 text-white transition hover:bg-purple-500 active:scale-95"
                                   title={t.aiImageCreate}>
                                   <Sparkles className="size-3.5" />
                                 </button>
@@ -1634,7 +1628,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                           </h4>
                           <p className={cn("mt-1 text-xs leading-5", s.muted)}>{t.aiImageHelp}</p>
                         </div>
-                        <button type="button" onClick={() => { setAiImageSource(null); }}
+                        <button type="button" onClick={() => { setAiImageSource(null); setManualAiPrompts(null); }}
                           className={cn("inline-flex size-8 shrink-0 items-center justify-center rounded-lg border", s.controlGroup, s.controlIdle)}>
                           <X className="size-3.5" />
                         </button>
@@ -1642,34 +1636,34 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                       <div className="grid gap-2 sm:grid-cols-3">
                         <input
                           value={aiImageForm.gender}
-                          onChange={(e) => { setAiImageForm((v) => ({ ...v, gender: e.target.value })); }}
+                          onChange={(e) => { setManualAiPrompts(null); setAiImageForm((v) => ({ ...v, gender: e.target.value })); }}
                           placeholder={t.aiImageGenderPlaceholder}
                           className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
                         />
                         <input
                           value={aiImageForm.age}
-                          onChange={(e) => { setAiImageForm((v) => ({ ...v, age: e.target.value })); }}
+                          onChange={(e) => { setManualAiPrompts(null); setAiImageForm((v) => ({ ...v, age: e.target.value })); }}
                           placeholder={t.aiImageAgePlaceholder}
                           className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
                         />
                         <input
                           value={aiImageForm.size}
-                          onChange={(e) => { setAiImageForm((v) => ({ ...v, size: e.target.value })); }}
+                          onChange={(e) => { setManualAiPrompts(null); setAiImageForm((v) => ({ ...v, size: e.target.value })); }}
                           placeholder={t.aiImageSizePlaceholder}
                           className={cn("min-h-10 rounded-xl border px-3 text-sm font-semibold outline-none focus:ring-4", s.input)}
                         />
                       </div>
                       <textarea
                         value={aiImageForm.instructions}
-                        onChange={(e) => { setAiImageForm((v) => ({ ...v, instructions: e.target.value })); }}
+                        onChange={(e) => { setManualAiPrompts(null); setAiImageForm((v) => ({ ...v, instructions: e.target.value })); }}
                         placeholder={t.aiImageInstructionsPlaceholder}
                         className={cn("min-h-20 rounded-xl border px-3 py-2 text-sm leading-6 outline-none focus:ring-4", s.input)}
                         dir="auto"
                       />
                       <div className="grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => setShowManualPrompts(!showManualPrompts)} disabled={manualAiBusy || aiImageBusy}
+                        <button type="button" onClick={handleFetchAiPrompts} disabled={manualAiBusy || aiImageBusy}
                           className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-extrabold transition disabled:opacity-60", "border bg-slate-800/80 text-sky-300 hover:bg-slate-700 active:scale-95")}>
-                          <ClipboardList className="size-4" />
+                          {manualAiBusy ? <Loader2 className="size-4 animate-spin" /> : <ClipboardList className="size-4" />}
                           {(t as any).aiManualPromptsBtn || "Promptları Gör"}
                         </button>
                         <button type="button" onClick={handleGenerateAiImages} disabled={aiImageBusy || manualAiBusy}
@@ -1679,60 +1673,25 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                         </button>
                       </div>
 
-                      {showManualPrompts && (
+                      {manualAiPrompts && (
                         <div className="mt-2 grid gap-3 border-t pt-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h5 className={cn("text-xs font-bold", s.title)}>Manuel AI Kullanımı</h5>
-                              <p className={cn("mt-0.5 text-[10px]", s.muted)}>Prompt ve referans görseli kopyalayıp harici AI aracına yapıştırın.</p>
-                            </div>
-                            <select 
-                              value={selectedPromptIndex}
-                              onChange={(e) => setSelectedPromptIndex(Number(e.target.value))}
-                              className={cn("rounded-lg border px-2 py-1 text-xs font-bold outline-none", s.input)}
-                            >
-                              {[1,2,3,4,5,6].map((num) => (
-                                <option key={num} value={num}>Prompt {num}</option>
-                              ))}
-                            </select>
+                          <div>
+                            <h5 className={cn("text-xs font-bold", s.title)}>{(t as any).aiManualPromptsTitle}</h5>
+                            <p className={cn("mt-0.5 text-[10px]", s.muted)}>{(t as any).aiManualPromptsDesc}</p>
                           </div>
                           
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            {/* Image Section */}
-                            <div className="grid gap-1">
-                              <div className="flex items-center justify-between">
-                                <span className={cn("text-[10px] font-bold", s.muted)}>Referans Görsel (Image 1)</span>
-                                <button type="button" onClick={async () => {
-                                  const imgName = selectedPromptIndex === 6 ? 'promt_2.png' : `promt_${selectedPromptIndex}.png`;
-                                  try {
-                                    const res = await fetch(`/prompts/${imgName}`);
-                                    const blob = await res.blob();
-                                    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-                                    showToast((t as any).btnCopied || "Kopyalandı", "success");
-                                  } catch (err) {
-                                    console.error(err);
-                                    showToast(t.errors.ERR_GENERAL, "error");
-                                  }
-                                }}
-                                  className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
-                                  <Copy className="size-3" /> Görseli Kopyala
-                                </button>
-                              </div>
-                              <img src={`/prompts/${selectedPromptIndex === 6 ? 'promt_2' : `promt_${selectedPromptIndex}`}.png`} alt={`Prompt ${selectedPromptIndex}`} className="aspect-[2/3] w-full rounded-xl object-cover bg-black/10" />
+                          <div className="grid gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className={cn("text-[10px] font-bold", s.muted)}>
+                                {(t as any).aiManualMasterPrompt || "Master prompt"}
+                              </span>
+                              <button type="button" onClick={() => handleCopy(manualAiPrompts.masterPrompt || "")}
+                                className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
+                                <Copy className="size-3" /> {(t as any).btnCopy}
+                              </button>
                             </div>
-
-                            {/* Prompt Text Section */}
-                            <div className="grid gap-1">
-                              <div className="flex items-center justify-between">
-                                <span className={cn("text-[10px] font-bold", s.muted)}>Prompt Metni</span>
-                                <button type="button" onClick={() => handleCopy(getGeneratedPrompt(selectedPromptIndex))}
-                                  className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300">
-                                  <Copy className="size-3" /> Metni Kopyala
-                                </button>
-                              </div>
-                              <div className="h-full max-h-[300px] overflow-y-auto rounded bg-black/10 p-3 text-[10px] font-mono leading-5 whitespace-pre-wrap select-all">
-                                {getGeneratedPrompt(selectedPromptIndex)}
-                              </div>
+                            <div className="max-h-72 overflow-y-auto rounded bg-black/10 p-3 text-[10px] font-mono leading-5 whitespace-pre-wrap select-all">
+                              {manualAiPrompts.masterPrompt}
                             </div>
                           </div>
                         </div>
@@ -1871,7 +1830,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 <button type="button" onClick={() => setShowShopifyPreview(false)} className={cn("px-4 py-2 text-xs font-bold rounded-lg border transition", s.controlIdle)}>
                   {t.close}
                 </button>
-                <button type="button" onClick={() => { setShowShopifyPreview(false); handlePushToShopify(); }} disabled={busy} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs font-bold rounded-lg transition disabled:opacity-50">
+                <button type="button" onClick={() => { setShowShopifyPreview(false); handlePushToShopify(); }} disabled={busy} className="bg-emerald-600 hover:bg-purple-500 text-white px-4 py-2 text-xs font-bold rounded-lg transition disabled:opacity-50">
                   {busy ? <Loader2 className="size-4 animate-spin" /> : (shopifySynced ? t.shopifyUpdateConfirm : t.shopifyConfirm)}
                 </button>
               </div>
