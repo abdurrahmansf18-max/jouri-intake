@@ -20,6 +20,7 @@ type BulkDraft = {
   priceAmount: string;
   colorRaw: string;
   season: string;
+  fabricType: string;
   categorySuggestion: string;
   productTypeSuggestion: string;
   barcode: string;
@@ -39,6 +40,7 @@ function makeDraft(): BulkDraft {
     priceAmount: "",
     colorRaw: "",
     season: "",
+    fabricType: "",
     categorySuggestion: "",
     productTypeSuggestion: "",
     barcode: "",
@@ -177,6 +179,7 @@ export default function BulkProductForm({ initialCards }: { initialCards?: BulkD
             currency: "EUR",
             colorRaw: card.colorRaw,
             season: card.season,
+            fabricType: card.fabricType,
           },
         }, "bulk");
         results.push({ id: card.id, ok: true });
@@ -460,6 +463,12 @@ function BulkCard({ card, index, busy, canRemove, onPatch, onRemove, onFiles, on
             label={t.season}
             value={card.season}
             onChange={(v) => onPatch({ season: v })}
+            s={s} disabled={busy}
+          />
+          <BulkField
+            label={(t as any).fabricType || "Kumaş"}
+            value={card.fabricType}
+            onChange={(v) => onPatch({ fabricType: v })}
             s={s} disabled={busy}
           />
           <BulkField
