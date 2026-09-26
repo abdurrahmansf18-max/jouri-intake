@@ -174,10 +174,11 @@ export default function AddProductPage() {
                  categorySuggestion: parsed.categorySuggestion || "",
                  productTypeSuggestion: parsed.productTypeSuggestion || "",
                  description: result.description || "",
+                 barcode: "",
                  notes: "",
                  files: [],
                  previews: [],
-                 sizeRows: sizes.length > 0 ? sizes.map((s: string) => ({ size: s, qty: "1" })) : [{ size: "", qty: "1" }]
+                 sizeRows: sizes.length > 0 ? sizes.map((s: string) => ({ size: s, qty: "1", barcode: "" })) : [{ size: "", qty: "1", barcode: "" }]
              };
          });
          setBulkCards(newCards);

@@ -163,7 +163,6 @@ class ParsedProductUpdate(BaseModel):
     colorRaw: Optional[str] = None
     colorGermanSuggestion: Optional[str] = None
     season: Optional[str] = None
-    fabricType: Optional[str] = None
     sizesRaw: Optional[str] = None
     tags: Optional[list[str]] = None
 
