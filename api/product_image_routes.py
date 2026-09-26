@@ -25,6 +25,7 @@ _IMAGE_LOCKED_STATUSES = {"ai_enhanced", "published", "sold_archive"}
 async def add_product_images(
     product_id: str,
     _: Annotated[None, Depends(verify_access)],
+    jouri_edit_unlock: Annotated[str | None, Cookie()] = None,
     db: Session = Depends(get_db),
     images: Annotated[list[UploadFile], File()] = [],
 ):
@@ -32,6 +33,9 @@ async def add_product_images(
         raise HTTPException(status_code=422, detail={"code": "ERR_IMAGE_REQUIRED"})
 
     p = product_service.get_or_404(db, product_id)
+    if p.status in _IMAGE_LOCKED_STATUSES and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
+        raise HTTPException(status_code=403, detail={"code": "ERR_EDIT_LOCK_REQUIRED"})
+
     existing = list(p.images or [])
     next_idx = file_manager.get_next_image_index(existing)
 
@@ -130,9 +134,13 @@ def delete_product_image(
     file_name: str,
     background_tasks: BackgroundTasks,
     _: Annotated[None, Depends(verify_access)],
+    jouri_edit_unlock: Annotated[str | None, Cookie()] = None,
     db: Session = Depends(get_db),
 ):
     p = product_service.get_or_404(db, product_id)
+    if p.status in _IMAGE_LOCKED_STATUSES and not auth_service.is_valid_edit_unlock(jouri_edit_unlock):
+        raise HTTPException(status_code=403, detail={"code": "ERR_EDIT_LOCK_REQUIRED"})
+        
     try:
         path = file_manager.resolve_image_path(p.folder_path, kind, file_name)
         path.unlink()
