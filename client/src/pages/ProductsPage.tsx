@@ -58,23 +58,35 @@ export default function ProductsPage() {
   const cacheActions = useProductCacheActions();
 
   const allProducts: ProductRecord[] = productsQuery.data ?? [];
+  
+  const discountFilteredProducts = useMemo<ProductRecord[]>(() => {
+    if (!hideDiscounted) return allProducts;
+    return allProducts.filter(p => !p.isDiscounted);
+  }, [allProducts, hideDiscounted]);
+
   // Aktif ürünler (sold_archive hariç)
-  const activeRecords = useMemo<ProductRecord[]>(() => allProducts.filter((p: ProductRecord) => p.status !== "sold_archive"), [allProducts]);
+  const activeRecords = useMemo<ProductRecord[]>(() => discountFilteredProducts.filter((p) => p.status !== "sold_archive"), [discountFilteredProducts]);
   // Satılan ürünler
-  const soldRecords = useMemo<ProductRecord[]>(() => allProducts.filter((p: ProductRecord) => p.status === "sold_archive"), [allProducts]);
+  const soldRecords = useMemo<ProductRecord[]>(() => discountFilteredProducts.filter((p) => p.status === "sold_archive"), [discountFilteredProducts]);
   // hideSold=false ise sold_archive da dahil edilir
-  const records = useMemo<ProductRecord[]>(() => hideSold ? activeRecords : allProducts, [activeRecords, allProducts, hideSold]);
+  const records = useMemo<ProductRecord[]>(() => hideSold ? activeRecords : discountFilteredProducts, [activeRecords, discountFilteredProducts, hideSold]);
+  
   const loading = productsQuery.isLoading;
 
   const counts: Record<StatusFilter, number> = {
     all: records.length,
-    pending: activeRecords.filter((r: ProductRecord) => r.status === "pending").length,
-    ai_enhanced: activeRecords.filter((r: ProductRecord) => r.status === "ai_enhanced").length,
-    published: activeRecords.filter((r: ProductRecord) => r.status === "published").length,
+    pending: activeRecords.filter((r) => r.status === "pending").length,
+    ai_enhanced: activeRecords.filter((r) => r.status === "ai_enhanced").length,
+    published: activeRecords.filter((r) => r.status === "published").length,
     sold_archive: hideSold ? 0 : soldRecords.length,
   };
-  const unsyncedPublishedCount = records.filter((r: ProductRecord) => r.status === "published" && !r.shopify?.productId).length;
-  const discountedCount = records.filter((r: ProductRecord) => r.isDiscounted).length;
+  
+  const unsyncedPublishedCount = records.filter((r) => r.status === "published" && !r.shopify?.productId).length;
+  
+  const discountedCount = useMemo(() => {
+    const base = hideSold ? allProducts.filter((p) => p.status !== "sold_archive") : allProducts;
+    return base.filter((r) => r.isDiscounted).length;
+  }, [allProducts, hideSold]);
 
   // Toplu işlem butonları sadece seçili filtrede anlamlı olan durumlarda görünsün.
   // "Şopify'e Gönderilmedi" açıkken görünür kayıtlar zaten hep published'tır.
@@ -190,7 +202,7 @@ export default function ProductsPage() {
     const filterScoped = records.filter((r: ProductRecord) => {
       if (filter !== "all" && r.status !== filter) return false;
       if (onlyUnsynced && (r.status !== "published" || r.shopify?.productId)) return false;
-      if (hideDiscounted && r.isDiscounted) return false;
+      
 
       const cat = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (categoryFilter === "uncategorized" && cat) return false;
@@ -317,10 +329,10 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={() => setHideDiscounted(!hideDiscounted)}
-                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", !hideDiscounted ? s.filterActive : s.filterIdle)}>
-                {hideDiscounted ? "İndirimlileri Göster" : "İndirimlileri Gizle"}
+                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", hideDiscounted ? s.filterActive : s.filterIdle)}>
+                {hideDiscounted ? "Tümünü Göster" : "İndirimli Ürünler"}
                 <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black",
-                  !hideDiscounted ? "bg-white/20" : "bg-white/5")}>
+                  hideDiscounted ? "bg-white/20" : "bg-white/5")}>
                   {discountedCount}
                 </span>
               </button>
