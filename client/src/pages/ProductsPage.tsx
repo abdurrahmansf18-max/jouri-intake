@@ -719,113 +719,113 @@ export default function ProductsPage() {
                 >
                   <span className="block min-w-0 text-center leading-tight">{t.bulkEditSelected(selectedIds.length)}</span>
                 </button>
-                )}\r
-                \r
-                {/* Bulk Share Button */}\r
-                <button\r
-                  type="button"\r
-                  disabled={shareBusy}\r
-                  className={cn(\r
-                    "min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors inline-flex items-center justify-center gap-2",\r
-                    shareBusy ? "bg-sky-400 cursor-not-allowed" : "bg-sky-600 hover:bg-sky-500"\r
-                  )}\r
-                  onClick={async () => {\r
-                    if (shareBusy) return;\r
-                    setShareBusy(true);\r
-                    try {\r
-                      const selectedRecords = records.filter((r: any) => selectedIds.includes(r.id));\r
-                      const parts = selectedRecords.map((r: any) => {\r
-                        const lines: string[] = [];\r
-                        if (r.parsed?.titleRaw) lines.push(`*${r.parsed.titleRaw}*`);\r
-                        if (r.productCode) lines.push(`${(t as any).shareProductCode || "Ürün Kodu"}: ${r.productCode}`);\r
-                        if (r.parsed?.priceAmount) {\r
-                          let priceStr = `${(t as any).sharePrice || "Fiyat"}: ${r.parsed.priceAmount} EUR`;\r
-                          if (r.isDiscounted && r.compareAtPriceAmount) priceStr += ` (${(t as any).shareDiscounted || "İndirimli"})`;\r
-                          lines.push(priceStr);\r
-                        }\r
-                        if (r.parsed?.colorRaw) lines.push(`${(t as any).shareColor || "Renk"}: ${r.parsed.colorRaw}`);\r
-                        if (r.parsed?.season) lines.push(`${(t as any).shareSeason || "Mevsim"}: ${r.parsed.season}`);\r
-                        if (r.parsed?.fabricType) lines.push(`${(t as any).shareFabric || "Kumaş"}: ${r.parsed.fabricType}`);\r
-                        const avail = (r.sizeStocks || []).filter((ss: any) => ss.qty > 0);\r
-                        if (avail.length > 0) lines.push(`${(t as any).shareSizes || "Bedenler"}: ${avail.map((ss: any) => `${ss.size}(${ss.qty})`).join(", ")}`);\r
-                        return lines.join("\n");\r
-                      });\r
-                      const combinedText = parts.join("\n\n---\n\n");\r
-                      if (navigator.share) {\r
-                        const files: File[] = [];\r
-                        for (const r of selectedRecords) {\r
-                          if (r.images?.length > 0) {\r
-                            try {\r
-                              const img = r.images[0];\r
-                              const res = await fetch(productImageUrl(r.id, img.fileName, undefined, img.folder));\r
-                              const blob = await res.blob();\r
-                              const ext = blob.type.includes("png") ? "png" : "jpg";\r
-                              files.push(new File([blob], `product-${r.id}.${ext}`, { type: blob.type || "image/jpeg" }));\r
-                            } catch { /* skip */ }\r
-                          }\r
-                        }\r
-                        const shareData: ShareData = { title: `${selectedIds.length} ${(t as any).shareDefaultTitle || "Ürün"}`, text: combinedText };\r
-                        if (files.length > 0 && navigator.canShare && navigator.canShare({ files })) shareData.files = files;\r
-                        await navigator.share(shareData);\r
-                      } else {\r
-                        try { await navigator.clipboard.writeText(combinedText); } catch { /* ignore */ }\r
-                        setShareClipboardText(combinedText);\r
-                        showToast((t as any).shareTextCopied || "Ürün bilgileri panoya kopyalandı!", "success");\r
-                      }\r
-                    } catch (err: any) {\r
-                      if (err?.name !== "AbortError") showToast((t as any).shareFailed || "Paylaşım başarısız.", "error");\r
-                    } finally {\r
-                      setShareBusy(false);\r
-                    }\r
-                  }}\r
-                >\r
-                  {shareBusy ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}\r
-                  <span className="block min-w-0 text-center leading-tight">{(t as any).bulkShareBtn || "Paylaş"} ({selectedIds.length})</span>\r
-                </button>\r
-                \r
-              </div>\r
-            )}\r
-          </div>\r
-        </div>\r
-      </div>\r
-\r
-      {/* Share Clipboard Modal (Desktop fallback) */}\r
-      {shareClipboardText !== null && (\r
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setShareClipboardText(null)}>\r
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>\r
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">\r
-              <h2 className="text-sm font-black flex items-center gap-2 text-white">\r
-                <Share2 className="size-4 text-emerald-500" />\r
-                {(t as any).shareBtn || "Paylaş"}\r
-              </h2>\r
-              <button type="button" onClick={() => setShareClipboardText(null)} className="rounded-lg p-1 text-slate-400 hover:text-white transition text-base leading-none">\r
-                ✕\r
-              </button>\r
-            </div>\r
-            <div className="grid gap-3 p-4">\r
-              <p className="text-xs text-slate-400 leading-5">\r
-                {(t as any).shareDesktopHint || "Bilgisayarda direkt paylaşım desteklenmiyor. Ürün bilgileri panoya kopyalandı:"}\r
-              </p>\r
-              <div className="max-h-60 overflow-y-auto rounded-xl border border-white/10 p-3 text-xs font-mono text-slate-300 leading-5 whitespace-pre-wrap select-all">\r
-                {shareClipboardText}\r
-              </div>\r
-              <div className="flex justify-end gap-2">\r
-                <button type="button" onClick={() => setShareClipboardText(null)} className="px-4 py-2 text-xs font-bold rounded-lg border border-white/10 text-slate-300 hover:text-white transition">\r
-                  {(t as any).close || "Kapat"}\r
-                </button>\r
-                <button type="button"\r
-                  onClick={async () => {\r
-                    try { await navigator.clipboard.writeText(shareClipboardText); showToast((t as any).shareTextCopied || "Kopyalandı!", "success"); } catch { /* ignore */ }\r
-                  }}\r
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition">\r
-                  {(t as any).btnCopy || "Kopyala"}\r
-                </button>\r
-              </div>\r
-            </div>\r
-          </div>\r
-        </div>\r
-      )}\r
-\r
+                )}
+                
+                {/* Bulk Share Button */}
+                <button
+                  type="button"
+                  disabled={shareBusy}
+                  className={cn(
+                    "min-h-11 min-w-0 rounded-lg px-4 py-2 text-sm font-black text-white transition-colors inline-flex items-center justify-center gap-2",
+                    shareBusy ? "bg-sky-400 cursor-not-allowed" : "bg-sky-600 hover:bg-sky-500"
+                  )}
+                  onClick={async () => {
+                    if (shareBusy) return;
+                    setShareBusy(true);
+                    try {
+                      const selectedRecords = records.filter((r: any) => selectedIds.includes(r.id));
+                      const parts = selectedRecords.map((r: any) => {
+                        const lines: string[] = [];
+                        if (r.parsed?.titleRaw) lines.push(`*${r.parsed.titleRaw}*`);
+                        if (r.productCode) lines.push(`${(t as any).shareProductCode || "Ürün Kodu"}: ${r.productCode}`);
+                        if (r.parsed?.priceAmount) {
+                          let priceStr = `${(t as any).sharePrice || "Fiyat"}: ${r.parsed.priceAmount} EUR`;
+                          if (r.isDiscounted && r.compareAtPriceAmount) priceStr += ` (${(t as any).shareDiscounted || "İndirimli"})`;
+                          lines.push(priceStr);
+                        }
+                        if (r.parsed?.colorRaw) lines.push(`${(t as any).shareColor || "Renk"}: ${r.parsed.colorRaw}`);
+                        if (r.parsed?.season) lines.push(`${(t as any).shareSeason || "Mevsim"}: ${r.parsed.season}`);
+                        if (r.parsed?.fabricType) lines.push(`${(t as any).shareFabric || "Kumaş"}: ${r.parsed.fabricType}`);
+                        const avail = (r.sizeStocks || []).filter((ss: any) => ss.qty > 0);
+                        if (avail.length > 0) lines.push(`${(t as any).shareSizes || "Bedenler"}: ${avail.map((ss: any) => `${ss.size}(${ss.qty})`).join(", ")}`);
+                        return lines.join("\n");
+                      });
+                      const combinedText = parts.join("\n\n---\n\n");
+                      if (navigator.share) {
+                        const files: File[] = [];
+                        for (const r of selectedRecords) {
+                          if (r.images?.length > 0) {
+                            try {
+                              const img = r.images[0];
+                              const res = await fetch(productImageUrl(r.id, img.fileName, undefined, img.folder));
+                              const blob = await res.blob();
+                              const ext = blob.type.includes("png") ? "png" : "jpg";
+                              files.push(new File([blob], `product-${r.id}.${ext}`, { type: blob.type || "image/jpeg" }));
+                            } catch { /* skip */ }
+                          }
+                        }
+                        const shareData: ShareData = { title: `${selectedIds.length} ${(t as any).shareDefaultTitle || "Ürün"}`, text: combinedText };
+                        if (files.length > 0 && navigator.canShare && navigator.canShare({ files })) shareData.files = files;
+                        await navigator.share(shareData);
+                      } else {
+                        try { await navigator.clipboard.writeText(combinedText); } catch { /* ignore */ }
+                        setShareClipboardText(combinedText);
+                        showToast((t as any).shareTextCopied || "Ürün bilgileri panoya kopyalandı!", "success");
+                      }
+                    } catch (err: any) {
+                      if (err?.name !== "AbortError") showToast((t as any).shareFailed || "Paylaşım başarısız.", "error");
+                    } finally {
+                      setShareBusy(false);
+                    }
+                  }}
+                >
+                  {shareBusy ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
+                  <span className="block min-w-0 text-center leading-tight">{(t as any).bulkShareBtn || "Paylaş"} ({selectedIds.length})</span>
+                </button>
+                
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Share Clipboard Modal (Desktop fallback) */}
+      {shareClipboardText !== null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setShareClipboardText(null)}>
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <h2 className="text-sm font-black flex items-center gap-2 text-white">
+                <Share2 className="size-4 text-emerald-500" />
+                {(t as any).shareBtn || "Paylaş"}
+              </h2>
+              <button type="button" onClick={() => setShareClipboardText(null)} className="rounded-lg p-1 text-slate-400 hover:text-white transition text-base leading-none">
+                ✕
+              </button>
+            </div>
+            <div className="grid gap-3 p-4">
+              <p className="text-xs text-slate-400 leading-5">
+                {(t as any).shareDesktopHint || "Bilgisayarda direkt paylaşım desteklenmiyor. Ürün bilgileri panoya kopyalandı:"}
+              </p>
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-white/10 p-3 text-xs font-mono text-slate-300 leading-5 whitespace-pre-wrap select-all">
+                {shareClipboardText}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShareClipboardText(null)} className="px-4 py-2 text-xs font-bold rounded-lg border border-white/10 text-slate-300 hover:text-white transition">
+                  {(t as any).close || "Kapat"}
+                </button>
+                <button type="button"
+                  onClick={async () => {
+                    try { await navigator.clipboard.writeText(shareClipboardText); showToast((t as any).shareTextCopied || "Kopyalandı!", "success"); } catch { /* ignore */ }
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition">
+                  {(t as any).btnCopy || "Kopyala"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Grid */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16">
