@@ -25,6 +25,7 @@ export default function ProductsPage() {
 
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [hideSold, setHideSold] = useState(true);
+  const [onlyDiscounted, setOnlyDiscounted] = useState(false);
   const [onlyUnsynced, setOnlyUnsynced] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
@@ -73,6 +74,7 @@ export default function ProductsPage() {
     sold_archive: hideSold ? 0 : soldRecords.length,
   };
   const unsyncedPublishedCount = records.filter((r: ProductRecord) => r.status === "published" && !r.shopify?.productId).length;
+  const discountedCount = records.filter((r: ProductRecord) => r.isDiscounted).length;
 
   // Toplu işlem butonları sadece seçili filtrede anlamlı olan durumlarda görünsün.
   // "Şopify'e Gönderilmedi" açıkken görünür kayıtlar zaten hep published'tır.
@@ -182,12 +184,13 @@ export default function ProductsPage() {
   }, [recordsForSeasonCounts]);
 
   // Filtre veya arama değişince sayfa 1'e dön
-  useEffect(() => { setPage(1); }, [filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold]);
+  useEffect(() => { setPage(1); }, [filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold, onlyDiscounted]);
 
   const searchResults = useMemo(() => {
     const filterScoped = records.filter((r: ProductRecord) => {
       if (filter !== "all" && r.status !== filter) return false;
       if (onlyUnsynced && (r.status !== "published" || r.shopify?.productId)) return false;
+      if (onlyDiscounted && !r.isDiscounted) return false;
 
       const cat = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (categoryFilter === "uncategorized" && cat) return false;
@@ -204,7 +207,7 @@ export default function ProductsPage() {
       return true;
     });
     return searchProducts(filterScoped, search);
-  }, [records, filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold]);
+  }, [records, filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold, onlyDiscounted]);
 
   const filtered = useMemo(() => searchResults.map((result) => result.record), [searchResults]);
   const searchMatchesById = useMemo(
@@ -310,6 +313,16 @@ export default function ProductsPage() {
                 onClick={() => setHideSold(!hideSold)}
                 className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", !hideSold ? s.filterActive : s.filterIdle)}>
                 {hideSold ? "Satılanları Göster" : "Satılanları Gizle"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOnlyDiscounted(!onlyDiscounted)}
+                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", onlyDiscounted ? s.filterActive : s.filterIdle)}>
+                {onlyDiscounted ? "Tümünü Göster" : "İndirimli Ürünler"}
+                <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black",
+                  onlyDiscounted ? "bg-white/20" : "bg-white/5")}>
+                  {discountedCount}
+                </span>
               </button>
             </div>
             <div className="flex w-full flex-1 items-center gap-2 lg:w-auto">

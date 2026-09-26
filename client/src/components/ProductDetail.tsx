@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, ChevronLeft, ChevronRight, Edit3,
@@ -571,8 +572,29 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     try {
       const textParts = [];
       if (p.titleRaw) textParts.push(`*${p.titleRaw}*`);
+      if (record.productCode) textParts.push(`Ürün Kodu: ${record.productCode}`);
+      
+      if (p.priceAmount) {
+        let priceStr = `Fiyat: ${p.priceAmount} EUR`;
+        if (record.isDiscounted && record.compareAtPriceAmount) {
+          priceStr += ` (İndirimli! Normal fiyat: ${record.compareAtPriceAmount} EUR)`;
+        }
+        textParts.push(priceStr);
+      }
+
       if (p.categorySuggestion && p.categorySuggestion !== "Diğer") textParts.push(`Kategori: ${p.categorySuggestion}`);
-      if (p.priceAmount) textParts.push(`Fiyat: ${p.priceAmount} EUR`);
+      if (p.productTypeSuggestion && p.productTypeSuggestion !== "Diğer") textParts.push(`Tür: ${p.productTypeSuggestion}`);
+      if (p.colorRaw) textParts.push(`Renk: ${p.colorRaw}`);
+      if (p.season) textParts.push(`Mevsim: ${p.season}`);
+      if (p.fabricType) textParts.push(`Kumaş: ${p.fabricType}`);
+      
+      if (availableSizes.length > 0) {
+        const sizesStr = availableSizes.map(s => `${s.size} (${s.qty} adet)`).join(', ');
+        textParts.push(`Mevcut Bedenler: ${sizesStr}`);
+      }
+
+      if (record.description) textParts.push(`\nAçıklama:\n${record.description}`);
+      if (record.notes) textParts.push(`\nNotlar:\n${record.notes}`);
       
       const shareData: ShareData = {
         title: p.titleRaw || 'Ürün',
@@ -615,7 +637,9 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
     finally { setUnlockBusy(false); }
   }
 
-  return (
+
+
+  return createPortal(
     <>
       <div className="product-detail-overlay fixed inset-0 z-50 overflow-hidden bg-black/60 p-0 sm:p-4" role="dialog" aria-modal="true">
         <div
@@ -1815,7 +1839,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
         </div>
       )}
 
-    </>
+    </>, document.body
   );
 }
 
