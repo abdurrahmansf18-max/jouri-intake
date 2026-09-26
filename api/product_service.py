@@ -44,6 +44,7 @@ def to_record(p: Product) -> ProductRecord:
             currency=p.currency,
             colorRaw=p.color_raw,
             season=p.season,
+            fabricType=p.fabric_type,
             colorGermanSuggestion=p.color_german,
             sizesRaw=p.sizes_raw,
             tags=p.tags or [],

@@ -184,6 +184,7 @@ async def create_product(
     colorRaw: Annotated[str | None, Form()] = None,
     colorGermanSuggestion: Annotated[str | None, Form()] = None,
     season: Annotated[str | None, Form()] = None,
+    fabricType: Annotated[str | None, Form()] = None,
     sizeStocksJson: Annotated[str | None, Form()] = None,
     barcodesJson: Annotated[str | None, Form()] = None,
     notes: Annotated[str | None, Form()] = None,
@@ -247,6 +248,7 @@ async def create_product(
         "colorRaw": colorRaw.strip() if colorRaw else parsed.colorRaw,
         "colorGermanSuggestion": colorGermanSuggestion.strip() if colorGermanSuggestion else parsed.colorGermanSuggestion,
         "season": normalize_season(season or parsed.season),
+        "fabricType": fabricType.strip() if fabricType else parsed.fabricType,
         "sizesRaw": sizes_raw_derived or parsed.sizesRaw,
     }
     parsed = parsed.model_copy(update=overrides)
@@ -277,6 +279,7 @@ async def create_product(
         color_raw=parsed.colorRaw,
         color_german=parsed.colorGermanSuggestion,
         season=parsed.season,
+        fabric_type=parsed.fabricType,
         sizes_raw=parsed.sizesRaw,
         tags=parsed.tags,
         is_discounted=False,
@@ -505,6 +508,8 @@ def update_product(
         if pd.season is not None:
             season = normalize_season(pd.season)
             track("season", p.season, season); p.season = season
+        if pd.fabricType is not None:
+            track("fabric_type", p.fabric_type, pd.fabricType); p.fabric_type = pd.fabricType
         if pd.sizesRaw is not None:
             normalized_sizes = normalize_size_values(
                 [s.strip() for s in re.split(r"[,/]+", pd.sizesRaw) if s.strip()],

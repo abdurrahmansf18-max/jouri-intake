@@ -24,6 +24,7 @@ class Product(Base):
     color_raw = Column(String, nullable=False, default="")
     season = Column(String, nullable=False, default="")
     color_german = Column(String, nullable=False, default="")
+    fabric_type = Column(String, nullable=False, default="")
     sizes_raw = Column(String, nullable=False, default="")
     tags = Column(JSON, nullable=False, default=list)
     is_discounted = Column(Boolean, nullable=False, default=False)
