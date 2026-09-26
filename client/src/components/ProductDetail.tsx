@@ -558,7 +558,7 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   const isArchive = record.status === "sold_archive";
   const dateLocale = locale === "ar" ? "ar" : "tr-TR";
   const isPublishedLocked = (record.status === "published" || record.status === "sold_archive") && !editUnlocked;
-  const isImageLocked = (record.status === "ai_enhanced" || record.status === "published" || record.status === "sold_archive") && !editUnlocked;
+  const isImageLocked = isPublishedLocked;
   const hasLockedStatusTargets = !isArchive && ACTIVE_STATUSES.some((st) =>
     st !== record.status && !statusCanMoveWithoutUnlock(record.status, st)
   );
