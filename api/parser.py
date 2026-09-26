@@ -63,6 +63,13 @@ Size suffix rule: when Y or M is attached to a number, translate it fully as Yea
 
 Return ONLY valid JSON. No markdown formatting like ```json.
 
+FABRIC TYPE RULES:
+- If only one fabric is mentioned for the whole product, set "fabricType" to that fabric name in English (e.g. "Velvet", "Cotton", "Tricot").
+- If the product has multiple pieces and ALL pieces have their fabric stated, format it as: "Piece1: Fabric1, Piece2: Fabric2" (e.g. "Shirt: Tricot, Vest: Waterproof").
+- If the product has multiple pieces but ONLY SOME have fabric stated, only include those pieces: e.g. "Shirt: Tricot, Pants: Velvet" (omit pieces with no fabric info).
+- If no fabric is mentioned at all, leave "fabricType" empty.
+- Translate fabric names to English (مخمل → Velvet, تريكو → Tricot, قطن → Cotton, بروف → Waterproof, كتان → Linen, فليس → Fleece, ووتر بروف → Waterproof).
+
 JSON Schema:
 {
     "titleRaw": "English Title",
@@ -71,6 +78,7 @@ JSON Schema:
     "priceAmount": "numeric string, e.g. 25",
     "currency": "EUR",
     "season": "Must be exactly 'Summer', 'Winter', or 'Spring'",
+    "fabricType": "Fabric type in English. Single fabric: 'Velvet'. Multi-piece: 'Shirt: Tricot, Vest: Waterproof'. Empty if not mentioned.",
     "variants": [
         {
             "color": "Color in English (e.g. Beige)",
@@ -281,6 +289,7 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
         structured_parsed.get("productTypeSuggestion", "") or _field(data.get("productTypeSuggestion", ""))
     )
     season = normalize_season(_field(data.get("season", ""))) or structured_parsed.get("season", "")
+    fabric_type = structured_parsed.get("fabricType", "") or _field(data.get("fabricType", ""))
 
     return {
         "parsed": ParsedProduct(
@@ -293,6 +302,7 @@ def _merge_ai_data(description: str, data: dict, provider: str) -> dict:
             colorGermanSuggestion="",
             sizesRaw=sizes_raw,
             season=season,
+            fabricType=fabric_type,
             tags=[]
         ).model_dump(),
         "description": _safe_description(description, data.get("description", ""), structured.get("description", "")),
