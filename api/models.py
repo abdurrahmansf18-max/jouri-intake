@@ -35,6 +35,7 @@ class ParsedProduct(BaseModel):
     season: str = ""
     colorGermanSuggestion: str = ""
     sizesRaw: str = ""
+    fabricType: str = ""
     tags: list[str] = Field(default_factory=list)
 
 
