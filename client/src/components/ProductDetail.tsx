@@ -632,17 +632,11 @@ const shareConfigLabels: Record<string, string> = {
       textParts.push(`${(t as any).shareSizes || "Mevcut Bedenler"}: ${sizesStr}`);
     }
 
-    if (shareConfig.description && record.description) textParts.push(`
-${(t as any).shareDescription || "Açıklama"}:
-${record.description}`);
-    if (shareConfig.notes && record.notes) textParts.push(`
-${(t as any).shareNotes || "Notlar"}:
-${record.notes}`);
+    if (shareConfig.description && record.description) textParts.push(`\n${(t as any).shareDescription || "Açıklama"}:\n${record.description}`);
+    if (shareConfig.notes && record.notes) textParts.push(`\n${(t as any).shareNotes || "Notlar"}:\n${record.notes}`);
 
-    return textParts.join("
-");
+    return textParts.join("\n");
   }
-
   function openShareOptions() {
     setShareImages(record.images.map(img => img.fileName));
     setShareOptionsOpen(true);
