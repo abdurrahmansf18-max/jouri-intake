@@ -18,7 +18,7 @@ from realtime import ws_manager
 
 router = APIRouter()
 
-_IMAGE_LOCKED_STATUSES = {"published", "sold_archive"}
+_IMAGE_LOCKED_STATUSES = {"ai_enhanced", "published", "sold_archive"}
 
 
 @router.post("/api/products/{product_id}/images", response_model=ProductRecord)
