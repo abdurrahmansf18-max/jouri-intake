@@ -193,6 +193,13 @@ export default function DashboardPage() {
     return sum;
   }, 0);
 
+  // Toplam Satış Tutarı Hesaplaması: Fiyatı olan ürünlerin (Fiyat x Satış Miktarı) toplamı
+  const totalSalesValue = products.reduce((sum: number, p: ProductRecord) => {
+    const price = parsePriceAmount(p.parsed.priceAmount);
+    if (price !== null && p.soldQuantity > 0) return sum + price * p.soldQuantity;
+    return sum;
+  }, 0);
+
   // "İnceleme Gerektirenler" metrikleri
   const attention = {
     // Fiyatı girilmemiş ürünler
@@ -347,7 +354,7 @@ export default function DashboardPage() {
 
       {/* ── 2. METRİKLER (Kısa İstatistik Kartları) ── */}
       {/* Ekrandaki ufak kutucuklarda Toplam Stok, Toplam Satış gibi özet bilgileri listeler */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <MetricCard
           icon={<Box className="size-4 text-emerald-400" />}
           label={t.dashActiveStock} // Aktif Stok
@@ -364,18 +371,26 @@ export default function DashboardPage() {
           small
         />
         <MetricCard
-          icon={<Images className="size-4 text-sky-400" />}
-          label={t.dashTotalImages} // Toplam Görsel
-          value={counts.totalImages}
-          color="text-sky-400"
-          bg="bg-sky-400/10 border-sky-400/20"
-        />
-        <MetricCard
           icon={<ShoppingBag className="size-4 text-amber-400" />}
           label={t.dashTotalSold} // Toplam Satış
           value={counts.totalSold}
           color="text-amber-400"
           bg="bg-amber-400/10 border-amber-400/20"
+        />
+        <MetricCard
+          icon={<DollarSign className="size-4 text-amber-400" />}
+          label={t.dashSalesValue} // Satış Tutarı
+          value={formatPrice(totalSalesValue.toFixed(0), "EUR")}
+          color="text-amber-400"
+          bg="bg-amber-400/10 border-amber-400/20"
+          small
+        />
+        <MetricCard
+          icon={<Images className="size-4 text-sky-400" />}
+          label={t.dashTotalImages} // Toplam Görsel
+          value={counts.totalImages}
+          color="text-sky-400"
+          bg="bg-sky-400/10 border-sky-400/20"
         />
         <MetricCard
           icon={<Images className="size-4 text-teal-300" />}

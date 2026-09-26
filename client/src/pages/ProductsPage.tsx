@@ -308,23 +308,25 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={() => setHideSold(!hideSold)}
-                className={cn(s.controlGroup, "px-3 py-1.5 text-xs font-extrabold rounded-lg transition-colors", !hideSold ? s.filterActive : s.filterIdle)}>
+                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", !hideSold ? s.filterActive : s.filterIdle)}>
                 {hideSold ? "Satılanları Göster" : "Satılanları Gizle"}
               </button>
             </div>
-            <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
-              <Search className="size-4 shrink-0 text-emerald-400" />
-              <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
-                value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder={t.searchPlaceholder} dir="auto" />
-            </label>
-            <div className="flex gap-2">
-              <SmartSearchPanel
-                s={s}
-                t={t}
-                onBarcode={(code) => setSearch(code)}
-                onOpenProduct={(product) => openView(product.id)}
-              />
+            <div className="flex w-full flex-1 items-center gap-2 lg:w-auto">
+              <label className={cn("flex min-h-10 flex-1 items-center gap-2 rounded-xl border px-3", s.input)}>
+                <Search className="size-4 shrink-0 text-emerald-400" />
+                <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-500"
+                  value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t.searchPlaceholder} dir="auto" />
+              </label>
+              <div className="flex shrink-0 gap-2">
+                <SmartSearchPanel
+                  s={s}
+                  t={t}
+                  onBarcode={(code) => setSearch(code)}
+                  onOpenProduct={(product) => openView(product.id)}
+                />
+              </div>
             </div>
           </div>
 
