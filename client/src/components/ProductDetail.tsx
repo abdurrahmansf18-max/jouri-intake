@@ -574,62 +574,94 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   // Satış için geçerli bedenler (stok > 0)
   const availableSizes = record.sizeStocks.filter((ss) => ss.qty > 0);
 
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareClipboardText, setShareClipboardText] = useState<string | null>(null);
+
+  function buildShareText(): string {
+    const textParts: string[] = [];
+    if (p.titleRaw) textParts.push(`*${p.titleRaw}*`);
+    if (record.productCode) textParts.push(`${(t as any).shareProductCode || "Ürün Kodu"}: ${record.productCode}`);
+
+    if (p.priceAmount) {
+      let priceStr = `${(t as any).sharePrice || "Fiyat"}: ${p.priceAmount} EUR`;
+      if (record.isDiscounted && record.compareAtPriceAmount) {
+        priceStr += ` (${(t as any).shareDiscounted || "İndirimli"}! ${(t as any).shareOriginalPrice || "Normal fiyat"}: ${record.compareAtPriceAmount} EUR)`;
+      }
+      textParts.push(priceStr);
+    }
+
+    if (p.categorySuggestion && p.categorySuggestion !== "Diğer") textParts.push(`${(t as any).shareCategory || "Kategori"}: ${p.categorySuggestion}`);
+    if (p.productTypeSuggestion && p.productTypeSuggestion !== "Diğer") textParts.push(`${(t as any).shareType || "Tür"}: ${p.productTypeSuggestion}`);
+    if (p.colorRaw) textParts.push(`${(t as any).shareColor || "Renk"}: ${p.colorRaw}`);
+    if (p.season) textParts.push(`${(t as any).shareSeason || "Mevsim"}: ${p.season}`);
+    if (p.fabricType) textParts.push(`${(t as any).shareFabric || "Kumaş"}: ${p.fabricType}`);
+
+    if (availableSizes.length > 0) {
+      const sizesStr = availableSizes.map(sz => `${sz.size} (${sz.qty} ${(t as any).sharePcs || "adet"})`).join(", ");
+      textParts.push(`${(t as any).shareSizes || "Mevcut Bedenler"}: ${sizesStr}`);
+    }
+
+    if (record.description) textParts.push(`\n${(t as any).shareDescription || "Açıklama"}:\n${record.description}`);
+    if (record.notes) textParts.push(`\n${(t as any).shareNotes || "Notlar"}:\n${record.notes}`);
+
+    return textParts.join("\n");
+  }
+
   async function handleShare() {
+    if (shareBusy) return;
+    setShareBusy(true);
     try {
-      const textParts = [];
-      if (p.titleRaw) textParts.push(`*${p.titleRaw}*`);
-      if (record.productCode) textParts.push(`Ürün Kodu: ${record.productCode}`);
-      
-      if (p.priceAmount) {
-        let priceStr = `Fiyat: ${p.priceAmount} EUR`;
-        if (record.isDiscounted && record.compareAtPriceAmount) {
-          priceStr += ` (İndirimli! Normal fiyat: ${record.compareAtPriceAmount} EUR)`;
-        }
-        textParts.push(priceStr);
-      }
+      const shareText = buildShareText();
+      const title = p.titleRaw || (t as any).shareDefaultTitle || "Ürün";
 
-      if (p.categorySuggestion && p.categorySuggestion !== "Diğer") textParts.push(`Kategori: ${p.categorySuggestion}`);
-      if (p.productTypeSuggestion && p.productTypeSuggestion !== "Diğer") textParts.push(`Tür: ${p.productTypeSuggestion}`);
-      if (p.colorRaw) textParts.push(`Renk: ${p.colorRaw}`);
-      if (p.season) textParts.push(`Mevsim: ${p.season}`);
-      if (p.fabricType) textParts.push(`Kumaş: ${p.fabricType}`);
-      
-      if (availableSizes.length > 0) {
-        const sizesStr = availableSizes.map(s => `${s.size} (${s.qty} adet)`).join(', ');
-        textParts.push(`Mevcut Bedenler: ${sizesStr}`);
-      }
-
-      if (record.description) textParts.push(`\nAçıklama:\n${record.description}`);
-      if (record.notes) textParts.push(`\nNotlar:\n${record.notes}`);
-      
-      const shareData: ShareData = {
-        title: p.titleRaw || 'Ürün',
-        text: textParts.join('\n'),
-      };
-
-      if (record.images.length > 0 && navigator.canShare) {
-        try {
-          const img = record.images[0];
-          const response = await fetch(productImageUrl(record.id, img.fileName, undefined, img.folder));
-          const blob = await response.blob();
-          const file = new File([blob], `product-${record.id}.jpg`, { type: blob.type || 'image/jpeg' });
-          if (navigator.canShare({ files: [file] })) {
-            shareData.files = [file];
-          }
-        } catch (err) {
-          console.warn("Could not attach image to share:", err);
-        }
-      }
-
+      // Try Web Share API (mobile / supported browsers)
       if (navigator.share) {
+        const shareData: ShareData = { title, text: shareText };
+
+        // Try to attach ALL product images as files
+        if (record.images.length > 0 && navigator.canShare) {
+          try {
+            const files = await Promise.all(
+              record.images.map(async (img, idx) => {
+                const response = await fetch(productImageUrl(record.id, img.fileName, undefined, img.folder));
+                const blob = await response.blob();
+                const ext = blob.type.includes("png") ? "png" : "jpg";
+                return new File([blob], `product-${record.id}-${idx + 1}.${ext}`, { type: blob.type || "image/jpeg" });
+              })
+            );
+            if (navigator.canShare({ files })) {
+              shareData.files = files;
+            } else if (files.length > 0 && navigator.canShare({ files: [files[0]] })) {
+              // Fallback: share only the first image if browser rejects all
+              shareData.files = [files[0]];
+            }
+          } catch (imgErr) {
+            console.warn("Could not attach images to share:", imgErr);
+          }
+        }
+
         await navigator.share(shareData);
       } else {
-        showToast("Tarayıcınız paylaşım özelliğini desteklemiyor.", "error");
+        // Desktop fallback: copy text to clipboard and show modal
+        try {
+          await navigator.clipboard.writeText(shareText);
+          setShareClipboardText(shareText);
+          showToast((t as any).shareTextCopied || "Ürün bilgileri panoya kopyalandı!", "success");
+        } catch (clipErr) {
+          // Last resort: show modal so user can copy manually
+          setShareClipboardText(shareText);
+        }
       }
-    } catch (err) {
-      console.error("Share failed:", err);
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        console.error("Share failed:", err);
+        showToast((t as any).shareFailed || "Paylaşım başarısız oldu.", "error");
+      }
+    } finally {
+      setShareBusy(false);
     }
   }
+
 
   async function handleVerifyUnlock(e: React.FormEvent) {
     e.preventDefault();
@@ -721,10 +753,10 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
               </button>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={handleShare}
-                className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition", s.controlGroup, s.controlIdle)}
-                title="Paylaş">
-                <Share2 className="size-4" />
+              <button type="button" onClick={handleShare} disabled={shareBusy}
+                className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition disabled:opacity-60", s.controlGroup, s.controlIdle)}
+                title={(t as any).shareBtn || "Paylaş"}>
+                {shareBusy ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
               </button>
               <button type="button" onClick={onClose}
                 className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition", s.controlGroup, s.controlIdle)}>
@@ -1873,6 +1905,47 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 </button>
                 <button type="button" onClick={() => { setShowShopifyPreview(false); handlePushToShopify(); }} disabled={busy} className="bg-emerald-600 hover:bg-purple-500 text-white px-4 py-2 text-xs font-bold rounded-lg transition disabled:opacity-50">
                   {busy ? <Loader2 className="size-4 animate-spin" /> : (shopifySynced ? t.shopifyUpdateConfirm : t.shopifyConfirm)}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Clipboard Modal (Desktop fallback) */}
+      {shareClipboardText !== null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setShareClipboardText(null)}>
+          <div className={cn("w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden", s.panel)} onClick={(e) => e.stopPropagation()}>
+            <div className={cn("flex items-center justify-between border-b px-4 py-3", s.panelBorder)}>
+              <h2 className={cn("text-sm font-black flex items-center gap-2", s.title)}>
+                <Share2 className="size-4 text-emerald-500" />
+                {(t as any).shareBtn || "Paylaş"}
+              </h2>
+              <button type="button" onClick={() => setShareClipboardText(null)} className={cn("rounded-lg p-1 transition", s.controlIdle)}>
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="grid gap-3 p-4">
+              <p className={cn("text-xs leading-5", s.muted)}>
+                {(t as any).shareDesktopHint || "Bilgisayarda direkt paylaşım desteklenmiyor. Ürün bilgileri panoya kopyalandı. Aşağıdan da kopyalayabilirsiniz:"}
+              </p>
+              <div className={cn("max-h-60 overflow-y-auto rounded-xl border p-3 text-xs font-mono leading-5 whitespace-pre-wrap select-all", s.panelBorder, s.muted)}>
+                {shareClipboardText}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShareClipboardText(null)} className={cn("px-4 py-2 text-xs font-bold rounded-lg border transition", s.controlIdle)}>
+                  {t.close}
+                </button>
+                <button type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(shareClipboardText);
+                      showToast((t as any).shareTextCopied || "Kopyalandı!", "success");
+                    } catch { /* ignore */ }
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition">
+                  <Copy className="size-3.5" />
+                  {(t as any).btnCopy || "Kopyala"}
                 </button>
               </div>
             </div>
