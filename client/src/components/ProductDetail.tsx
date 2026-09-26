@@ -2022,7 +2022,7 @@ const shareConfigLabels: Record<string, string> = {
                           )}
                         >
                           <img 
-                            src={productImageUrl(record.id, img.fileName, 200, img.folder)} 
+                            src={productImageUrl(record.id, img.fileName, "thumbnails", img.folder)} 
                             className="size-full object-cover"
                             alt="preview"
                           />
@@ -2043,7 +2043,7 @@ const shareConfigLabels: Record<string, string> = {
                 onClick={() => setShareOptionsOpen(false)} 
                 className={cn("px-4 py-2.5 text-xs font-bold rounded-xl transition", s.controlIdle)}
               >
-                {t.cancel}
+                {(t as any).cancel || "İptal"}
               </button>
               <button 
                 type="button" 
