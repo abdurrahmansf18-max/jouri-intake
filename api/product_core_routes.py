@@ -172,8 +172,8 @@ async def visual_search_products_endpoint(
 @router.post("/api/products", response_model=ProductRecord)
 async def create_product(
     _: Annotated[None, Depends(verify_access)],
-    db: Session = Depends(get_db),
     background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
     description: Annotated[str, Form()] = "",
     images: Annotated[list[UploadFile], File()] = [],
     titleRaw: Annotated[str | None, Form()] = None,
