@@ -1,5 +1,6 @@
 import { Barcode, Camera, ImageUp, Loader2, Search, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { visualSearchProducts } from "../api";
 import { cn, COPY } from "../i18n";
 import { productImageUrl } from "../api";
@@ -58,9 +59,9 @@ export default function SmartSearchPanel({ s, t, onBarcode, onOpenProduct }: Pro
         }}
       />
 
-      {barcodeOpen && (
-        <div className="fixed inset-0 z-[70] grid place-items-end bg-black/60 p-3 sm:place-items-center" onClick={() => setBarcodeOpen(false)}>
-          <div className={cn("smart-pop w-full max-w-md rounded-2xl border p-4 shadow-2xl", s.panel)} onClick={(e) => e.stopPropagation()}>
+      {barcodeOpen && createPortal(
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" onClick={() => setBarcodeOpen(false)}>
+          <div className={cn("w-full max-w-md rounded-2xl border p-4 shadow-2xl", s.panel)} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className={cn("flex items-center gap-2 text-sm font-black", s.title)}><Barcode className="size-4 text-emerald-400" /> {t.searchByBarcode}</h3>
               <button type="button" onClick={() => setBarcodeOpen(false)} className={cn("grid size-8 place-items-center rounded-lg border", s.controlGroup, s.controlIdle)}>
@@ -73,10 +74,11 @@ export default function SmartSearchPanel({ s, t, onBarcode, onOpenProduct }: Pro
               <button type="submit" className={cn("grid size-11 place-items-center rounded-xl", s.primary)}><Search className="size-4" /></button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {visualOpen && (
+      {visualOpen && createPortal(
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" onClick={() => setVisualOpen(false)}>
           <div className={cn("flex w-full max-w-2xl flex-col rounded-2xl border shadow-2xl", s.panel)} style={{ maxHeight: "min(86dvh, 600px)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -108,7 +110,8 @@ export default function SmartSearchPanel({ s, t, onBarcode, onOpenProduct }: Pro
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
