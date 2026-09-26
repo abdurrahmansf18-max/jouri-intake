@@ -25,7 +25,7 @@ export default function ProductsPage() {
 
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [hideSold, setHideSold] = useState(true);
-  const [onlyDiscounted, setOnlyDiscounted] = useState(false);
+  const [hideDiscounted, setHideDiscounted] = useState(false);
   const [onlyUnsynced, setOnlyUnsynced] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
@@ -184,13 +184,13 @@ export default function ProductsPage() {
   }, [recordsForSeasonCounts]);
 
   // Filtre veya arama değişince sayfa 1'e dön
-  useEffect(() => { setPage(1); }, [filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold, onlyDiscounted]);
+  useEffect(() => { setPage(1); }, [filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold, hideDiscounted]);
 
   const searchResults = useMemo(() => {
     const filterScoped = records.filter((r: ProductRecord) => {
       if (filter !== "all" && r.status !== filter) return false;
       if (onlyUnsynced && (r.status !== "published" || r.shopify?.productId)) return false;
-      if (onlyDiscounted && !r.isDiscounted) return false;
+      if (hideDiscounted && r.isDiscounted) return false;
 
       const cat = normalizeCategory(r.parsed?.categorySuggestion ?? "");
       if (categoryFilter === "uncategorized" && cat) return false;
@@ -207,7 +207,7 @@ export default function ProductsPage() {
       return true;
     });
     return searchProducts(filterScoped, search);
-  }, [records, filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold, onlyDiscounted]);
+  }, [records, filter, onlyUnsynced, search, categoryFilter, typeFilter, seasonFilter, hideSold, hideDiscounted]);
 
   const filtered = useMemo(() => searchResults.map((result) => result.record), [searchResults]);
   const searchMatchesById = useMemo(
@@ -316,11 +316,11 @@ export default function ProductsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setOnlyDiscounted(!onlyDiscounted)}
-                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", onlyDiscounted ? s.filterActive : s.filterIdle)}>
-                {onlyDiscounted ? "Tümünü Göster" : "İndirimli Ürünler"}
+                onClick={() => setHideDiscounted(!hideDiscounted)}
+                className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold transition", !hideDiscounted ? s.filterActive : s.filterIdle)}>
+                {hideDiscounted ? "İndirimlileri Göster" : "İndirimlileri Gizle"}
                 <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-black",
-                  onlyDiscounted ? "bg-white/20" : "bg-white/5")}>
+                  !hideDiscounted ? "bg-white/20" : "bg-white/5")}>
                   {discountedCount}
                 </span>
               </button>
