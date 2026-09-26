@@ -1776,10 +1776,12 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                     <label className={cn("mb-3 grid cursor-pointer place-items-center rounded-xl border border-dashed px-4 py-4 text-center transition", s.dropzone)}>
                       <input className="sr-only" type="file" accept="image/*" multiple
                         onChange={(e) => {
+                          const savedScroll = scrollRef.current?.scrollTop ?? 0;
                           const sel = Array.from(e.currentTarget.files ?? []);
                           setImageFiles(sel);
                           setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return sel.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })); });
                           e.currentTarget.value = "";
+                          requestAnimationFrame(() => { scrollRef.current?.scrollTo({ top: savedScroll, behavior: "auto" }); });
                         }} />
                       <span className={cn("mb-2 flex size-10 items-center justify-center rounded-xl ring-1", s.dropIcon)}>
                         <ImagePlus className="size-4" />
