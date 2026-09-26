@@ -51,7 +51,6 @@ export default function SmartSearchPanel({ s, t, onBarcode, onOpenProduct }: Pro
         ref={visualInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="sr-only"
         onChange={(e) => {
           handleVisualFile(e.currentTarget.files?.[0] ?? null);
@@ -139,7 +138,7 @@ function BarcodeCamera({ onDetected, s, t }: { onDetected: (code: string) => voi
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
         {t.openCameraScanBarcode}
       </button>
-      <input ref={inputRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => { scan(e.currentTarget.files?.[0] ?? null); e.currentTarget.value = ""; }} />
+      <input ref={inputRef} type="file" accept="image/*" className="sr-only" onChange={(e) => { scan(e.currentTarget.files?.[0] ?? null); e.currentTarget.value = ""; }} />
       <p className={cn("mt-2 text-xs leading-5", s.muted)}>{t.barcodeScanHelp}</p>
     </div>
   );

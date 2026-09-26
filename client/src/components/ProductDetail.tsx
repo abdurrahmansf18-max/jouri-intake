@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore, Box, CalendarDays, ChevronLeft, ChevronRight, Edit3,
   ImagePlus, Images, Lock, Loader2, Palette, Plus, ReceiptText,
-  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles, Bot, ClipboardList, Check, Copy, Wand2
+  RotateCcw, Ruler, Save, ShoppingBag, Tag, Trash2, Unlock, X, Sparkles, Bot, ClipboardList, Check, Copy, Wand2, Share2
 } from "lucide-react";
 import {
   addProductImages, deleteProduct, deleteProductImage,
@@ -567,6 +567,42 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
   // Satış için geçerli bedenler (stok > 0)
   const availableSizes = record.sizeStocks.filter((ss) => ss.qty > 0);
 
+  async function handleShare() {
+    try {
+      const textParts = [];
+      if (p.titleRaw) textParts.push(`*${p.titleRaw}*`);
+      if (p.categorySuggestion && p.categorySuggestion !== "Diğer") textParts.push(`Kategori: ${p.categorySuggestion}`);
+      if (p.priceAmount) textParts.push(`Fiyat: ${p.priceAmount} EUR`);
+      
+      const shareData: ShareData = {
+        title: p.titleRaw || 'Ürün',
+        text: textParts.join('\n'),
+      };
+
+      if (record.images.length > 0 && navigator.canShare) {
+        try {
+          const img = record.images[0];
+          const response = await fetch(productImageUrl(record.id, img.fileName, undefined, img.folder));
+          const blob = await response.blob();
+          const file = new File([blob], `product-${record.id}.jpg`, { type: blob.type || 'image/jpeg' });
+          if (navigator.canShare({ files: [file] })) {
+            shareData.files = [file];
+          }
+        } catch (err) {
+          console.warn("Could not attach image to share:", err);
+        }
+      }
+
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        showToast("Tarayıcınız paylaşım özelliğini desteklemiyor.", "error");
+      }
+    } catch (err) {
+      console.error("Share failed:", err);
+    }
+  }
+
   async function handleVerifyUnlock(e: React.FormEvent) {
     e.preventDefault();
     setUnlockBusy(true);
@@ -654,10 +690,17 @@ export default function ProductDetail({ record, initialMode = "view", onClose, o
                 {t.editBtn}
               </button>
             </div>
-            <button type="button" onClick={onClose}
-              className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition", s.controlGroup, s.controlIdle)}>
-              <X className="size-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={handleShare}
+                className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition", s.controlGroup, s.controlIdle)}
+                title="Paylaş">
+                <Share2 className="size-4" />
+              </button>
+              <button type="button" onClick={onClose}
+                className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition", s.controlGroup, s.controlIdle)}>
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
 
           {/* Mobil tab */}
