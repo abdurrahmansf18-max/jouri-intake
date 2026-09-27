@@ -905,14 +905,6 @@ const shareConfigLabels: Record<string, string> = {
                       </span>
                     </InfoRow>}
 
-                    {/* Kumaş Türü */}
-                    {p.fabricType && <InfoRow label={(t as any).fabricType || "Kumaş Türü"} s={s}>
-                      <span className="inline-flex items-center gap-1">
-                        <Tag className="size-3 text-indigo-400" />
-                        <span dir="auto">{p.fabricType}</span>
-                      </span>
-                    </InfoRow>}
-
                     {/* Bedenler + Toplam stok — yan yana */}
                     {record.sizeStocks.length > 0 ? (
                       <div className="grid grid-cols-2 gap-0 py-2.5">
@@ -1817,13 +1809,14 @@ const shareConfigLabels: Record<string, string> = {
                   )}
 
                   {!isImageLocked && (
-                    <label className={cn("mb-3 grid cursor-pointer place-items-center rounded-xl border border-dashed px-4 py-4 text-center transition", s.dropzone)}>
+                    <label className={cn("mb-3 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-4 py-4 text-center transition", s.dropzone)}>
                       <input className="sr-only" type="file" accept="image/*" multiple
                         onChange={(e) => {
                           const savedScroll = scrollRef.current?.scrollTop ?? 0;
                           const sel = Array.from(e.currentTarget.files ?? []);
+                          const newPreviews = sel.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
                           setImageFiles(sel);
-                          setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return sel.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })); });
+                          setImagePreviews((c) => { c.forEach((p) => URL.revokeObjectURL(p.url)); return newPreviews; });
                           e.currentTarget.value = "";
                           requestAnimationFrame(() => { scrollRef.current?.scrollTo({ top: savedScroll, behavior: "auto" }); });
                         }} />

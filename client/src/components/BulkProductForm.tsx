@@ -104,11 +104,15 @@ export default function BulkProductForm({ initialCards }: { initialCards?: BulkD
     setCards((prev) => prev.map((c) => {
       if (c.id !== id) return c;
       const combined = [...c.files, ...newFiles].slice(0, 5);
-      c.previews.forEach((p) => URL.revokeObjectURL(p.url));
+      // Revoke old previews synchronously before creating new ones
+      const oldPreviews = c.previews;
+      const newPreviews = combined.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
+      // Revoke after creating new ones to avoid blank flash
+      requestAnimationFrame(() => { oldPreviews.forEach((p) => URL.revokeObjectURL(p.url)); });
       return {
         ...c,
         files: combined,
-        previews: combined.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })),
+        previews: newPreviews,
         error: undefined,
       };
     }));
